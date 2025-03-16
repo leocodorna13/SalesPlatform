@@ -16,10 +16,10 @@ if (Astro.request.method === 'POST') {
     
     // Extrair dados do produto
     const productData = {
-      title: formData.get('title'),
-      description: formData.get('description'),
-      price: parseFloat(formData.get('price')),
-      category_id: formData.get('category_id')
+      title: formData.get('title')?.toString() || '',
+      description: formData.get('description')?.toString() || '',
+      price: parseFloat(formData.get('price')?.toString() || '0'),
+      category_id: formData.get('category_id')?.toString() || null
     };
     
     // Extrair arquivos de imagem
@@ -148,33 +148,68 @@ if (Astro.request.method === 'POST') {
   )}
 </AdminLayout>
 
-<script>
-  // Manipular o envio do formulário para incluir as imagens
-  document.getElementById('product-form')?.addEventListener('submit', (e) => {
-    e.preventDefault();
+<script is:inline>
+  // Aguardar o carregamento completo do DOM
+  window.addEventListener('DOMContentLoaded', () => {
+    console.log('Script de formulário inicializado');
     
-    const form = e.target;
-    const formData = new FormData(form);
+    const form = document.getElementById('product-form');
+    if (!form) {
+      console.error('Formulário não encontrado');
+      return;
+    }
     
-    // Adicionar as imagens do uploader
-    if (window.getUploadedFiles) {
-      const files = window.getUploadedFiles();
+    console.log('Formulário encontrado:', form);
+    
+    form.addEventListener('submit', (e) => {
+      e.preventDefault();
+      console.log('Formulário enviado');
       
-      if (files.length === 0) {
-        alert('Por favor, adicione pelo menos uma imagem do produto.');
+      // Verificar se a função getUploadedFiles existe
+      if (typeof window.getUploadedFiles !== 'function') {
+        console.error('Função getUploadedFiles não encontrada');
+        alert('Erro ao processar imagens. Recarregue a página e tente novamente.');
         return;
       }
       
-      // Remover o campo de imagens existente (se houver)
-      formData.delete('images');
-      
-      // Adicionar cada arquivo ao FormData
-      files.forEach(file => {
-        formData.append('images', file);
-      });
-    }
-    
-    // Enviar o formulário
-    form.submit();
+      try {
+        // Obter os arquivos do uploader
+        const files = window.getUploadedFiles();
+        console.log('Arquivos capturados pelo uploader:', files);
+        
+        if (files.length === 0) {
+          alert('Por favor, adicione pelo menos uma imagem do produto.');
+          return;
+        }
+        
+        // Criar FormData com os dados do formulário
+        const formData = new FormData(form);
+        
+        // Remover o campo de imagens existente (se houver)
+        formData.delete('images');
+        
+        // Adicionar cada arquivo ao FormData
+        files.forEach((file) => {
+          console.log('Adicionando arquivo ao FormData:', file.name, file.type, file.size);
+          formData.append('images', file);
+        });
+        
+        // Debug: verificar o conteúdo do FormData
+        console.log('FormData entries:');
+        for (const [key, value] of formData.entries()) {
+          if (key === 'images') {
+            console.log(key, ':', value instanceof File ? `File: ${value.name} (${value.size} bytes)` : value);
+          } else {
+            console.log(key, ':', value);
+          }
+        }
+        
+        // Enviar o formulário
+        form.submit();
+      } catch (error) {
+        console.error('Erro ao processar imagens:', error);
+        alert('Ocorreu um erro ao processar as imagens. Tente novamente.');
+      }
+    });
   });
 </script>

@@ -8,12 +8,12 @@ interface Props {
   category: {
     name: string;
     slug: string;
-  };
+  } | null;
   viewsCount: number;
   interestCount: number;
 }
 
-const { id, title, price, status, imageUrl, category, viewsCount, interestCount } = Astro.props;
+const { id, title, price, status, imageUrl, category, viewsCount = 0, interestCount = 0 } = Astro.props;
 
 // Formatar preço
 const formattedPrice = new Intl.NumberFormat('pt-BR', {
@@ -45,14 +45,14 @@ const formattedPrice = new Intl.NumberFormat('pt-BR', {
   <div class="p-4">
     <div class="flex justify-between items-start mb-2">
       <h3 class="text-lg font-medium text-gray-900 line-clamp-2 m-0">{title}</h3>
-      <span class="badge badge-available">{category.name}</span>
+      {category && category.name && <span class="badge badge-available">{category.name}</span>}
     </div>
     
     <p class="text-xl font-bold text-primary-700 mb-3">{formattedPrice}</p>
     
     <div class="flex justify-between text-sm text-gray-500">
-      <span>{viewsCount} visualizações</span>
-      <span>{interestCount} interessados</span>
+      <span>{viewsCount || 0} visualizações</span>
+      <span>{interestCount || 0} interessados</span>
     </div>
     
     <a 

@@ -1,6 +1,12 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import { getProducts, updateProductStatus, deleteProduct } from '../../services/supabase';
+import { getProducts, updateProductStatus, deleteProduct, testImageUpload, getCurrentUser } from '../../services/supabase';
+
+// Verificar autenticação primeiro
+const user = await getCurrentUser();
+if (!user) {
+  return Astro.redirect('/admin/login?redirect=' + encodeURIComponent(Astro.url.pathname));
+}
 
 // Interface para imagem do produto
 interface ProductImage {
@@ -8,10 +14,7 @@ interface ProductImage {
   is_primary: boolean;
 }
 
-// Buscar todos os produtos
-const products = await getProducts();
-
-// Processar ações
+// Processar ações do formulário
 let message = '';
 let messageType = '';
 let actionResult = null;
@@ -19,8 +22,8 @@ let actionResult = null;
 if (Astro.request.method === 'POST') {
   try {
     const formData = await Astro.request.formData();
-    const action = formData.get('action') as string | null;
-    const productId = formData.get('productId') as string | null;
+    const action = formData.get('action')?.toString();
+    const productId = formData.get('productId')?.toString();
     
     console.log(`Processando ação: ${action} para produto: ${productId}`);
     
@@ -42,13 +45,32 @@ if (Astro.request.method === 'POST') {
         ? 'Produto excluído com sucesso!' 
         : 'Falha ao excluir produto. Verifique o console para mais detalhes.';
       messageType = actionResult ? 'success' : 'error';
+    } else if (action === 'test-upload') {
+      // Testar upload de imagem
+      const result = await testImageUpload();
+      
+      if (result && typeof result === 'object') {
+        const success = 'success' in result ? result.success : false;
+        const errorDetails = 'error' in result ? result.error : null;
+        
+        message = success 
+          ? 'Teste de upload concluído com sucesso! O sistema de armazenamento de imagens está funcionando corretamente.'
+          : `Erro no teste de upload: ${errorDetails ? (typeof errorDetails === 'string' ? errorDetails : JSON.stringify(errorDetails)) : 'Erro desconhecido'}`;
+        messageType = success ? 'success' : 'error';
+      } else {
+        message = 'Resultado do teste de upload inválido';
+        messageType = 'error';
+      }
     }
   } catch (error) {
     console.error('Erro ao processar ação:', error);
-    message = 'Ocorreu um erro ao processar a ação. Tente novamente.';
+    message = `Erro ao processar ação: ${error instanceof Error ? error.message : String(error)}`;
     messageType = 'error';
   }
 }
+
+// Buscar todos os produtos
+const products = await getProducts();
 
 // Formatar preço
 const formatPrice = (price: number): string => {
@@ -77,6 +99,19 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
         Novo Produto
       </span>
     </a>
+    <button 
+      type="button"
+      class="text-gray-400 hover:text-gray-500"
+      title="Testar Upload de Imagem"
+      onclick="document.getElementById('test-upload-form').submit()"
+    >
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L20 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-2-4h6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2m0-1h6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2a2 2 0 012 2v2" />
+      </svg>
+    </button>
+    <form id="test-upload-form" method="POST">
+      <input type="hidden" name="action" value="test-upload">
+    </form>
   </div>
   
   {message && (
@@ -129,7 +164,7 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
             
             <div class="flex-1">
               <h3 class="font-medium text-gray-900">{product.title}</h3>
-              <p class="text-sm text-gray-500">{product.categories.name}</p>
+              <p class="text-sm text-gray-500">{product.categories?.name || 'Sem categoria'}</p>
             </div>
             
             <div class="w-32 font-medium text-gray-900">
@@ -213,146 +248,67 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
       </div>
     )}
   </div>
-  
-  <!-- Modal de confirmação para marcar como vendido -->
-  <div id="status-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
-    <div class="bg-white rounded-lg max-w-md w-full p-6">
-      <h3 class="text-lg font-medium text-gray-900 mb-4" id="status-modal-title">Marcar produto como vendido?</h3>
-      <p class="text-gray-500 mb-6" id="status-modal-message">
-        Tem certeza que deseja marcar este produto como vendido? Ele continuará visível no site, mas com uma tarja de "Vendido".
-      </p>
-      <form method="POST" id="status-form">
-        <input type="hidden" name="action" id="status-action" value="mark-sold">
-        <input type="hidden" name="productId" id="status-product-id">
-        <div class="flex justify-end space-x-3">
-          <button 
-            type="button" 
-            class="btn btn-outline" 
-            id="status-cancel"
-          >
-            Cancelar
-          </button>
-          <button 
-            type="submit" 
-            class="btn btn-primary" 
-            id="status-confirm"
-          >
-            Confirmar
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
-  
-  <!-- Modal de confirmação para excluir -->
-  <div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden z-50">
-    <div class="bg-white rounded-lg max-w-md w-full p-6">
-      <h3 class="text-lg font-medium text-gray-900 mb-4">Excluir produto?</h3>
-      <p class="text-gray-500 mb-6" id="delete-modal-message">
-        Tem certeza que deseja excluir este produto? Esta ação não pode ser desfeita.
-      </p>
-      <form method="POST" id="delete-form">
-        <input type="hidden" name="action" value="delete">
-        <input type="hidden" name="productId" id="delete-product-id">
-        <div class="flex justify-end space-x-3">
-          <button 
-            type="button" 
-            class="btn btn-outline" 
-            id="delete-cancel"
-          >
-            Cancelar
-          </button>
-          <button 
-            type="submit" 
-            class="btn btn-danger" 
-            id="delete-confirm"
-          >
-            Excluir
-          </button>
-        </div>
-      </form>
-    </div>
-  </div>
 </AdminLayout>
 
 <script>
   // Elementos do DOM
-  const statusToggles = document.querySelectorAll('.status-toggle');
+  const statusButtons = document.querySelectorAll('.status-toggle');
   const deleteButtons = document.querySelectorAll('.delete-product');
   
-  const statusModal = document.getElementById('status-modal') as HTMLElement;
-  const statusModalTitle = document.getElementById('status-modal-title') as HTMLElement;
-  const statusModalMessage = document.getElementById('status-modal-message') as HTMLElement;
-  const statusAction = document.getElementById('status-action') as HTMLInputElement;
-  const statusProductId = document.getElementById('status-product-id') as HTMLInputElement;
-  const statusCancel = document.getElementById('status-cancel') as HTMLElement;
-  
-  const deleteModal = document.getElementById('delete-modal') as HTMLElement;
-  const deleteModalMessage = document.getElementById('delete-modal-message') as HTMLElement;
-  const deleteProductId = document.getElementById('delete-product-id') as HTMLInputElement;
-  const deleteCancel = document.getElementById('delete-cancel') as HTMLElement;
-  
-  // Funções para mostrar/esconder modais
-  function showStatusModal(productId: string, currentStatus: string): void {
-    if (currentStatus === 'available') {
-      if (statusModalTitle) statusModalTitle.textContent = 'Marcar produto como vendido?';
-      if (statusModalMessage) statusModalMessage.textContent = 'Tem certeza que deseja marcar este produto como vendido? Ele continuará visível no site, mas com uma tarja de "Vendido".';
-      if (statusAction) statusAction.value = 'mark-sold';
-    } else {
-      if (statusModalTitle) statusModalTitle.textContent = 'Marcar produto como disponível?';
-      if (statusModalMessage) statusModalMessage.textContent = 'Tem certeza que deseja marcar este produto como disponível novamente?';
-      if (statusAction) statusAction.value = 'mark-available';
+  // Função para recarregar a página após uma ação bem-sucedida
+  const reloadAfterAction = async (formData: FormData) => {
+    try {
+      const response = await fetch('/admin/produtos', {
+        method: 'POST',
+        body: formData
+      });
+      
+      if (response.ok) {
+        // Recarregar a página para mostrar as alterações
+        window.location.reload();
+      } else {
+        console.error('Erro ao executar ação:', response.statusText);
+        alert('Ocorreu um erro ao executar a ação. Tente novamente.');
+      }
+    } catch (error) {
+      console.error('Erro ao executar ação:', error);
+      alert('Ocorreu um erro ao executar a ação. Tente novamente.');
     }
-    
-    if (statusProductId) statusProductId.value = productId;
-    if (statusModal) statusModal.classList.remove('hidden');
-  }
+  };
   
-  function hideStatusModal(): void {
-    if (statusModal) statusModal.classList.add('hidden');
-  }
-  
-  function showDeleteModal(productId: string, productTitle: string): void {
-    if (deleteModalMessage) deleteModalMessage.textContent = `Tem certeza que deseja excluir o produto "${productTitle}"? Esta ação não pode ser desfeita.`;
-    if (deleteProductId) deleteProductId.value = productId;
-    if (deleteModal) deleteModal.classList.remove('hidden');
-  }
-  
-  function hideDeleteModal(): void {
-    if (deleteModal) deleteModal.classList.add('hidden');
-  }
-  
-  // Event listeners
-  statusToggles.forEach(button => {
+  // Adicionar event listeners aos botões de alteração de status
+  statusButtons.forEach(button => {
     button.addEventListener('click', () => {
-      const productId = button.getAttribute('data-product-id');
-      const currentStatus = button.getAttribute('data-current-status');
-      if (productId && currentStatus) {
-        showStatusModal(productId, currentStatus);
+      const element = button as HTMLElement;
+      const productId = element.dataset.productId;
+      const currentStatus = element.dataset.currentStatus;
+      const newStatus = currentStatus === 'available' ? 'sold' : 'available';
+      const action = currentStatus === 'available' ? 'mark-sold' : 'mark-available';
+      
+      if (confirm(`Deseja realmente marcar este produto como ${newStatus === 'available' ? 'disponível' : 'vendido'}?`)) {
+        const formData = new FormData();
+        formData.append('action', action);
+        formData.append('productId', productId || '');
+        
+        reloadAfterAction(formData);
       }
     });
   });
   
+  // Adicionar event listeners aos botões de exclusão
   deleteButtons.forEach(button => {
     button.addEventListener('click', () => {
-      const productId = button.getAttribute('data-product-id');
-      const productTitle = button.getAttribute('data-product-title');
-      if (productId && productTitle) {
-        showDeleteModal(productId, productTitle);
+      const element = button as HTMLElement;
+      const productId = element.dataset.productId;
+      const productTitle = element.dataset.productTitle;
+      
+      if (confirm(`Deseja realmente excluir o produto "${productTitle}"? Esta ação não pode ser desfeita.`)) {
+        const formData = new FormData();
+        formData.append('action', 'delete');
+        formData.append('productId', productId || '');
+        
+        reloadAfterAction(formData);
       }
     });
-  });
-  
-  statusCancel?.addEventListener('click', hideStatusModal);
-  deleteCancel?.addEventListener('click', hideDeleteModal);
-  
-  // Fechar modais ao clicar fora
-  window.addEventListener('click', (e) => {
-    if (e.target === statusModal) {
-      hideStatusModal();
-    }
-    if (e.target === deleteModal) {
-      hideDeleteModal();
-    }
   });
 </script>

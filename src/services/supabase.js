@@ -186,6 +186,28 @@ export async function getProductById(id) {
  */
 export async function createProduct(productData, imageFiles) {
   try {
+    console.log('Criando produto:', productData);
+    console.log('Arquivos de imagem recebidos:', imageFiles);
+    
+    // Garantir que o bucket existe
+    await createBucketIfNotExists('product-images');
+    
+    // Verificar se os arquivos são válidos
+    const validFiles = [];
+    if (imageFiles && imageFiles.length > 0) {
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        // Verificar se é um objeto File válido
+        if (file && typeof file === 'object' && 'name' in file && 'type' in file && 'size' in file && file.size > 0) {
+          validFiles.push(file);
+        } else {
+          console.warn('Arquivo inválido ignorado:', file);
+        }
+      }
+    }
+    
+    console.log(`${validFiles.length} arquivos válidos encontrados`);
+    
     // Criar o produto
     const { data: product, error } = await supabase
       .from('products')
@@ -193,46 +215,137 @@ export async function createProduct(productData, imageFiles) {
         title: productData.title,
         description: productData.description,
         price: productData.price,
-        category_id: productData.category_id,
+        category_id: productData.category_id || null, // Permitir categoria nula
         status: 'available'
       }])
       .select()
       .single();
     
     if (error) throw error;
+    console.log('Produto criado com sucesso:', product);
     
     // Fazer upload das imagens
-    if (imageFiles && imageFiles.length > 0) {
-      for (let i = 0; i < imageFiles.length; i++) {
-        const file = imageFiles[i];
-        if (!file || file.size === 0) continue;
+    if (validFiles.length > 0) {
+      console.log(`Iniciando upload de ${validFiles.length} imagens`);
+      
+      const uploadedImages = [];
+      
+      for (let i = 0; i < validFiles.length; i++) {
+        const file = validFiles[i];
+        console.log(`Processando imagem ${i+1}/${validFiles.length}:`, file.name, file.type, file.size);
         
-        const fileExt = file.name.split('.').pop();
-        const fileName = `${product.id}/${Date.now()}.${fileExt}`;
-        const filePath = `products/${fileName}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('product-images')
-          .upload(filePath, file);
-        
-        if (uploadError) {
-          console.error('Erro ao fazer upload da imagem:', uploadError);
-          continue;
+        try {
+          // Gerar nome de arquivo único
+          const fileExt = file.name.split('.').pop();
+          const timestamp = new Date().getTime();
+          const fileName = `${product.id}/${timestamp}-${i}.${fileExt}`;
+          const filePath = `products/${fileName}`;
+          
+          console.log('Caminho do arquivo no storage:', filePath);
+          
+          // Converter para Blob usando fetch API (mais confiável)
+          let fileBlob;
+          if (file instanceof Blob) {
+            fileBlob = file;
+            console.log('Arquivo já é um Blob');
+          } else {
+            console.log('Tentando converter arquivo para Blob usando ArrayBuffer');
+            try {
+              // Método 1: Usando ArrayBuffer
+              const arrayBuffer = await file.arrayBuffer();
+              fileBlob = new Blob([arrayBuffer], { type: file.type });
+            } catch (blobError) {
+              console.warn('Erro ao converter para Blob usando ArrayBuffer:', blobError);
+              
+              try {
+                // Método 2: Usando FileReader
+                console.log('Tentando converter usando FileReader');
+                const reader = new FileReader();
+                const fileData = await new Promise((resolve, reject) => {
+                  reader.onload = () => resolve(reader.result);
+                  reader.onerror = reject;
+                  reader.readAsArrayBuffer(file);
+                });
+                
+                fileBlob = new Blob([fileData], { type: file.type });
+              } catch (readerError) {
+                console.error('Erro ao converter usando FileReader:', readerError);
+                // Método 3: Último recurso - usar o arquivo original
+                fileBlob = file;
+              }
+            }
+          }
+          
+          console.log('Blob preparado para upload:', fileBlob.size, fileBlob.type);
+          
+          // Fazer upload do arquivo
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('product-images')
+            .upload(filePath, fileBlob, {
+              cacheControl: '3600',
+              upsert: true, // Usar upsert para substituir se existir
+              contentType: file.type
+            });
+          
+          if (uploadError) {
+            console.error('Erro ao fazer upload da imagem:', uploadError);
+            continue;
+          }
+          
+          console.log('Upload concluído com sucesso:', uploadData);
+          
+          // Obter URL pública
+          const { data: publicURLData } = supabase.storage
+            .from('product-images')
+            .getPublicUrl(filePath);
+          
+          const publicUrl = publicURLData?.publicUrl;
+          console.log('URL pública gerada:', publicUrl);
+          
+          if (!publicUrl) {
+            console.error('Falha ao gerar URL pública para a imagem');
+            continue;
+          }
+          
+          // Salvar referência da imagem no banco
+          const { data: imageData, error: imageError } = await supabase
+            .from('product_images')
+            .insert([{
+              product_id: product.id,
+              image_url: publicUrl,
+              is_primary: i === 0 // A primeira imagem é a principal
+            }])
+            .select();
+          
+          if (imageError) {
+            console.error('Erro ao salvar referência da imagem:', imageError);
+          } else {
+            console.log('Referência da imagem salva com sucesso:', imageData);
+            uploadedImages.push({
+              url: publicUrl,
+              isPrimary: i === 0
+            });
+          }
+        } catch (uploadErr) {
+          console.error('Exceção durante o upload:', uploadErr);
         }
-        
-        const { data: publicURL } = supabase.storage
-          .from('product-images')
-          .getPublicUrl(filePath);
-        
-        // Salvar referência da imagem no banco
-        await supabase
-          .from('product_images')
-          .insert([{
-            product_id: product.id,
-            image_url: publicURL.publicUrl,
-            is_primary: i === 0 // A primeira imagem é a principal
-          }]);
       }
+      
+      console.log(`Upload concluído para ${uploadedImages.length} de ${validFiles.length} imagens`);
+      
+      // Atualizar o produto com a contagem de imagens
+      if (uploadedImages.length > 0) {
+        const { error: updateError } = await supabase
+          .from('products')
+          .update({ has_images: true })
+          .eq('id', product.id);
+          
+        if (updateError) {
+          console.error('Erro ao atualizar flag de imagens do produto:', updateError);
+        }
+      }
+    } else {
+      console.log('Nenhuma imagem válida para upload');
     }
     
     return product;
@@ -546,6 +659,128 @@ export async function getDashboardStats() {
       soldProducts: 0,
       totalViews: 0,
       interestedCount: 0
+    };
+  }
+}
+
+/**
+ * Cria um bucket no Supabase Storage se ele não existir
+ * @param {string} bucketName - Nome do bucket a ser criado
+ * @returns {Promise<boolean>} - true se o bucket foi criado ou já existe
+ */
+export async function createBucketIfNotExists(bucketName) {
+  try {
+    // Verificar se o bucket existe
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketExists = buckets.some(bucket => bucket.name === bucketName);
+    
+    if (!bucketExists) {
+      console.log(`Bucket ${bucketName} não existe. Criando...`);
+      const { data, error } = await supabase.storage.createBucket(bucketName, {
+        public: true // Tornar o bucket público
+      });
+      
+      if (error) {
+        console.error('Erro ao criar bucket:', error);
+        return false;
+      }
+      
+      console.log(`Bucket ${bucketName} criado com sucesso:`, data);
+    } else {
+      console.log(`Bucket ${bucketName} já existe.`);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Erro ao verificar/criar bucket:', error);
+    return false;
+  }
+}
+
+/**
+ * Função para testar o upload de imagens para o Supabase Storage
+ * @returns {Promise<{success: boolean, error?: any, url?: string}>}
+ */
+export async function testImageUpload() {
+  console.log('Iniciando teste de upload de imagem...');
+  
+  try {
+    // Verificar se o cliente Supabase está disponível
+    if (!supabase) {
+      console.error('Cliente Supabase não inicializado');
+      return { success: false, error: 'Cliente Supabase não inicializado' };
+    }
+    
+    // Verificar se o bucket existe, criando-o se necessário
+    const { data: buckets } = await supabase.storage.listBuckets();
+    const bucketName = 'product-images';
+    const bucketExists = buckets.some(bucket => bucket.name === bucketName);
+    
+    if (!bucketExists) {
+      console.log(`Bucket '${bucketName}' não encontrado. Criando...`);
+      const { error: createBucketError } = await supabase.storage.createBucket(bucketName, {
+        public: true,
+        fileSizeLimit: 5242880, // 5MB
+      });
+      
+      if (createBucketError) {
+        console.error('Erro ao criar bucket:', createBucketError);
+        return { success: false, error: createBucketError };
+      }
+      
+      console.log(`Bucket '${bucketName}' criado com sucesso`);
+    } else {
+      console.log(`Bucket '${bucketName}' já existe`);
+    }
+    
+    // Criar uma imagem de teste (1x1 pixel transparente em base64)
+    const base64Image = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+P+/HgAFeAJ5jfZixgAAAABJRU5ErkJggg==';
+    
+    // Converter base64 para blob
+    const response = await fetch(base64Image);
+    const blob = await response.blob();
+    
+    // Criar um arquivo a partir do blob
+    const testFile = new File([blob], 'test-image.png', { type: 'image/png' });
+    
+    // Fazer upload do arquivo
+    console.log('Iniciando upload do arquivo de teste...');
+    const timestamp = new Date().getTime();
+    const filePath = `test/test-image-${timestamp}.png`;
+    
+    const { data: uploadData, error: uploadError } = await supabase.storage
+      .from(bucketName)
+      .upload(filePath, testFile, {
+        cacheControl: '3600',
+        upsert: true
+      });
+    
+    if (uploadError) {
+      console.error('Erro ao fazer upload do arquivo de teste:', uploadError);
+      return { success: false, error: uploadError };
+    }
+    
+    console.log('Arquivo de teste enviado com sucesso:', uploadData);
+    
+    // Obter URL pública do arquivo
+    const { data: publicUrlData } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(filePath);
+    
+    const publicUrl = publicUrlData?.publicUrl;
+    console.log('URL pública do arquivo de teste:', publicUrl);
+    
+    return { 
+      success: true, 
+      url: publicUrl,
+      message: 'Teste de upload concluído com sucesso!'
+    };
+    
+  } catch (error) {
+    console.error('Erro durante o teste de upload:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : String(error)
     };
   }
 }

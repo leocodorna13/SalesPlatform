@@ -1,7 +1,13 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import AdminPanel from '../../components/AdminPanel.astro';
-import { supabase } from '../../services/supabase';
+import { supabase, getCurrentUser } from '../../services/supabase';
+
+// Verificar autenticação primeiro
+const user = await getCurrentUser();
+if (!user) {
+  return Astro.redirect('/admin/login?redirect=' + encodeURIComponent(Astro.url.pathname));
+}
 
 // Buscar estatísticas para o dashboard
 const { data: products, error: productsError } = await supabase

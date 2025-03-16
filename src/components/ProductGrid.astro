@@ -9,7 +9,7 @@ interface Product {
   categories: {
     name: string;
     slug: string;
-  };
+  } | null;
   product_images: {
     id: string;
     image_url: string;
@@ -46,9 +46,9 @@ const getMainImage = (images) => {
         price={product.price}
         status={product.status}
         imageUrl={getMainImage(product.product_images)}
-        category={product.categories}
-        viewsCount={product.views_count}
-        interestCount={product.interest_count}
+        category={product.categories || null}
+        viewsCount={product.views_count || 0}
+        interestCount={product.interest_count || 0}
       />
     ))
   ) : (

@@ -114,12 +114,15 @@ if (requireAuth) {
       // Lógica para logout
       document.getElementById('logout-btn')?.addEventListener('click', async () => {
         try {
-          const response = await fetch('/api/auth/logout', {
+          // Usar fetch para chamar a função de logout do Supabase
+          const response = await fetch('/admin/logout-handler', {
             method: 'POST',
           });
           
           if (response.ok) {
             window.location.href = '/admin/login';
+          } else {
+            console.error('Erro ao fazer logout');
           }
         } catch (error) {
           console.error('Erro ao fazer logout:', error);
