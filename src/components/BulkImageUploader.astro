@@ -1,0 +1,318 @@
+---
+---
+
+<div class="space-y-4">
+  <label class="label">Carregamento em massa de produtos</label>
+  
+  <div class="border-dashed border-2 border-gray-300 rounded-lg p-6 text-center" id="bulk-upload-container">
+    <input
+      type="file"
+      id="bulk-product-images"
+      name="bulk-images"
+      accept="image/*"
+      multiple
+      class="hidden"
+    />
+    
+    <label for="bulk-product-images" class="cursor-pointer flex flex-col items-center justify-center">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+      </svg>
+      <span class="text-gray-600 font-medium">Clique para selecionar múltiplas imagens</span>
+      <span class="text-gray-500 text-sm mt-1">ou arraste e solte aqui</span>
+    </label>
+  </div>
+  
+  <!-- Contêiner para lista de imagens e formulários -->
+  <div id="bulk-image-list" class="space-y-6 mt-4"></div>
+  
+  <div class="text-gray-500 text-sm">
+    <p>• Cada imagem se tornará um produto separado</p>
+    <p>• Preencha os detalhes para cada produto</p>
+    <p>• Formatos aceitos: JPG, PNG, WebP</p>
+    <p>• Tamanho máximo: 5MB por imagem</p>
+  </div>
+  
+  <div class="flex justify-end space-x-3 mt-6" id="bulk-actions" style="display: none;">
+    <button type="button" class="btn btn-outline" id="bulk-cancel">
+      Cancelar
+    </button>
+    <button type="button" class="btn btn-primary" id="bulk-submit">
+      Publicar todos os produtos
+    </button>
+  </div>
+</div>
+
+<script is:inline>
+  document.addEventListener('DOMContentLoaded', () => {
+    const fileInput = document.getElementById('bulk-product-images');
+    const imageList = document.getElementById('bulk-image-list');
+    const uploadContainer = document.getElementById('bulk-upload-container');
+    const bulkActions = document.getElementById('bulk-actions');
+    const bulkSubmit = document.getElementById('bulk-submit');
+    const bulkCancel = document.getElementById('bulk-cancel');
+    const productForm = document.getElementById('product-form');
+    
+    if (!fileInput || !imageList || !uploadContainer || !bulkActions || !bulkSubmit || !bulkCancel || !productForm) {
+      console.error('Elementos necessários não encontrados');
+      return;
+    }
+    
+    // Obter categorias do select original
+    function getCategories() {
+      const categoryOptions = document.getElementById('category-options');
+      if (!categoryOptions) return [];
+      
+      return Array.from(categoryOptions.querySelectorAll('option'))
+        .filter(option => option.value)
+        .map(option => ({
+          id: option.getAttribute('data-id'),
+          name: option.value
+        }));
+    }
+    
+    // Função para mostrar lista de imagens e formulários
+    function showBulkList(files) {
+      // Limpar lista anterior
+      imageList.innerHTML = '';
+      
+      if (files.length === 0) {
+        bulkActions.style.display = 'none';
+        return;
+      }
+      
+      bulkActions.style.display = 'flex';
+      const categories = getCategories();
+      
+      Array.from(files).forEach((file, index) => {
+        if (!file.type.match('image.*')) return;
+        
+        const reader = new FileReader();
+        
+        reader.onload = (e) => {
+          const listItem = document.createElement('div');
+          listItem.className = 'bg-white rounded-lg shadow-md overflow-hidden';
+          
+          listItem.innerHTML = `
+            <div class="flex flex-col md:flex-row">
+              <!-- Imagem do produto -->
+              <div class="md:w-1/4 p-4 flex items-center justify-center bg-gray-50">
+                <div class="relative">
+                  <img src="${e.target.result}" alt="Produto ${index + 1}" class="w-full h-48 object-contain rounded-lg" />
+                  <button type="button" class="absolute top-1 right-1 bg-white rounded-full p-1 delete-bulk-item" data-index="${index}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+              </div>
+              
+              <!-- Formulário do produto -->
+              <div class="md:w-3/4 p-4 space-y-4">
+                <div class="text-sm text-gray-500 mb-2">Produto ${index + 1}</div>
+                
+                <input type="hidden" name="bulk-file-${index}" value="${file.name}" />
+                
+                <div>
+                  <label class="label">Título do produto</label>
+                  <input type="text" class="input bulk-title" data-index="${index}" placeholder="Ex: Sofá de 3 lugares" required />
+                </div>
+                
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label class="label">Preço (R$)</label>
+                    <input type="number" class="input bulk-price" data-index="${index}" placeholder="Ex: 299.90" min="0" step="0.01" required />
+                  </div>
+                  
+                  <div>
+                    <label class="label">Categoria</label>
+                    <div class="relative">
+                      <input type="text" class="input bulk-category" data-index="${index}" placeholder="Digite ou selecione uma categoria" list="bulk-categories-${index}" required />
+                      <datalist id="bulk-categories-${index}">
+                        ${categories.map(cat => `<option value="${cat.name}" data-id="${cat.id}"></option>`).join('')}
+                      </datalist>
+                    </div>
+                  </div>
+                </div>
+                
+                <div>
+                  <label class="label">Descrição</label>
+                  <textarea class="input bulk-description" data-index="${index}" rows="3" placeholder="Descreva o produto, estado de conservação, dimensões, etc."></textarea>
+                </div>
+              </div>
+            </div>
+          `;
+          
+          imageList.appendChild(listItem);
+        };
+        
+        reader.readAsDataURL(file);
+      });
+    }
+    
+    // Evento para seleção de arquivos
+    fileInput.addEventListener('change', (e) => {
+      showBulkList(e.target.files);
+    });
+    
+    // Suporte para arrastar e soltar
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      uploadContainer.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }, false);
+    });
+    
+    uploadContainer.addEventListener('dragenter', () => {
+      uploadContainer.classList.add('border-blue-500');
+    }, false);
+    
+    uploadContainer.addEventListener('dragleave', () => {
+      uploadContainer.classList.remove('border-blue-500');
+    }, false);
+    
+    uploadContainer.addEventListener('drop', (e) => {
+      uploadContainer.classList.remove('border-blue-500');
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      fileInput.files = files;
+      showBulkList(files);
+    }, false);
+    
+    // Remover item da lista
+    imageList.addEventListener('click', (e) => {
+      const deleteButton = e.target.closest('.delete-bulk-item');
+      if (deleteButton) {
+        const index = parseInt(deleteButton.getAttribute('data-index'));
+        const listItem = deleteButton.closest('.bg-white');
+        
+        // Criar uma nova FileList sem o arquivo removido
+        const dt = new DataTransfer();
+        const files = fileInput.files;
+        
+        for (let i = 0; i < files.length; i++) {
+          if (i !== index) {
+            dt.items.add(files[i]);
+          }
+        }
+        
+        fileInput.files = dt.files;
+        listItem.remove();
+        
+        // Reindexar os elementos restantes
+        const listItems = imageList.querySelectorAll('.bg-white');
+        if (listItems.length === 0) {
+          bulkActions.style.display = 'none';
+        }
+      }
+    });
+    
+    // Cancelar upload em massa
+    bulkCancel.addEventListener('click', () => {
+      fileInput.value = '';
+      imageList.innerHTML = '';
+      bulkActions.style.display = 'none';
+    });
+    
+    // Submeter todos os produtos
+    bulkSubmit.addEventListener('click', async () => {
+      const files = fileInput.files;
+      if (files.length === 0) return;
+      
+      // Desabilitar botão para evitar múltiplos envios
+      bulkSubmit.disabled = true;
+      bulkSubmit.textContent = 'Publicando...';
+      
+      // Coletar dados de todos os produtos
+      const products = [];
+      let hasErrors = false;
+      
+      for (let i = 0; i < files.length; i++) {
+        const titleInput = document.querySelector(`.bulk-title[data-index="${i}"]`);
+        const priceInput = document.querySelector(`.bulk-price[data-index="${i}"]`);
+        const categoryInput = document.querySelector(`.bulk-category[data-index="${i}"]`);
+        const descriptionInput = document.querySelector(`.bulk-description[data-index="${i}"]`);
+        
+        if (!titleInput || !priceInput || !categoryInput) {
+          console.error(`Campos não encontrados para o produto ${i}`);
+          continue;
+        }
+        
+        // Validar campos obrigatórios
+        if (!titleInput.value || !priceInput.value || !categoryInput.value) {
+          titleInput.classList.add('border-red-500');
+          priceInput.classList.add('border-red-500');
+          categoryInput.classList.add('border-red-500');
+          hasErrors = true;
+          continue;
+        }
+        
+        // Encontrar ID da categoria ou null para nova categoria
+        const categories = getCategories();
+        let categoryId = null;
+        
+        for (const category of categories) {
+          if (category.name.toLowerCase() === categoryInput.value.toLowerCase()) {
+            categoryId = category.id;
+            break;
+          }
+        }
+        
+        products.push({
+          file: files[i],
+          data: {
+            title: titleInput.value,
+            price: parseFloat(priceInput.value),
+            category: categoryInput.value,
+            category_id: categoryId,
+            description: descriptionInput ? descriptionInput.value : ''
+          }
+        });
+      }
+      
+      if (hasErrors) {
+        alert('Por favor, preencha todos os campos obrigatórios para cada produto.');
+        bulkSubmit.disabled = false;
+        bulkSubmit.textContent = 'Publicar todos os produtos';
+        return;
+      }
+      
+      // Criar formulário para envio
+      const formData = new FormData();
+      formData.append('bulk_upload', 'true');
+      formData.append('product_count', products.length.toString());
+      
+      // Adicionar dados de cada produto
+      products.forEach((product, index) => {
+        formData.append(`image_${index}`, product.file);
+        formData.append(`title_${index}`, product.data.title);
+        formData.append(`price_${index}`, product.data.price.toString());
+        formData.append(`category_${index}`, product.data.category);
+        if (product.data.category_id) {
+          formData.append(`category_id_${index}`, product.data.category_id);
+        }
+        formData.append(`description_${index}`, product.data.description);
+      });
+      
+      try {
+        // Enviar para o servidor
+        const response = await fetch('/admin/produtos/novo', {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (response.ok) {
+          // Redirecionar para a página de sucesso
+          window.location.href = '/admin/produtos?bulk_success=true';
+        } else {
+          throw new Error('Erro ao criar produtos');
+        }
+      } catch (error) {
+        console.error('Erro ao criar produtos:', error);
+        alert('Ocorreu um erro ao criar os produtos. Por favor, tente novamente.');
+        bulkSubmit.disabled = false;
+        bulkSubmit.textContent = 'Publicar todos os produtos';
+      }
+    });
+  });
+</script>

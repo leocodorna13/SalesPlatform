@@ -1,43 +1,99 @@
 ---
 import AdminLayout from '../../../layouts/AdminLayout.astro';
 import ImageUploader from '../../../components/ImageUploader.astro';
-import { getCategories, createProduct } from '../../../services/supabase';
+import BulkImageUploader from '../../../components/BulkImageUploader.astro';
+import { getCategories, createProduct, findOrCreateCategory, createBulkProducts } from '../../../services/supabase';
 
 // Buscar categorias
 const categories = await getCategories();
 
 // Processar formulário
 let success = false;
-let error = null;
+let bulkSuccess = false;
+let errorMessage = null;
 
 if (Astro.request.method === 'POST') {
   try {
     const formData = await Astro.request.formData();
+    const title = formData.get('title')?.toString() || '';
+    const price = parseFloat(formData.get('price')?.toString() || '0');
+    const description = formData.get('description')?.toString() || '';
+    let categoryId = formData.get('category_id')?.toString() || '';
+    const categoryName = formData.get('category_name')?.toString() || '';
     
-    // Extrair dados do produto
-    const productData = {
-      title: formData.get('title')?.toString() || '',
-      description: formData.get('description')?.toString() || '',
-      price: parseFloat(formData.get('price')?.toString() || '0'),
-      category_id: formData.get('category_id')?.toString() || null
-    };
+    // Verificar se é upload em massa
+    const isBulkUpload = formData.get('bulk_upload') === 'true';
     
-    // Extrair arquivos de imagem
-    const imageFiles = formData.getAll('images');
-    
-    // Criar produto
-    const product = await createProduct(productData, imageFiles);
-    
-    if (product) {
-      success = true;
+    if (isBulkUpload) {
+      // Processar upload em massa
+      const productCount = parseInt(formData.get('product_count')?.toString() || '0');
+      const productsData = [];
+      
+      for (let i = 0; i < productCount; i++) {
+        const productTitle = formData.get(`title_${i}`)?.toString() || '';
+        const productPrice = parseFloat(formData.get(`price_${i}`)?.toString() || '0');
+        const productDescription = formData.get(`description_${i}`)?.toString() || '';
+        let productCategoryId = formData.get(`category_id_${i}`)?.toString() || '';
+        const productCategoryName = formData.get(`category_${i}`)?.toString() || '';
+        const productImage = formData.get(`image_${i}`);
+        
+        if (!productImage || !(productImage instanceof File)) {
+          continue;
+        }
+        
+        // Criar nova categoria se necessário
+        if ((!productCategoryId || productCategoryId === '') && productCategoryName) {
+          const newCategory = await findOrCreateCategory(productCategoryName);
+          if (newCategory && typeof newCategory === 'object' && 'id' in newCategory) {
+            productCategoryId = String(newCategory.id);
+          }
+        }
+        
+        productsData.push({
+          title: productTitle,
+          price: productPrice,
+          description: productDescription,
+          category_id: productCategoryId,
+          image: productImage
+        });
+      }
+      
+      // Criar produtos em massa
+      if (productsData.length > 0) {
+        await createBulkProducts(productsData);
+        bulkSuccess = true;
+      }
     } else {
-      error = 'Ocorreu um erro ao criar o produto. Tente novamente.';
+      // Upload de produto único
+      const imageFiles = formData.getAll('images');
+      
+      // Criar nova categoria se necessário
+      if ((!categoryId || categoryId === '') && categoryName) {
+        // Criar nova categoria
+        const newCategory = await findOrCreateCategory(categoryName);
+        if (newCategory && typeof newCategory === 'object' && 'id' in newCategory) {
+          categoryId = String(newCategory.id);
+        }
+      }
+      
+      // Criar produto
+      if (title && price && categoryId && imageFiles.length > 0) {
+        await createProduct({
+          title,
+          price,
+          description,
+          category_id: categoryId
+        }, imageFiles);
+        
+        success = true;
+      }
     }
-  } catch (e) {
-    console.error('Erro ao criar produto:', e);
-    error = 'Ocorreu um erro ao criar o produto. Tente novamente.';
+  } catch (error) {
+    console.error('Erro ao criar produto:', error);
+    errorMessage = 'Ocorreu um erro ao criar o produto. Por favor, tente novamente.';
   }
 }
+
 ---
 
 <AdminLayout title="Novo Produto">
@@ -50,16 +106,20 @@ if (Astro.request.method === 'POST') {
     </a>
   </div>
 
-  {success ? (
-    <div class="bg-white rounded-lg shadow-md p-6 text-center">
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-green-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+  {success || bulkSuccess ? (
+    <div class="bg-white rounded-lg shadow-md p-4 md:p-6 text-center">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 md:h-16 md:w-16 text-green-500 mx-auto mb-3 md:mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
       </svg>
-      <h2 class="text-2xl font-semibold text-gray-900 mb-2">Produto criado com sucesso!</h2>
-      <p class="text-gray-600 mb-6">
-        O produto foi adicionado e já está disponível para visualização no site.
+      <h2 class="text-xl md:text-2xl font-semibold text-gray-900 mb-2">
+        {bulkSuccess ? 'Produtos criados com sucesso!' : 'Produto criado com sucesso!'}
+      </h2>
+      <p class="text-gray-600 mb-4 md:mb-6">
+        {bulkSuccess 
+          ? 'Os produtos foram adicionados e já estão disponíveis para visualização no site.'
+          : 'O produto foi adicionado e já está disponível para visualização no site.'}
       </p>
-      <div class="flex justify-center space-x-4">
+      <div class="flex flex-wrap justify-center gap-3 md:gap-4">
         <a href="/admin/produtos" class="btn btn-outline">
           Ver lista de produtos
         </a>
@@ -69,86 +129,185 @@ if (Astro.request.method === 'POST') {
       </div>
     </div>
   ) : (
-    <div class="bg-white rounded-lg shadow-md p-6">
-      <h2 class="text-xl font-semibold text-gray-900 mb-6">Adicionar novo produto</h2>
+    <div class="bg-white rounded-lg shadow-md p-4 md:p-6">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between mb-4 md:mb-6">
+        <h2 class="text-lg md:text-xl font-semibold text-gray-900">Adicionar novo produto</h2>
+        
+        <div class="mt-3 md:mt-0">
+          <div class="inline-flex rounded-md shadow-sm" role="group">
+            <button type="button" id="single-mode-btn" class="px-3 py-1.5 md:px-4 md:py-2 text-sm font-medium text-white bg-primary-600 rounded-l-lg hover:bg-primary-700 focus:z-10 focus:ring-2 focus:ring-primary-500 active">
+              Produto único
+            </button>
+            <button type="button" id="bulk-mode-btn" class="px-3 py-1.5 md:px-4 md:py-2 text-sm font-medium text-gray-900 bg-white border border-gray-200 rounded-r-lg hover:bg-gray-100 hover:text-primary-700 focus:z-10 focus:ring-2 focus:ring-primary-500">
+              Upload em massa
+            </button>
+          </div>
+        </div>
+      </div>
       
-      {error && (
-        <div class="bg-red-100 border border-red-200 text-red-800 rounded-md p-4 mb-6">
-          {error}
+      {errorMessage && (
+        <div class="bg-red-100 border border-red-200 text-red-800 rounded-md p-3 md:p-4 mb-4 md:mb-6 text-sm md:text-base">
+          {errorMessage}
         </div>
       )}
       
-      <form method="POST" enctype="multipart/form-data" class="space-y-6" id="product-form">
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-          <div>
-            <label for="title" class="label">Título do produto</label>
-            <input 
-              type="text" 
-              id="title" 
-              name="title" 
-              required
-              class="input"
-              placeholder="Ex: Sofá de 3 lugares"
-            />
+      <div id="single-upload-mode">
+        <form method="POST" enctype="multipart/form-data" class="space-y-4 md:space-y-6" id="product-form">
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+            <div>
+              <label for="title" class="label">Título do produto</label>
+              <input 
+                type="text" 
+                id="title" 
+                name="title" 
+                required
+                class="input"
+                placeholder="Ex: Sofá de 3 lugares"
+              />
+            </div>
+            
+            <div>
+              <label for="price" class="label">Preço (R$)</label>
+              <input 
+                type="number" 
+                id="price" 
+                name="price" 
+                required
+                min="0"
+                step="0.01"
+                class="input"
+                placeholder="Ex: 299.90"
+              />
+            </div>
           </div>
           
           <div>
-            <label for="price" class="label">Preço (R$)</label>
-            <input 
-              type="number" 
-              id="price" 
-              name="price" 
-              required
-              min="0"
-              step="0.01"
-              class="input"
-              placeholder="Ex: 299.90"
-            />
+            <label for="category_input" class="label">Categoria</label>
+            <div class="relative">
+              <input 
+                type="text" 
+                id="category_input" 
+                name="category_name" 
+                class="input"
+                placeholder="Digite ou selecione uma categoria" 
+                list="category-options"
+                required
+              />
+              <datalist id="category-options">
+                {categories.map((category) => (
+                  <option value={category.name} data-id={category.id}></option>
+                ))}
+              </datalist>
+              
+              <input 
+                type="hidden" 
+                id="category_id" 
+                name="category_id"
+              />
+            </div>
           </div>
-        </div>
-        
-        <div>
-          <label for="category_id" class="label">Categoria</label>
-          <select 
-            id="category_id" 
-            name="category_id" 
-            required
-            class="input"
-          >
-            <option value="">Selecione uma categoria</option>
-            {categories.map((category) => (
-              <option value={category.id}>{category.name}</option>
-            ))}
-          </select>
-        </div>
-        
-        <div>
-          <label for="description" class="label">Descrição</label>
-          <textarea 
-            id="description" 
-            name="description" 
-            rows="5"
-            class="input"
-            placeholder="Descreva o produto, estado de conservação, dimensões, etc."
-          ></textarea>
-        </div>
-        
-        <ImageUploader />
-        
-        <div class="flex justify-end space-x-3">
-          <a href="/admin/produtos" class="btn btn-outline">
-            Cancelar
-          </a>
-          <button type="submit" class="btn btn-primary">
-            Salvar produto
-          </button>
-        </div>
-      </form>
+          
+          <div>
+            <label for="description" class="label">Descrição</label>
+            <textarea 
+              id="description" 
+              name="description" 
+              rows="4"
+              class="input"
+              placeholder="Descreva o produto, estado de conservação, dimensões, etc."
+            ></textarea>
+          </div>
+          
+          <ImageUploader />
+          
+          <div class="flex flex-wrap justify-end gap-3">
+            <a href="/admin/produtos" class="btn btn-outline w-full md:w-auto">
+              Cancelar
+            </a>
+            <button type="submit" class="btn btn-primary w-full md:w-auto">
+              Salvar produto
+            </button>
+          </div>
+        </form>
+      </div>
+      
+      <div id="bulk-upload-mode" style="display: none;">
+        <BulkImageUploader categories={categories} />
+      </div>
     </div>
   )}
 </AdminLayout>
 
+<style>
+  /* Estilos para melhorar a experiência em dispositivos móveis */
+  @media (max-width: 768px) {
+    .input, .btn {
+      font-size: 16px; /* Evitar zoom automático em iOS */
+      padding: 0.625rem;
+    }
+    
+    .label {
+      font-size: 0.875rem;
+      margin-bottom: 0.25rem;
+    }
+  }
+</style>
+
 <script is:inline>
-  // Nenhum JavaScript adicional necessário
-  // O formulário enviará os arquivos diretamente
+  document.addEventListener('DOMContentLoaded', () => {
+    // Alternar entre modos de upload
+    const singleModeBtn = document.getElementById('single-mode-btn');
+    const bulkModeBtn = document.getElementById('bulk-mode-btn');
+    const singleUploadMode = document.getElementById('single-upload-mode');
+    const bulkUploadMode = document.getElementById('bulk-upload-mode');
+    
+    if (singleModeBtn && bulkModeBtn && singleUploadMode && bulkUploadMode) {
+      singleModeBtn.addEventListener('click', () => {
+        singleModeBtn.classList.add('bg-primary-600', 'text-white');
+        singleModeBtn.classList.remove('bg-white', 'text-gray-900', 'border', 'border-gray-200');
+        
+        bulkModeBtn.classList.add('bg-white', 'text-gray-900', 'border', 'border-gray-200');
+        bulkModeBtn.classList.remove('bg-primary-600', 'text-white');
+        
+        singleUploadMode.style.display = 'block';
+        bulkUploadMode.style.display = 'none';
+      });
+      
+      bulkModeBtn.addEventListener('click', () => {
+        bulkModeBtn.classList.add('bg-primary-600', 'text-white');
+        bulkModeBtn.classList.remove('bg-white', 'text-gray-900', 'border', 'border-gray-200');
+        
+        singleModeBtn.classList.add('bg-white', 'text-gray-900', 'border', 'border-gray-200');
+        singleModeBtn.classList.remove('bg-primary-600', 'text-white');
+        
+        bulkUploadMode.style.display = 'block';
+        singleUploadMode.style.display = 'none';
+      });
+    }
+    
+    // Gerenciar campo de categoria
+    const categoryInput = document.getElementById('category_input');
+    const categoryIdInput = document.getElementById('category_id');
+    const categoryOptions = document.getElementById('category-options');
+    
+    if (categoryInput && categoryIdInput && categoryOptions) {
+      // Quando o usuário seleciona ou digita uma categoria
+      categoryInput.addEventListener('input', () => {
+        const value = categoryInput.value;
+        let categoryId = null;
+        
+        // Verificar se a categoria já existe
+        const options = categoryOptions.querySelectorAll('option');
+        for (const option of options) {
+          if (option.value.toLowerCase() === value.toLowerCase()) {
+            categoryId = option.getAttribute('data-id');
+            break;
+          }
+        }
+        
+        // Atualizar o campo hidden com o ID da categoria (ou null para nova categoria)
+        categoryIdInput.value = categoryId || '';
+      });
+    }
+  });
 </script>

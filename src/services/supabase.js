@@ -803,3 +803,125 @@ export async function testImageUpload() {
     };
   }
 }
+
+/**
+ * Cria uma nova categoria ou retorna uma existente com o mesmo nome
+ * @param {string} categoryName - Nome da categoria
+ * @returns {Promise<object|null>} - Categoria criada/encontrada ou null se falhar
+ */
+export async function findOrCreateCategory(categoryName) {
+  try {
+    // Normalizar o nome da categoria
+    const name = categoryName.trim();
+    
+    // Gerar slug a partir do nome
+    const slug = name.toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\w\s-]/g, '')
+      .replace(/\s+/g, '-');
+    
+    // Verificar se a categoria já existe
+    const { data: existingCategory, error: searchError } = await supabase
+      .from('categories')
+      .select('*')
+      .ilike('name', name)
+      .single();
+    
+    if (!searchError && existingCategory) {
+      return existingCategory;
+    }
+    
+    // Criar nova categoria
+    const { data: newCategory, error: createError } = await supabase
+      .from('categories')
+      .insert([{ name, slug }])
+      .select()
+      .single();
+    
+    if (createError) throw createError;
+    return newCategory;
+  } catch (error) {
+    console.error('Erro ao criar/encontrar categoria:', error);
+    return null;
+  }
+}
+
+/**
+ * Cria múltiplos produtos em uma única operação
+ * @param {Array} productsData - Array de objetos com dados dos produtos e arquivos de imagem
+ * @returns {Promise<Array|null>} - Array de produtos criados ou null se falhar
+ */
+export async function createBulkProducts(productsData) {
+  try {
+    const createdProducts = [];
+    
+    // Processar cada produto
+    for (const productData of productsData) {
+      const { title, price, description, category_id, image } = productData;
+      
+      if (!title || !price || !category_id || !image) {
+        console.error('Dados de produto incompletos:', productData);
+        continue;
+      }
+      
+      // Criar produto no Supabase
+      const { data: product, error: productError } = await supabase
+        .from('products')
+        .insert([{
+          title,
+          price,
+          description,
+          category_id,
+          created_at: new Date().toISOString()
+        }])
+        .select()
+        .single();
+      
+      if (productError) {
+        console.error('Erro ao criar produto:', productError);
+        continue;
+      }
+      
+      // Fazer upload da imagem
+      if (image && product) {
+        const fileExt = image.name.split('.').pop();
+        const fileName = `${product.id}-${Date.now()}.${fileExt}`;
+        const filePath = `products/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('images')
+          .upload(filePath, image);
+        
+        if (uploadError) {
+          console.error('Erro ao fazer upload da imagem:', uploadError);
+          continue;
+        }
+        
+        // Obter URL pública da imagem
+        const { data: publicURL } = supabase.storage
+          .from('images')
+          .getPublicUrl(filePath);
+        
+        // Atualizar produto com URL da imagem
+        const { error: updateError } = await supabase
+          .from('products')
+          .update({
+            image_url: publicURL.publicUrl
+          })
+          .eq('id', product.id);
+        
+        if (updateError) {
+          console.error('Erro ao atualizar produto com URL da imagem:', updateError);
+        }
+      }
+      
+      createdProducts.push(product);
+    }
+    
+    return createdProducts;
+  } catch (error) {
+    console.error('Erro ao criar produtos em massa:', error);
+    throw error;
+  }
+}
