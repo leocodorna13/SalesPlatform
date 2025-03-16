@@ -1,0 +1,9 @@
+[build]
+command = "npm run build"
+environment = { NODE_VERSION = "18" }
+
+[build.environment]
+ASTRO_ADAPTER = "@astrojs/cloudflare"
+
+[site]
+functions = "./functions"

@@ -24,9 +24,6 @@ jobs:
       - name: Install dependencies
         run: npm ci
         
-      - name: Install Cloudflare adapter
-        run: npm install @astrojs/cloudflare@12.2.4 --save
-        
       - name: Build
         run: npm run build
         env:
