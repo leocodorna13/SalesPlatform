@@ -30,3 +30,7 @@ Thumbs.db
 .vscode/
 *.sublime-project
 *.sublime-workspace
+
+# Cloudflare
+.wrangler/
+.dev.vars

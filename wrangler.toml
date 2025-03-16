@@ -1,0 +1,18 @@
+name = "site-de-venda"
+compatibility_date = "2024-03-16"
+
+[site]
+bucket = "./dist"
+
+[build]
+command = "npm run build"
+
+[env.production]
+routes = [
+  { pattern = "/api/*", zone_name = "site-de-venda.pages.dev" }
+]
+
+# Configuração para SSR
+[[build.upload.rules]]
+type = "ESModule"
+globs = ["**/*.js"]
