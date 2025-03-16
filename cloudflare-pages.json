@@ -1,0 +1,9 @@
+{
+  "build": {
+    "command": "npm install @astrojs/cloudflare && npm run build",
+    "output": "dist"
+  },
+  "env": {
+    "NODE_VERSION": "18"
+  }
+}
