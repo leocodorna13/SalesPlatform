@@ -1,0 +1,59 @@
+---
+import ProductCard from './ProductCard.astro';
+
+interface Product {
+  id: string;
+  title: string;
+  price: number;
+  status: 'available' | 'sold';
+  categories: {
+    name: string;
+    slug: string;
+  };
+  product_images: {
+    id: string;
+    image_url: string;
+    is_primary: boolean;
+  }[];
+  views_count: number;
+  interest_count: number;
+}
+
+interface Props {
+  products: Product[];
+  showSold?: boolean;
+}
+
+const { products, showSold = true } = Astro.props;
+
+// Filtrar produtos vendidos se necessário
+const filteredProducts = showSold ? products : products.filter(p => p.status === 'available');
+
+// Encontrar a imagem principal para cada produto
+const getMainImage = (images) => {
+  if (!images || images.length === 0) return null;
+  const primary = images.find(img => img.is_primary);
+  return primary ? primary.image_url : images[0].image_url;
+};
+---
+
+<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+  {filteredProducts.length > 0 ? (
+    filteredProducts.map((product) => (
+      <ProductCard
+        id={product.id}
+        title={product.title}
+        price={product.price}
+        status={product.status}
+        imageUrl={getMainImage(product.product_images)}
+        category={product.categories}
+        viewsCount={product.views_count}
+        interestCount={product.interest_count}
+      />
+    ))
+  ) : (
+    <div class="col-span-full text-center py-12">
+      <p class="text-gray-500 text-lg">Nenhum produto encontrado.</p>
+    </div>
+  )}
+</div>

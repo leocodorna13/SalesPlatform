@@ -1,0 +1,130 @@
+---
+import '../styles/global.css';
+import { getCurrentUser } from '../services/supabase';
+
+interface Props {
+  title: string;
+  requireAuth?: boolean;
+}
+
+// Interface para o tipo de usuário
+interface User {
+  email: string;
+  id: string;
+  [key: string]: any;
+}
+
+const { title, requireAuth = true } = Astro.props;
+
+// Verificar autenticação
+let user = null;
+let isAuthenticated = false;
+let redirected = false;
+
+if (requireAuth) {
+  try {
+    // Verificar se estamos na página de login
+    const isLoginPage = Astro.url.pathname.includes('/admin/login');
+    
+    // Só verificar autenticação se não estamos na página de login
+    if (!isLoginPage) {
+      user = await getCurrentUser() as User | null;
+      isAuthenticated = !!user;
+      
+      // Só redirecionar se não estamos na página de login e não estamos autenticados
+      if (!isAuthenticated && !redirected) {
+        redirected = true;
+        return Astro.redirect('/admin/login');
+      }
+    }
+  } catch (error) {
+    console.error('Erro ao verificar autenticação:', error);
+  }
+}
+---
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="robots" content="noindex, nofollow" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <title>{title} | Admin</title>
+  </head>
+  <body class="bg-gray-100">
+    <div class="flex h-screen">
+      <!-- Sidebar -->
+      <aside class="w-64 bg-primary-800 text-white">
+        <div class="p-4">
+          <h2 class="text-xl font-bold text-white mb-6">VendaMudança</h2>
+          <nav>
+            <ul class="space-y-2">
+              <li>
+                <a href="/admin" class="block py-2 px-4 rounded hover:bg-primary-700">
+                  Dashboard
+                </a>
+              </li>
+              <li>
+                <a href="/admin/produtos" class="block py-2 px-4 rounded hover:bg-primary-700">
+                  Produtos
+                </a>
+              </li>
+              <li>
+                <a href="/admin/categorias" class="block py-2 px-4 rounded hover:bg-primary-700">
+                  Categorias
+                </a>
+              </li>
+              <li>
+                <a href="/admin/interessados" class="block py-2 px-4 rounded hover:bg-primary-700">
+                  Interessados
+                </a>
+              </li>
+              <li class="pt-6">
+                <button id="logout-btn" class="w-full text-left py-2 px-4 rounded hover:bg-primary-700">
+                  Sair
+                </button>
+              </li>
+            </ul>
+          </nav>
+        </div>
+      </aside>
+
+      <!-- Main content -->
+      <div class="flex-1 flex flex-col overflow-hidden">
+        <header class="bg-white shadow-sm">
+          <div class="px-6 py-4 flex justify-between items-center">
+            <h1 class="text-xl font-semibold text-gray-800 m-0">{title}</h1>
+            {user && (
+              <div class="flex items-center">
+                <span class="text-sm text-gray-600 mr-4">{user.email}</span>
+                <a href="/" class="text-sm text-primary-600 hover:text-primary-800">Ver site</a>
+              </div>
+            )}
+          </div>
+        </header>
+
+        <main class="flex-1 overflow-y-auto p-6">
+          <slot />
+        </main>
+      </div>
+    </div>
+
+    <script>
+      // Lógica para logout
+      document.getElementById('logout-btn')?.addEventListener('click', async () => {
+        try {
+          const response = await fetch('/api/auth/logout', {
+            method: 'POST',
+          });
+          
+          if (response.ok) {
+            window.location.href = '/admin/login';
+          }
+        } catch (error) {
+          console.error('Erro ao fazer logout:', error);
+        }
+      });
+    </script>
+  </body>
+</html>

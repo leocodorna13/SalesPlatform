@@ -1,0 +1,49 @@
+---
+/**
+ * Componente para filtrar produtos por categoria
+ */
+
+interface Props {
+  categories: Array<{
+    id: number;
+    name: string;
+    slug: string;
+    description?: string;
+  }>;
+  currentCategory?: string;
+}
+
+const { categories, currentCategory = 'todos' } = Astro.props;
+---
+
+<div class="bg-white rounded-lg shadow-sm mb-8 overflow-hidden">
+  <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
+    <h2 class="text-lg font-medium text-gray-900">Categorias</h2>
+  </div>
+  
+  <div class="flex flex-wrap gap-2 p-4">
+    <a 
+      href="/" 
+      class={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+        currentCategory === 'todos' 
+          ? 'bg-primary-100 text-primary-800 hover:bg-primary-200' 
+          : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+      }`}
+    >
+      Todos
+    </a>
+    
+    {categories.map(category => (
+      <a 
+        href={`/categoria/${category.slug}`} 
+        class={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+          currentCategory === category.slug 
+            ? 'bg-primary-100 text-primary-800 hover:bg-primary-200' 
+            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
+        }`}
+      >
+        {category.name}
+      </a>
+    ))}
+  </div>
+</div>

@@ -1,0 +1,83 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { loginAdmin } from '../../services/supabase';
+
+// Verificar se o formulário foi enviado
+let error = null;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const email = formData.get('email');
+    const password = formData.get('password');
+    
+    const data = await loginAdmin(email, password);
+    
+    if (data) {
+      return Astro.redirect('/admin');
+    } else {
+      error = 'Credenciais inválidas. Tente novamente.';
+    }
+  } catch (e) {
+    console.error('Erro ao fazer login:', e);
+    error = 'Ocorreu um erro ao fazer login. Tente novamente.';
+  }
+}
+---
+
+<Layout title="Login Administrativo">
+  <div class="min-h-[80vh] flex items-center justify-center">
+    <div class="w-full max-w-md">
+      <div class="bg-white rounded-lg shadow-lg overflow-hidden">
+        <div class="bg-primary-600 p-6 text-white text-center">
+          <h1 class="text-2xl font-bold">VendaMudança</h1>
+          <p class="text-primary-100 mt-1">Área Administrativa</p>
+        </div>
+        
+        <div class="p-6">
+          <h2 class="text-xl font-semibold text-gray-900 mb-6">Faça login para continuar</h2>
+          
+          {error && (
+            <div class="bg-red-100 border border-red-200 text-red-800 rounded-md p-4 mb-6">
+              {error}
+            </div>
+          )}
+          
+          <form method="POST" class="space-y-4">
+            <div>
+              <label for="email" class="label">E-mail</label>
+              <input 
+                type="email" 
+                id="email" 
+                name="email" 
+                required
+                class="input"
+              />
+            </div>
+            
+            <div>
+              <label for="password" class="label">Senha</label>
+              <input 
+                type="password" 
+                id="password" 
+                name="password" 
+                required
+                class="input"
+              />
+            </div>
+            
+            <button type="submit" class="btn btn-primary w-full">
+              Entrar
+            </button>
+          </form>
+          
+          <div class="mt-6 text-center">
+            <a href="/" class="text-primary-600 hover:text-primary-800 text-sm">
+              Voltar para o site
+            </a>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</Layout>

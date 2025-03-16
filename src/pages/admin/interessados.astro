@@ -1,0 +1,166 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { supabase } from '../../services/supabase';
+
+// Buscar todos os interessados com informações do produto
+const { data: interested, error } = await supabase
+  .from('interested_users')
+  .select(`
+    *,
+    products:product_id (
+      id,
+      title,
+      status,
+      price,
+      product_images (
+        image_url,
+        is_primary
+      )
+    )
+  `)
+  .order('created_at', { ascending: false });
+
+// Formatar data
+const formatDate = (dateString) => {
+  const date = new Date(dateString);
+  return new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  }).format(date);
+};
+
+// Formatar preço
+const formatPrice = (price) => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(price);
+};
+
+// Obter imagem principal
+const getMainImage = (images) => {
+  if (!images || images.length === 0) return null;
+  const primary = images.find(img => img.is_primary);
+  return primary ? primary.image_url : images[0].image_url;
+};
+---
+
+<AdminLayout title="Interessados">
+  <div class="mb-6">
+    <h1 class="text-2xl font-bold text-gray-900">Pessoas interessadas nos produtos</h1>
+    <p class="text-gray-600 mt-1">
+      Lista de todas as pessoas que demonstraram interesse em seus produtos.
+    </p>
+  </div>
+  
+  <div class="bg-white rounded-lg shadow overflow-hidden">
+    {interested && interested.length > 0 ? (
+      <div class="overflow-x-auto">
+        <table class="min-w-full divide-y divide-gray-200">
+          <thead class="bg-gray-50">
+            <tr>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Produto
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Interessado
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Contato
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Data
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Status
+              </th>
+              <th scope="col" class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                Ações
+              </th>
+            </tr>
+          </thead>
+          <tbody class="bg-white divide-y divide-gray-200">
+            {interested.map((item) => (
+              <tr class="hover:bg-gray-50">
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="flex items-center">
+                    <div class="flex-shrink-0 h-10 w-10 relative">
+                      <img 
+                        class="h-10 w-10 rounded-md object-cover" 
+                        src={getMainImage(item.products.product_images)} 
+                        alt={item.products.title}
+                      />
+                      {item.products.status === 'sold' && (
+                        <div class="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center rounded-md">
+                          <div class="bg-red-600 text-white text-xs font-bold py-0.5 px-1 transform -rotate-45">
+                            Vendido
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div class="ml-4">
+                      <div class="text-sm font-medium text-gray-900 line-clamp-1">
+                        {item.products.title}
+                      </div>
+                      <div class="text-sm text-gray-500">
+                        {formatPrice(item.products.price)}
+                      </div>
+                    </div>
+                  </div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="text-sm font-medium text-gray-900">{item.name}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <div class="text-sm text-gray-900">{item.email}</div>
+                  <div class="text-sm text-gray-500">{item.phone}</div>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  {formatDate(item.created_at)}
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap">
+                  <span class={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    item.products.status === 'available' 
+                      ? 'bg-green-100 text-green-800' 
+                      : 'bg-red-100 text-red-800'
+                  }`}>
+                    {item.products.status === 'available' ? 'Disponível' : 'Vendido'}
+                  </span>
+                </td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <div class="flex space-x-2">
+                    <a 
+                      href={`/produto/${item.product_id}`} 
+                      class="text-primary-600 hover:text-primary-900"
+                      target="_blank"
+                    >
+                      Ver produto
+                    </a>
+                    <a 
+                      href={`https://wa.me/${item.phone.replace(/\D/g, '')}`} 
+                      class="text-green-600 hover:text-green-900"
+                      target="_blank"
+                    >
+                      WhatsApp
+                    </a>
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    ) : (
+      <div class="text-center py-12">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+        </svg>
+        <p class="text-gray-500 text-lg">Nenhum interessado registrado ainda.</p>
+        <p class="text-gray-400 mt-2">Quando alguém demonstrar interesse em seus produtos, aparecerá aqui.</p>
+      </div>
+    )}
+  </div>
+</AdminLayout>

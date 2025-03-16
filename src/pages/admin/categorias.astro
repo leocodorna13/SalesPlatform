@@ -1,0 +1,121 @@
+---
+import AdminLayout from '../../layouts/AdminLayout.astro';
+import { getCategories, createCategory } from '../../services/supabase';
+
+// Buscar categorias
+const categories = await getCategories();
+
+// Processar formulário
+let message = '';
+let messageType = '';
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    const name = formData.get('name');
+    
+    // Criar slug a partir do nome
+    const slug = name
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^\w\s]/g, '')
+      .replace(/\s+/g, '-');
+    
+    const category = await createCategory(name, slug);
+    
+    if (category) {
+      message = 'Categoria criada com sucesso!';
+      messageType = 'success';
+    } else {
+      message = 'Ocorreu um erro ao criar a categoria. Tente novamente.';
+      messageType = 'error';
+    }
+  } catch (error) {
+    console.error('Erro ao criar categoria:', error);
+    message = 'Ocorreu um erro ao criar a categoria. Tente novamente.';
+    messageType = 'error';
+  }
+}
+---
+
+<AdminLayout title="Gerenciar Categorias">
+  <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+    <!-- Lista de categorias -->
+    <div class="md:col-span-2">
+      <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="p-4 border-b border-gray-200">
+          <h2 class="text-lg font-medium text-gray-900">Categorias</h2>
+        </div>
+        
+        {message && (
+          <div class={`m-4 p-3 rounded-md ${messageType === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+            {message}
+          </div>
+        )}
+        
+        <div class="divide-y divide-gray-200">
+          {categories.length > 0 ? (
+            categories.map((category) => (
+              <div class="flex items-center justify-between p-4 hover:bg-gray-50">
+                <div>
+                  <h3 class="font-medium text-gray-900">{category.name}</h3>
+                  <p class="text-sm text-gray-500">Slug: {category.slug}</p>
+                </div>
+                <div class="flex space-x-2">
+                  <a 
+                    href={`/categoria/${category.slug}`} 
+                    class="text-gray-400 hover:text-gray-500" 
+                    title="Ver produtos nesta categoria"
+                    target="_blank"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                    </svg>
+                  </a>
+                </div>
+              </div>
+            ))
+          ) : (
+            <div class="text-center py-8">
+              <p class="text-gray-500">Nenhuma categoria cadastrada.</p>
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+    
+    <!-- Formulário para adicionar categoria -->
+    <div>
+      <div class="bg-white rounded-lg shadow overflow-hidden">
+        <div class="p-4 border-b border-gray-200">
+          <h2 class="text-lg font-medium text-gray-900">Nova Categoria</h2>
+        </div>
+        
+        <div class="p-4">
+          <form method="POST" class="space-y-4">
+            <div>
+              <label for="name" class="label">Nome da categoria</label>
+              <input 
+                type="text" 
+                id="name" 
+                name="name" 
+                required
+                class="input"
+                placeholder="Ex: Móveis, Eletrônicos, etc."
+              />
+              <p class="text-xs text-gray-500 mt-1">
+                O slug será gerado automaticamente a partir do nome.
+              </p>
+            </div>
+            
+            <button type="submit" class="btn btn-primary w-full">
+              Adicionar categoria
+            </button>
+          </form>
+        </div>
+      </div>
+    </div>
+  </div>
+</AdminLayout>

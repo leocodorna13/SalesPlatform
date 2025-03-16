@@ -1,0 +1,66 @@
+---
+interface Props {
+  id: string;
+  title: string;
+  price: number;
+  status: 'available' | 'sold';
+  imageUrl: string;
+  category: {
+    name: string;
+    slug: string;
+  };
+  viewsCount: number;
+  interestCount: number;
+}
+
+const { id, title, price, status, imageUrl, category, viewsCount, interestCount } = Astro.props;
+
+// Formatar preço
+const formattedPrice = new Intl.NumberFormat('pt-BR', {
+  style: 'currency',
+  currency: 'BRL'
+}).format(price);
+---
+
+<div class="card group relative">
+  <!-- Badge de status -->
+  {status === 'sold' && (
+    <div class="absolute top-0 right-0 left-0 bottom-0 flex items-center justify-center z-10 bg-black bg-opacity-30">
+      <div class="bg-red-600 text-white font-bold py-2 px-4 transform -rotate-45 text-xl uppercase">
+        Vendido
+      </div>
+    </div>
+  )}
+  
+  <!-- Imagem do produto -->
+  <div class="aspect-square overflow-hidden">
+    <img 
+      src={imageUrl || '/placeholder-product.jpg'} 
+      alt={title}
+      class="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+    />
+  </div>
+  
+  <!-- Informações do produto -->
+  <div class="p-4">
+    <div class="flex justify-between items-start mb-2">
+      <h3 class="text-lg font-medium text-gray-900 line-clamp-2 m-0">{title}</h3>
+      <span class="badge badge-available">{category.name}</span>
+    </div>
+    
+    <p class="text-xl font-bold text-primary-700 mb-3">{formattedPrice}</p>
+    
+    <div class="flex justify-between text-sm text-gray-500">
+      <span>{viewsCount} visualizações</span>
+      <span>{interestCount} interessados</span>
+    </div>
+    
+    <a 
+      href={`/produto/${id}`} 
+      class="mt-3 btn btn-primary w-full block text-center"
+      aria-disabled={status === 'sold'}
+    >
+      {status === 'available' ? 'Ver detalhes' : 'Produto vendido'}
+    </a>
+  </div>
+</div>

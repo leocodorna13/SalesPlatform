@@ -1,0 +1,68 @@
+---
+import Layout from '../layouts/Layout.astro';
+import ProductGrid from '../components/ProductGrid.astro';
+import CategoryFilter from '../components/CategoryFilter.astro';
+import { getProducts, getCategories } from '../services/supabase';
+
+// Buscar todas as categorias
+const categories = await getCategories();
+
+// Buscar produtos disponíveis
+const products = await getProducts('available');
+
+// Produtos em destaque (os 4 mais recentes)
+const featuredProducts = products.slice(0, 4);
+---
+
+<Layout title="Produtos à venda">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <!-- Banner principal -->
+    <div class="relative bg-gradient-to-r from-primary-600 to-primary-800 rounded-xl overflow-hidden mb-12">
+      <div class="absolute inset-0 opacity-10 bg-pattern"></div>
+      <div class="relative z-10 px-8 py-16 md:px-16 md:py-20 text-white">
+        <h1 class="text-3xl md:text-4xl font-bold mb-4">Produtos à venda</h1>
+        <p class="text-lg md:text-xl mb-6 max-w-2xl">
+          Encontre produtos de qualidade a preços acessíveis. Todos os itens estão em ótimo estado.
+        </p>
+        <a href="#produtos" class="inline-block bg-white text-primary-700 font-medium px-6 py-3 rounded-lg hover:bg-gray-100 transition-colors">
+          Ver produtos
+        </a>
+      </div>
+    </div>
+    
+    <!-- Produtos em destaque -->
+    {featuredProducts.length > 0 && (
+      <div class="mb-16">
+        <h2 class="text-2xl font-bold text-gray-900 mb-6">Produtos em destaque</h2>
+        <ProductGrid products={featuredProducts} />
+      </div>
+    )}
+    
+    <!-- Filtro de categorias e todos os produtos -->
+    <div id="produtos">
+      <h2 class="text-2xl font-bold text-gray-900 mb-6">Todos os produtos</h2>
+      
+      <CategoryFilter categories={categories} currentCategory="todos" />
+      
+      {products.length > 0 ? (
+        <ProductGrid products={products} />
+      ) : (
+        <div class="text-center py-16 bg-gray-50 rounded-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+          </svg>
+          <h3 class="text-xl font-semibold text-gray-900 mb-2">Nenhum produto disponível</h3>
+          <p class="text-gray-600">
+            No momento não há produtos disponíveis para venda.
+          </p>
+        </div>
+      )}
+    </div>
+  </div>
+</Layout>
+
+<style>
+  .bg-pattern {
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.2'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+</style>

@@ -1,0 +1,75 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import ProductGrid from '../../components/ProductGrid.astro';
+import CategoryFilter from '../../components/CategoryFilter.astro';
+import { getProductsByCategorySlug, getCategoryBySlug } from '../../services/supabase';
+
+// Obter o slug da categoria da URL
+const { slug } = Astro.params;
+
+// Verificar se o slug existe
+if (!slug) {
+  return Astro.redirect('/');
+}
+
+// Buscar categoria pelo slug
+const category = await getCategoryBySlug(slug);
+
+// Verificar se a categoria existe
+if (!category) {
+  return Astro.redirect('/');
+}
+
+// Buscar produtos da categoria
+const products = await getProductsByCategorySlug(slug);
+
+// Buscar todas as categorias para o filtro
+const { getCategories } = await import('../../services/supabase');
+const categories = await getCategories();
+
+// Definir tipagem para a categoria
+interface Category {
+  name: string;
+  description?: string;
+}
+
+// Type assertion para garantir que category tenha a estrutura esperada
+const typedCategory = category as Category;
+---
+
+<Layout title={`Produtos na categoria ${typedCategory.name}`}>
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <div class="mb-6">
+      <a href="/" class="text-primary-600 hover:text-primary-800 flex items-center">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+        </svg>
+        Voltar para todos os produtos
+      </a>
+    </div>
+    
+    <div class="mb-8">
+      <h1 class="text-3xl font-bold text-gray-900">{typedCategory.name}</h1>
+      {typedCategory.description && (
+        <p class="mt-2 text-gray-600">{typedCategory.description}</p>
+      )}
+    </div>
+    
+    {products.length > 0 ? (
+      <ProductGrid products={products} />
+    ) : (
+      <div class="text-center py-12 bg-gray-50 rounded-lg">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+        </svg>
+        <h2 class="text-xl font-semibold text-gray-900 mb-2">Nenhum produto encontrado</h2>
+        <p class="text-gray-600 mb-4">
+          Não há produtos disponíveis nesta categoria no momento.
+        </p>
+        <a href="/" class="btn btn-primary">
+          Ver todos os produtos
+        </a>
+      </div>
+    )}
+  </div>
+</Layout>

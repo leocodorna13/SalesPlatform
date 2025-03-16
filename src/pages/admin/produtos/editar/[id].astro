@@ -1,0 +1,283 @@
+---
+import AdminLayout from '../../../../layouts/AdminLayout.astro';
+import ImageUploader from '../../../../components/ImageUploader.astro';
+import { getProductById, getCategories, supabase } from '../../../../services/supabase';
+
+// Obter o ID do produto da URL
+const { id } = Astro.params;
+
+// Buscar detalhes do produto e categorias
+const product = await getProductById(id);
+const categories = await getCategories();
+
+// Verificar se o produto existe
+if (!product) {
+  return Astro.redirect('/admin/produtos');
+}
+
+// Processar formulário
+let success = false;
+let error = null;
+
+if (Astro.request.method === 'POST') {
+  try {
+    const formData = await Astro.request.formData();
+    
+    // Extrair dados do produto
+    const title = formData.get('title');
+    const description = formData.get('description');
+    const price = parseFloat(formData.get('price'));
+    const category_id = formData.get('category_id');
+    
+    // Atualizar produto
+    const { error: updateError } = await supabase
+      .from('products')
+      .update({
+        title,
+        description,
+        price,
+        category_id
+      })
+      .eq('id', id);
+    
+    if (updateError) {
+      throw updateError;
+    }
+    
+    // Extrair arquivos de imagem
+    const imageFiles = formData.getAll('images');
+    
+    // Se houver novas imagens, fazer upload
+    if (imageFiles.length > 0 && imageFiles[0].size > 0) {
+      // Primeiro excluir as imagens antigas
+      await supabase
+        .from('product_images')
+        .delete()
+        .eq('product_id', id);
+      
+      // Fazer upload das novas imagens
+      for (let i = 0; i < imageFiles.length; i++) {
+        const file = imageFiles[i];
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${id}/${Date.now()}.${fileExt}`;
+        const filePath = `products/${fileName}`;
+        
+        const { error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(filePath, file);
+        
+        if (uploadError) {
+          console.error('Erro ao fazer upload da imagem:', uploadError);
+          continue;
+        }
+        
+        const { data: publicURL } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(filePath);
+        
+        // Salvar referência da imagem no banco
+        await supabase
+          .from('product_images')
+          .insert([{
+            product_id: id,
+            image_url: publicURL.publicUrl,
+            is_primary: i === 0 // A primeira imagem é a principal
+          }]);
+      }
+    }
+    
+    success = true;
+  } catch (e) {
+    console.error('Erro ao atualizar produto:', e);
+    error = 'Ocorreu um erro ao atualizar o produto. Tente novamente.';
+  }
+}
+
+// Formatar preço para o input
+const formattedPrice = product.price.toString();
+---
+
+<AdminLayout title="Editar Produto">
+  <div class="mb-6">
+    <a href="/admin/produtos" class="text-primary-600 hover:text-primary-800 flex items-center">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+      </svg>
+      Voltar para lista de produtos
+    </a>
+  </div>
+
+  {success ? (
+    <div class="bg-white rounded-lg shadow-md p-6 text-center">
+      <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-green-500 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+      </svg>
+      <h2 class="text-2xl font-semibold text-gray-900 mb-2">Produto atualizado com sucesso!</h2>
+      <p class="text-gray-600 mb-6">
+        As alterações foram salvas e já estão disponíveis para visualização no site.
+      </p>
+      <div class="flex justify-center space-x-4">
+        <a href="/admin/produtos" class="btn btn-outline">
+          Ver lista de produtos
+        </a>
+        <a href={`/produto/${id}`} class="btn btn-primary" target="_blank">
+          Ver produto no site
+        </a>
+      </div>
+    </div>
+  ) : (
+    <div class="bg-white rounded-lg shadow-md p-6">
+      <div class="flex justify-between items-center mb-6">
+        <h2 class="text-xl font-semibold text-gray-900">Editar produto</h2>
+        <div class="flex items-center">
+          <span class={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium mr-2 ${
+            product.status === 'available' 
+              ? 'bg-green-100 text-green-800' 
+              : 'bg-red-100 text-red-800'
+          }`}>
+            {product.status === 'available' ? 'Disponível' : 'Vendido'}
+          </span>
+          <a 
+            href={`/produto/${id}`} 
+            class="text-primary-600 hover:text-primary-800 text-sm"
+            target="_blank"
+          >
+            Ver no site
+          </a>
+        </div>
+      </div>
+      
+      {error && (
+        <div class="bg-red-100 border border-red-200 text-red-800 rounded-md p-4 mb-6">
+          {error}
+        </div>
+      )}
+      
+      <form method="POST" enctype="multipart/form-data" class="space-y-6" id="product-form">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div>
+            <label for="title" class="label">Título do produto</label>
+            <input 
+              type="text" 
+              id="title" 
+              name="title" 
+              required
+              class="input"
+              value={product.title}
+            />
+          </div>
+          
+          <div>
+            <label for="price" class="label">Preço (R$)</label>
+            <input 
+              type="number" 
+              id="price" 
+              name="price" 
+              required
+              min="0"
+              step="0.01"
+              class="input"
+              value={formattedPrice}
+            />
+          </div>
+        </div>
+        
+        <div>
+          <label for="category_id" class="label">Categoria</label>
+          <select 
+            id="category_id" 
+            name="category_id" 
+            required
+            class="input"
+          >
+            {categories.map((category) => (
+              <option 
+                value={category.id}
+                selected={category.id === product.category_id}
+              >
+                {category.name}
+              </option>
+            ))}
+          </select>
+        </div>
+        
+        <div>
+          <label for="description" class="label">Descrição</label>
+          <textarea 
+            id="description" 
+            name="description" 
+            rows="5"
+            class="input"
+          >{product.description}</textarea>
+        </div>
+        
+        <div>
+          <div class="mb-2">
+            <label class="label">Imagens atuais</label>
+            <p class="text-sm text-gray-500 mb-2">
+              Se adicionar novas imagens, as imagens atuais serão substituídas.
+            </p>
+          </div>
+          
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+            {product.product_images && product.product_images.map((image, index) => (
+              <div class="relative group">
+                <img 
+                  src={image.image_url} 
+                  alt={`${product.title} - Imagem ${index + 1}`}
+                  class="w-full h-32 object-cover rounded-lg"
+                />
+                {image.is_primary && (
+                  <div class="absolute bottom-2 right-2 bg-green-500 text-white rounded-full p-1">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+        
+        <ImageUploader />
+        
+        <div class="flex justify-end space-x-3">
+          <a href="/admin/produtos" class="btn btn-outline">
+            Cancelar
+          </a>
+          <button type="submit" class="btn btn-primary">
+            Salvar alterações
+          </button>
+        </div>
+      </form>
+    </div>
+  )}
+</AdminLayout>
+
+<script>
+  // Manipular o envio do formulário para incluir as imagens
+  document.getElementById('product-form')?.addEventListener('submit', (e) => {
+    // Não é necessário impedir o envio padrão, pois as imagens são opcionais na edição
+    
+    // Garantir que o target é um HTMLFormElement
+    const form = e.target as HTMLFormElement;
+    const formData = new FormData(form);
+    
+    // Adicionar as imagens do uploader, se houver
+    // @ts-ignore - Acessando propriedade adicionada ao window
+    if (window.getUploadedFiles) {
+      // @ts-ignore - Acessando propriedade adicionada ao window
+      const files = window.getUploadedFiles();
+      
+      if (files.length > 0) {
+        // Remover o campo de imagens existente (se houver)
+        formData.delete('images');
+        
+        // Adicionar cada arquivo ao FormData
+        files.forEach(file => {
+          formData.append('images', file);
+        });
+      }
+    }
+  });
+</script>
