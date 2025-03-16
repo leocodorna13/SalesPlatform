@@ -1,19 +1,20 @@
 ---
 ---
 
-<div class="space-y-4" id="image-uploader-component">
+<div class="space-y-4">
   <label class="label">Imagens do produto</label>
   
   <div class="border-dashed border-2 border-gray-300 rounded-lg p-6 text-center" id="upload-container">
     <input
       type="file"
-      id="file-upload"
+      id="product-images"
+      name="images"
       accept="image/*"
       multiple
       class="hidden"
     />
     
-    <label for="file-upload" class="cursor-pointer flex flex-col items-center justify-center">
+    <label for="product-images" class="cursor-pointer flex flex-col items-center justify-center">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-12 w-12 text-gray-400 mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
       </svg>
@@ -22,7 +23,8 @@
     </label>
   </div>
   
-  <div id="image-preview" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 mt-4 hidden"></div>
+  <!-- Contêiner para pré-visualização das imagens -->
+  <div id="image-preview" class="grid grid-cols-2 md:grid-cols-4 gap-4 mt-4"></div>
   
   <div class="text-gray-500 text-sm">
     <p>• A primeira imagem será a principal</p>
@@ -32,145 +34,102 @@
 </div>
 
 <script is:inline>
-  // Executar quando o DOM estiver completamente carregado
-  window.addEventListener('DOMContentLoaded', () => {
-    console.log('ImageUploader - DOM carregado');
-    
-    // Armazenar os arquivos selecionados
-    const files = [];
-    
-    // Expor a função para obter os arquivos
-    window.getUploadedFiles = function() {
-      console.log('getUploadedFiles chamado, retornando:', files);
-      return files;
-    };
-    
-    // Elementos DOM
-    const fileInput = document.getElementById('file-upload');
-    const previewContainer = document.getElementById('image-preview');
+  document.addEventListener('DOMContentLoaded', () => {
+    const fileInput = document.getElementById('product-images');
+    const imagePreview = document.getElementById('image-preview');
     const uploadContainer = document.getElementById('upload-container');
-    const dropZone = document.querySelector('.border-dashed');
     
-    console.log('Elementos DOM:');
-    console.log('- fileInput:', fileInput);
-    console.log('- previewContainer:', previewContainer);
-    console.log('- dropZone:', dropZone);
-    
-    if (!fileInput || !previewContainer || !dropZone) {
+    if (!fileInput || !imagePreview || !uploadContainer) {
       console.error('Elementos necessários não encontrados');
       return;
     }
     
-    // Adicionar evento de mudança para o input de arquivo
-    fileInput.addEventListener('change', (e) => {
-      const input = e.target;
-      if (input.files) {
-        handleFileSelect(input.files);
-      }
-    });
-    
-    // Adicionar eventos de drag and drop
-    dropZone.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      dropZone.classList.add('border-primary-300', 'bg-primary-50');
-    });
-    
-    dropZone.addEventListener('dragleave', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
-      dropZone.classList.remove('border-primary-300', 'bg-primary-50');
-    });
-    
-    dropZone.addEventListener('drop', (e) => {
-      e.preventDefault();
-      e.stopPropagation();
+    // Função para mostrar pré-visualização
+    function showPreview(files) {
+      // Limpar pré-visualizações anteriores
+      imagePreview.innerHTML = '';
       
-      dropZone.classList.remove('border-primary-300', 'bg-primary-50');
+      if (files.length === 0) return;
       
-      if (e.dataTransfer && e.dataTransfer.files.length > 0) {
-        handleFileSelect(e.dataTransfer.files);
-      }
-    });
-    
-    // Função para lidar com a seleção de arquivos
-    function handleFileSelect(selectedFiles) {
-      if (!selectedFiles || selectedFiles.length === 0) return;
-      
-      // Mostrar o container de preview
-      previewContainer.classList.remove('hidden');
-      
-      // Adicionar cada arquivo à visualização
-      for (let i = 0; i < selectedFiles.length; i++) {
-        const file = selectedFiles[i];
+      Array.from(files).forEach((file, index) => {
+        if (!file.type.match('image.*')) return;
         
-        // Verificar se é uma imagem
-        if (!file.type.match('image.*')) continue;
-        
-        // Adicionar ao array de arquivos
-        files.push(file);
-        
-        // Criar elemento de visualização
-        const previewElement = document.createElement('div');
-        previewElement.className = 'relative group';
-        
-        // Criar o reader para ler o arquivo como URL de dados
         const reader = new FileReader();
-        reader.onload = (function(file, index) {
-          return function(e) {
-            if (!e.target || !e.target.result) return;
-            
-            // Criar a imagem de preview
-            const img = document.createElement('img');
-            img.src = e.target.result;
-            img.className = 'w-full h-32 object-cover rounded-lg';
-            img.alt = file.name;
-            
-            // Adicionar botão de remoção
-            const removeButton = document.createElement('button');
-            removeButton.className = 'absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity';
-            removeButton.innerHTML = `
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        
+        reader.onload = (e) => {
+          const div = document.createElement('div');
+          div.className = 'relative';
+          
+          // Adicionar classe especial à primeira imagem (principal)
+          if (index === 0) {
+            div.classList.add('border-2', 'border-blue-500', 'rounded-lg');
+          }
+          
+          div.innerHTML = `
+            <img src="${e.target.result}" alt="Pré-visualização" class="w-full h-32 object-cover rounded-lg" />
+            <span class="absolute top-1 right-1 bg-white rounded-full p-1 cursor-pointer delete-preview">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
               </svg>
-            `;
-            removeButton.addEventListener('click', function() {
-              // Remover do array de arquivos
-              files.splice(index, 1);
-              
-              // Remover da visualização
-              previewElement.remove();
-              
-              // Se não houver mais arquivos, esconder o container de preview
-              if (files.length === 0) {
-                previewContainer.classList.add('hidden');
-              }
-            });
-            
-            // Adicionar badge de imagem principal
-            if (index === 0) {
-              const primaryBadge = document.createElement('div');
-              primaryBadge.className = 'absolute bottom-2 right-2 bg-green-500 text-white rounded-full p-1';
-              primaryBadge.innerHTML = `
-                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
-                </svg>
-              `;
-              previewElement.appendChild(primaryBadge);
-            }
-            
-            // Adicionar elementos ao preview
-            previewElement.appendChild(img);
-            previewElement.appendChild(removeButton);
-            
-            // Adicionar ao container
-            previewContainer.appendChild(previewElement);
-          };
-        })(file, files.length - 1);
+            </span>
+            ${index === 0 ? '<span class="absolute top-1 left-1 bg-blue-500 text-white text-xs px-2 py-1 rounded-full">Principal</span>' : ''}
+          `;
+          
+          imagePreview.appendChild(div);
+        };
         
-        // Ler o arquivo como URL de dados
         reader.readAsDataURL(file);
-      }
+      });
     }
+    
+    // Evento para seleção de arquivos
+    fileInput.addEventListener('change', (e) => {
+      showPreview(e.target.files);
+    });
+    
+    // Suporte para arrastar e soltar
+    ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+      uploadContainer.addEventListener(eventName, (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }, false);
+    });
+    
+    uploadContainer.addEventListener('dragenter', () => {
+      uploadContainer.classList.add('border-blue-500');
+    }, false);
+    
+    uploadContainer.addEventListener('dragleave', () => {
+      uploadContainer.classList.remove('border-blue-500');
+    }, false);
+    
+    uploadContainer.addEventListener('drop', (e) => {
+      uploadContainer.classList.remove('border-blue-500');
+      const dt = e.dataTransfer;
+      const files = dt.files;
+      fileInput.files = files;
+      showPreview(files);
+    }, false);
+    
+    // Remover imagens da pré-visualização
+    imagePreview.addEventListener('click', (e) => {
+      if (e.target.closest('.delete-preview')) {
+        const previewItem = e.target.closest('.relative');
+        const index = Array.from(imagePreview.children).indexOf(previewItem);
+        
+        // Criar uma nova FileList sem o arquivo removido
+        const dt = new DataTransfer();
+        const files = fileInput.files;
+        
+        for (let i = 0; i < files.length; i++) {
+          if (i !== index) {
+            dt.items.add(files[i]);
+          }
+        }
+        
+        fileInput.files = dt.files;
+        showPreview(fileInput.files);
+      }
+    });
   });
 </script>

@@ -197,8 +197,11 @@ export async function createProduct(productData, imageFiles) {
     if (imageFiles && imageFiles.length > 0) {
       for (let i = 0; i < imageFiles.length; i++) {
         const file = imageFiles[i];
-        // Verificar se é um objeto File válido
-        if (file && typeof file === 'object' && 'name' in file && 'type' in file && 'size' in file && file.size > 0) {
+        // Verificar se é um objeto File válido ou se tem conteúdo
+        if (file && 
+            typeof file === 'object' && 
+            ((file instanceof File && file.size > 0) || 
+             (file.name && file.type && file.size > 0))) {
           validFiles.push(file);
         } else {
           console.warn('Arquivo inválido ignorado:', file);
@@ -243,47 +246,12 @@ export async function createProduct(productData, imageFiles) {
           
           console.log('Caminho do arquivo no storage:', filePath);
           
-          // Converter para Blob usando fetch API (mais confiável)
-          let fileBlob;
-          if (file instanceof Blob) {
-            fileBlob = file;
-            console.log('Arquivo já é um Blob');
-          } else {
-            console.log('Tentando converter arquivo para Blob usando ArrayBuffer');
-            try {
-              // Método 1: Usando ArrayBuffer
-              const arrayBuffer = await file.arrayBuffer();
-              fileBlob = new Blob([arrayBuffer], { type: file.type });
-            } catch (blobError) {
-              console.warn('Erro ao converter para Blob usando ArrayBuffer:', blobError);
-              
-              try {
-                // Método 2: Usando FileReader
-                console.log('Tentando converter usando FileReader');
-                const reader = new FileReader();
-                const fileData = await new Promise((resolve, reject) => {
-                  reader.onload = () => resolve(reader.result);
-                  reader.onerror = reject;
-                  reader.readAsArrayBuffer(file);
-                });
-                
-                fileBlob = new Blob([fileData], { type: file.type });
-              } catch (readerError) {
-                console.error('Erro ao converter usando FileReader:', readerError);
-                // Método 3: Último recurso - usar o arquivo original
-                fileBlob = file;
-              }
-            }
-          }
-          
-          console.log('Blob preparado para upload:', fileBlob.size, fileBlob.type);
-          
-          // Fazer upload do arquivo
+          // Fazer upload do arquivo diretamente
           const { data: uploadData, error: uploadError } = await supabase.storage
             .from('product-images')
-            .upload(filePath, fileBlob, {
+            .upload(filePath, file, {
               cacheControl: '3600',
-              upsert: true, // Usar upsert para substituir se existir
+              upsert: true,
               contentType: file.type
             });
           
@@ -427,7 +395,58 @@ export async function deleteProduct(id) {
       return false;
     }
     
-    // Primeiro excluir as imagens
+    // Buscar as imagens do produto antes de excluí-las
+    const { data: productImages, error: fetchError } = await supabase
+      .from('product_images')
+      .select('*')
+      .eq('product_id', id);
+    
+    if (fetchError) {
+      console.error('Erro ao buscar imagens do produto:', fetchError);
+    } else {
+      console.log(`Encontradas ${productImages?.length || 0} imagens para exclusão`);
+      
+      // Excluir os arquivos do storage
+      if (productImages && productImages.length > 0) {
+        try {
+          // Excluir a pasta inteira do produto no storage
+          const { data: storageData, error: storageError } = await supabase.storage
+            .from('product-images')
+            .remove([`products/${id}`]);
+          
+          if (storageError) {
+            console.error('Erro ao excluir arquivos do storage:', storageError);
+            
+            // Tentar excluir arquivos individuais se a exclusão da pasta falhar
+            for (const image of productImages) {
+              // Extrair o caminho do arquivo da URL
+              const imageUrl = image.image_url;
+              const urlParts = imageUrl.split('/');
+              const fileName = urlParts[urlParts.length - 1];
+              const filePath = `products/${id}/${fileName}`;
+              
+              console.log(`Tentando excluir arquivo individual: ${filePath}`);
+              
+              const { error: individualError } = await supabase.storage
+                .from('product-images')
+                .remove([filePath]);
+              
+              if (individualError) {
+                console.error(`Erro ao excluir arquivo ${filePath}:`, individualError);
+              } else {
+                console.log(`Arquivo ${filePath} excluído com sucesso`);
+              }
+            }
+          } else {
+            console.log('Arquivos excluídos do storage:', storageData);
+          }
+        } catch (storageExcError) {
+          console.error('Exceção ao excluir arquivos do storage:', storageExcError);
+        }
+      }
+    }
+    
+    // Excluir as referências das imagens no banco
     const { data: imageData, error: imagesError } = await supabase
       .from('product_images')
       .delete()
@@ -439,7 +458,7 @@ export async function deleteProduct(id) {
       throw imagesError;
     }
     
-    console.log('Imagens excluídas:', imageData);
+    console.log('Referências de imagens excluídas:', imageData);
     
     // Depois excluir o produto
     const { data, error } = await supabase
