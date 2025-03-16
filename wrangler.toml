@@ -8,11 +8,4 @@ bucket = "./dist"
 command = "npm run build"
 
 [env.production]
-routes = [
-  { pattern = "/api/*", zone_name = "site-de-venda.pages.dev" }
-]
-
-# Configuração para SSR
-[[build.upload.rules]]
-type = "ESModule"
-globs = ["**/*.js"]
+NODE_ENV = "production"

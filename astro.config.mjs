@@ -7,10 +7,7 @@ export default defineConfig({
   integrations: [tailwind()],
   output: 'server',
   adapter: cloudflare({
-    mode: 'advanced',
-    routes: {
-      strategy: 'include',
-      patterns: ['/*']
-    }
+    mode: 'directory',
+    functionPerRoute: false
   }),
 });
