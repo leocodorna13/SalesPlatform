@@ -2,12 +2,15 @@ import { defineConfig } from 'astro/config';
 import tailwind from '@astrojs/tailwind';
 import cloudflare from '@astrojs/cloudflare';
 
+// https://astro.build/config
 export default defineConfig({
   integrations: [tailwind()],
-  output: 'server', // Necessário para funcionalidades dinâmicas com Supabase
+  output: 'server',
   adapter: cloudflare({
-    mode: 'directory',
-    functionPerRoute: true,
-    imageService: true,
+    mode: 'advanced',
+    routes: {
+      strategy: 'include',
+      patterns: ['/*']
+    }
   }),
 });

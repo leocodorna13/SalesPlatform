@@ -1,0 +1,13 @@
+[build]
+  command = "npm run build"
+  publish = "dist"
+  environment = { NODE_VERSION = "18" }
+
+[build.environment]
+  ASTRO_ADAPTER = "@astrojs/cloudflare"
+
+[site]
+  bucket = "./dist"
+
+[env.production]
+  NODE_ENV = "production"
