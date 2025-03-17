@@ -108,7 +108,13 @@ export async function getProducts(status = 'all') {
     
     if (status !== 'all') {
       query = query.eq('status', status);
+    } else {
+      // Se status for 'all', ainda assim excluímos os produtos ocultos
+      query = query.neq('status', 'hidden');
     }
+    
+    // Filtrar apenas produtos visíveis para o público
+    query = query.eq('visible', true);
     
     const { data, error } = await query;
     
@@ -116,6 +122,36 @@ export async function getProducts(status = 'all') {
     return data || [];
   } catch (error) {
     console.error('Erro ao buscar produtos:', error);
+    return [];
+  }
+}
+
+/**
+ * Busca produtos para o painel de administração (incluindo ocultos)
+ * @param {string} status - Status dos produtos (available, sold, hidden, all)
+ * @returns {Promise<Array>} - Lista de produtos
+ */
+export async function getAdminProducts(status = 'all') {
+  try {
+    let query = supabase
+      .from('products')
+      .select(`
+        *,
+        categories (id, name, slug),
+        product_images (id, image_url, is_primary)
+      `)
+      .order('created_at', { ascending: false });
+    
+    if (status !== 'all') {
+      query = query.eq('status', status);
+    }
+    
+    const { data, error } = await query;
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Erro ao buscar produtos para administração:', error);
     return [];
   }
 }
@@ -143,6 +179,8 @@ export async function getProductsByCategorySlug(categorySlug) {
         categories (*)
       `)
       .eq('category_id', category.id)
+      .eq('status', 'available') // Mostrar apenas produtos visíveis
+      .eq('visible', true) // Mostrar apenas produtos visíveis
       .order('created_at', { ascending: false });
     
     if (error) throw error;
@@ -164,8 +202,8 @@ export async function getProductById(id) {
       .from('products')
       .select(`
         *,
-        categories (id, name, slug),
-        product_images (id, image_url, is_primary)
+        product_images (*),
+        categories (*)
       `)
       .eq('id', id)
       .single();
@@ -173,8 +211,37 @@ export async function getProductById(id) {
     if (error) throw error;
     return data;
   } catch (error) {
-    console.error('Erro ao buscar produto:', error);
+    console.error('Erro ao buscar produto por ID:', error);
     return null;
+  }
+}
+
+/**
+ * Busca produtos relacionados (mesma categoria, excluindo o produto atual)
+ * @param {string} categoryId - ID da categoria
+ * @param {string} currentProductId - ID do produto atual a ser excluído
+ * @returns {Promise<Array>} - Lista de produtos relacionados
+ */
+export async function getRelatedProducts(categoryId, currentProductId) {
+  try {
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        product_images (*),
+        categories (*)
+      `)
+      .eq('category_id', categoryId)
+      .eq('status', 'available')
+      .eq('visible', true) // Mostrar apenas produtos visíveis
+      .neq('id', currentProductId)
+      .limit(4);
+    
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Erro ao buscar produtos relacionados:', error);
+    return [];
   }
 }
 
@@ -217,7 +284,8 @@ export async function createProduct(productData, imageFiles) {
         description: productData.description,
         price: productData.price,
         category_id: productData.category_id || null, // Permitir categoria nula
-        status: 'available'
+        status: 'available',
+        visible: true // Produto visível por padrão
       }])
       .select()
       .single();
@@ -1008,6 +1076,8 @@ export async function batchProductAction(productIds, action) {
   try {
     let result;
     
+    console.log(`Executando ação em lote: ${action} para ${productIds.length} produtos`);
+    
     switch (action) {
       case 'markSold':
         result = await supabase
@@ -1031,10 +1101,12 @@ export async function batchProductAction(productIds, action) {
         break;
         
       case 'markVisible':
+        console.log('Tornando produtos visíveis:', productIds);
         result = await supabase
           .from('products')
           .update({ visible: true, updated_at: new Date().toISOString() })
           .in('id', productIds);
+        console.log('Resultado da operação markVisible:', result);
         break;
         
       case 'delete':
@@ -1057,7 +1129,10 @@ export async function batchProductAction(productIds, action) {
         return { success: false, error: 'Ação inválida' };
     }
     
-    if (result.error) throw result.error;
+    if (result.error) {
+      console.error(`Erro na operação ${action}:`, result.error);
+      throw result.error;
+    }
     
     return { 
       success: true, 
@@ -1070,6 +1145,49 @@ export async function batchProductAction(productIds, action) {
     };
   } catch (error) {
     console.error('Erro ao executar ação em lote:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+/**
+ * Alterna a visibilidade de um produto
+ * @param {string} productId - ID do produto
+ * @returns {Promise<object>} - Resultado da operação
+ */
+export async function toggleProductVisibility(productId) {
+  try {
+    // Primeiro, obter o estado atual do produto
+    const { data: product, error: getError } = await supabase
+      .from('products')
+      .select('visible')
+      .eq('id', productId)
+      .single();
+    
+    if (getError) throw getError;
+    
+    // Alternar a visibilidade
+    const newVisibility = !product.visible;
+    
+    console.log(`Alterando visibilidade do produto ${productId} para: ${newVisibility}`);
+    
+    // Atualizar o produto
+    const { error } = await supabase
+      .from('products')
+      .update({ 
+        visible: newVisibility,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', productId);
+    
+    if (error) throw error;
+    
+    return { 
+      success: true, 
+      visible: newVisibility,
+      message: `Produto ${newVisibility ? 'visível' : 'oculto'} com sucesso!`
+    };
+  } catch (error) {
+    console.error('Erro ao alternar visibilidade do produto:', error);
     return { success: false, error: error.message };
   }
 }

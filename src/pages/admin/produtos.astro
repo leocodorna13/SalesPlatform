@@ -1,6 +1,6 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import { getProducts, updateProductStatus, deleteProduct, testImageUpload, getCurrentUser, batchProductAction } from '../../services/supabase';
+import { getAdminProducts, updateProductStatus, deleteProduct, testImageUpload, getCurrentUser, batchProductAction, toggleProductVisibility } from '../../services/supabase';
 
 // Verificar autenticação primeiro
 const user = await getCurrentUser();
@@ -84,12 +84,25 @@ if (Astro.request.method === 'POST') {
                     (result && typeof result === 'object' && 'error' in result ? 
                       `Erro: ${typeof result.error === 'string' ? result.error : 'Erro desconhecido'}` : 'Operação concluída');
     } else if (action === 'batch-markVisible' && productIds.length > 0) {
+      console.log(`Processando batch-markVisible para ${productIds.length} produtos:`, productIds);
       const result = await batchProductAction(productIds, 'markVisible');
+      console.log('Resultado da operação batch-markVisible:', result);
       messageType = result && typeof result === 'object' && 'success' in result && result.success ? 'success' : 'error';
       flashMessage = result && typeof result === 'object' && 'message' in result ? 
                     (typeof result.message === 'string' ? result.message : 'Operação concluída') : 
                     (result && typeof result === 'object' && 'error' in result ? 
                       `Erro: ${typeof result.error === 'string' ? result.error : 'Erro desconhecido'}` : 'Operação concluída');
+      console.log(`Mensagem definida para batch-markVisible: ${flashMessage}, tipo: ${messageType}`);
+    } else if (action === 'toggle-visibility' && productId) {
+      console.log(`Processando toggle-visibility para produto ${productId}`);
+      const result = await toggleProductVisibility(productId);
+      console.log('Resultado da operação:', result);
+      messageType = result && typeof result === 'object' && 'success' in result && result.success ? 'success' : 'error';
+      flashMessage = result && typeof result === 'object' && 'message' in result ? 
+                    (typeof result.message === 'string' ? result.message : 'Operação concluída') : 
+                    (result && typeof result === 'object' && 'error' in result ? 
+                      `Erro: ${typeof result.error === 'string' ? result.error : 'Erro desconhecido'}` : 'Operação concluída');
+      console.log(`Mensagem definida: ${flashMessage}, tipo: ${messageType}`);
     } else if (action === 'test-upload') {
       // Testar upload de imagem
       const result = await testImageUpload();
@@ -115,7 +128,7 @@ if (Astro.request.method === 'POST') {
 }
 
 // Buscar todos os produtos
-const products = await getProducts();
+const products = await getAdminProducts();
 
 // Formatar preço
 const formatPrice = (price: number): string => {
@@ -222,7 +235,7 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
     {products.length > 0 ? (
       <div class="divide-y divide-gray-200">
         {products.map((product) => (
-          <div class="flex items-center p-4 hover:bg-gray-50 product-row">
+          <div class={`flex items-center p-4 hover:bg-gray-50 product-row ${!product.visible ? 'bg-gray-50 opacity-70' : ''}`} data-product-id={product.id} data-visible={product.visible}>
             <div class="w-10">
               <input type="checkbox" class="checkbox checkbox-sm product-checkbox" data-product-id={product.id} />
             </div>
@@ -327,6 +340,25 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
               
               <button 
                 type="button"
+                class="text-gray-400 hover:text-gray-500 visibility-toggle" 
+                title={product.visible ? 'Ocultar produto' : 'Tornar produto visível'}
+                data-product-id={product.id}
+                data-visible={product.visible}
+              >
+                {product.visible ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                  </svg>
+                ) : (
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+                  </svg>
+                )}
+              </button>
+              
+              <button 
+                type="button"
                 class="text-gray-400 hover:text-red-500 delete-product" 
                 title="Excluir produto"
                 data-product-id={product.id}
@@ -392,7 +424,7 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
       const productId = element.dataset.productId;
       const currentStatus = element.dataset.currentStatus;
       const newStatus = currentStatus === 'available' ? 'sold' : currentStatus === 'sold' ? 'available' : 'visible';
-      const action = currentStatus === 'available' ? 'mark-sold' : currentStatus === 'sold' ? 'mark-available' : 'mark-visible';
+      const action = currentStatus === 'available' ? 'mark-sold' : currentStatus === 'sold' ? 'mark-available' : 'toggle-visibility';
       
       if (confirm(`Deseja realmente marcar este produto como ${newStatus === 'available' ? 'disponível' : newStatus === 'sold' ? 'vendido' : 'visível'}?`)) {
         const formData = new FormData();
@@ -524,13 +556,32 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
       
       if (confirm(`Deseja realmente marcar ${selectedIds.length} produto(s) como visível(is)?`)) {
         const formData = new FormData();
-        formData.append('action', 'batch-mark-visible');
+        formData.append('action', 'batch-markVisible');
+        
+        console.log(`Marcando ${selectedIds.length} produtos como visíveis`);
         
         selectedIds.forEach(id => {
           formData.append('productIds[]', id || '');
+          console.log(`Adicionado produto ID: ${id}`);
         });
         
-        reloadAfterAction(formData);
+        // Usar fetch diretamente para ter mais controle sobre a resposta
+        fetch('', {
+          method: 'POST',
+          body: formData
+        })
+        .then(response => {
+          console.log('Resposta recebida:', response.status);
+          return response.text();
+        })
+        .then((text) => {
+          console.log('Resposta:', text);
+          window.location.reload();
+        })
+        .catch(error => {
+          console.error('Erro:', error);
+          alert('Ocorreu um erro ao processar sua solicitação.');
+        });
       }
     });
   }
@@ -569,6 +620,56 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
       }
     });
   }
+
+  // Adicionar indicador visual para produtos ocultos
+  document.querySelectorAll('div[data-product-id]').forEach((row) => {
+    if (row instanceof HTMLElement) {
+      const isVisible = row.dataset.visible === 'true';
+      
+      if (!isVisible) {
+        row.classList.add('bg-gray-50', 'opacity-70');
+      }
+    }
+  });
+
+  // Manipulador para botões de alternar visibilidade
+  document.querySelectorAll('.visibility-toggle').forEach((button) => {
+    if (button instanceof HTMLElement) {
+      button.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (this instanceof HTMLElement) {
+          const productId = this.dataset.productId;
+          const isVisible = this.dataset.visible === 'true';
+          const newVisibility = !isVisible;
+          
+          if (confirm(`Deseja realmente ${isVisible ? 'ocultar' : 'tornar visível'} este produto?`)) {
+            const formData = new FormData();
+            formData.append('action', 'toggle-visibility');
+            formData.append('productId', productId || '');
+            
+            console.log(`Enviando solicitação para alternar visibilidade do produto ${productId} para ${newVisibility}`);
+            
+            fetch('', {
+              method: 'POST',
+              body: formData
+            })
+            .then(response => {
+              console.log('Resposta recebida:', response.status);
+              return response.text();
+            })
+            .then((text) => {
+              console.log('Resposta:', text);
+              window.location.reload();
+            })
+            .catch(error => {
+              console.error('Erro:', error);
+              alert('Ocorreu um erro ao processar sua solicitação.');
+            });
+          }
+        }
+      });
+    }
+  });
 
   // Verificar se há parâmetro de sucesso de upload em massa na URL
   document.addEventListener('DOMContentLoaded', () => {

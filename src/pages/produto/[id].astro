@@ -1,6 +1,7 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { getProductById, registerInterest, incrementProductViews } from '../../services/supabase';
+import ProductGrid from '../../components/ProductGrid.astro';
+import { getProductById, registerInterest, incrementProductViews, getRelatedProducts } from '../../services/supabase';
 
 // Definir interface para o produto
 interface ProductImage {
@@ -14,7 +15,8 @@ interface Product {
   title: string;
   description: string;
   price: number;
-  status: 'available' | 'sold';
+  status: 'available' | 'sold' | 'hidden';
+  visible: boolean;
   product_images: ProductImage[];
   categories: {
     id: string;
@@ -36,8 +38,8 @@ if (!id) {
 // Buscar detalhes do produto
 const product = await getProductById(id) as Product | null;
 
-// Verificar se o produto existe
-if (!product) {
+// Verificar se o produto existe e está visível
+if (!product || !product.visible) {
   return Astro.redirect('/');
 }
 
@@ -86,6 +88,11 @@ const formatPrice = (price: number) => {
 
 // Encontrar a imagem principal
 const mainImage = product.product_images.find(img => img.is_primary) || product.product_images[0];
+
+// Buscar produtos relacionados (da mesma categoria)
+const relatedProducts = product.categories ? 
+  await getRelatedProducts(product.categories.id, id) : 
+  [];
 
 ---
 
@@ -262,6 +269,14 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
         </div>
       ) : null}
     </div>
+    
+    <!-- Produtos relacionados -->
+    {relatedProducts.length > 0 && (
+      <div class="mt-16">
+        <h2 class="text-2xl font-bold text-gray-900 mb-6">Produtos relacionados</h2>
+        <ProductGrid products={relatedProducts} />
+      </div>
+    )}
   </div>
 </Layout>
 
