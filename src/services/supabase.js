@@ -1444,8 +1444,22 @@ export async function toggleProductVisibility(productId) {
 // ======= Funções de Configurações do Site =======
 
 /**
- * Busca configurações do site
- * @returns {Promise<object|null>} - Configurações do site ou null se não encontradas
+ * Interface para as configurações do site
+ * @typedef {Object} SiteSettings
+ * @property {string} id - ID único das configurações
+ * @property {string} heroTitle - Título principal da página inicial
+ * @property {string} heroDescription - Descrição principal da página inicial
+ * @property {string} heroImageUrl - URL da imagem de fundo do hero
+ * @property {string} contactPhone - Telefone de contato
+ * @property {string} contactWhatsapp - WhatsApp de contato
+ * @property {string} paymentMethods - Formas de pagamento aceitas
+ * @property {string} whatsappMessage - Mensagem padrão do WhatsApp
+ * @property {string} projectName - Nome do projeto/site
+ */
+
+/**
+ * Busca as configurações do site
+ * @returns {Promise<SiteSettings>} Configurações do site
  */
 export async function getSiteSettings() {
   try {
@@ -1458,13 +1472,15 @@ export async function getSiteSettings() {
       // Se a tabela não existir ou não tiver dados, retornamos configurações padrão
       if (error.code === 'PGRST116') {
         return {
+          id: '1',
           heroTitle: "Desapego dos Martins",
           heroDescription: "Encontre produtos de qualidade a preços acessíveis. Todos os itens estão em ótimo estado e prontos para um novo lar.",
           heroImageUrl: "/images/hero-background.jpg",
           contactPhone: "",
           contactWhatsapp: "",
           paymentMethods: "Pix, dinheiro, ou cartão parcelado com juros da maquininha",
-          whatsappMessage: "Olá, tenho interesse nesse desapego!"
+          whatsappMessage: "Olá, tenho interesse nesse desapego!",
+          projectName: 'Desapegos'
         };
       }
       console.error('Erro ao buscar configurações do site:', error);
@@ -1479,21 +1495,36 @@ export async function getSiteSettings() {
 }
 
 /**
- * Atualiza configurações do site
+ * Atualiza as configurações do site
  * @param {object} settings - Novas configurações
  * @returns {Promise<object>} - Resultado da operação
  */
 export async function updateSiteSettings(settings) {
   try {
+    console.log('Iniciando atualização de configurações:', settings);
+    
+    // Verificar se o usuário está autenticado
+    const session = await getSession();
+    if (!session) {
+      console.error('Usuário não autenticado ao tentar atualizar configurações');
+      return { success: false, message: 'Você precisa estar autenticado para atualizar as configurações' };
+    }
+    
     // Verificar se já existem configurações
-    const { data: existingSettings } = await supabase
+    const { data: existingSettings, error: fetchError } = await supabase
       .from('site_settings')
       .select('id')
       .single();
     
+    if (fetchError && fetchError.code !== 'PGRST116') {
+      console.error('Erro ao buscar configurações existentes:', fetchError);
+      return { success: false, message: fetchError.message };
+    }
+    
     let result;
     
     if (existingSettings) {
+      console.log('Atualizando configurações existentes com ID:', existingSettings.id);
       // Atualizar configurações existentes
       const { data, error } = await supabase
         .from('site_settings')
@@ -1502,9 +1533,15 @@ export async function updateSiteSettings(settings) {
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao atualizar configurações:', error);
+        return { success: false, message: error.message };
+      }
+      
+      console.log('Configurações atualizadas com sucesso:', data);
       result = { success: true, data };
     } else {
+      console.log('Criando novas configurações');
       // Criar novas configurações
       const { data, error } = await supabase
         .from('site_settings')
@@ -1512,7 +1549,12 @@ export async function updateSiteSettings(settings) {
         .select()
         .single();
       
-      if (error) throw error;
+      if (error) {
+        console.error('Erro ao criar configurações:', error);
+        return { success: false, message: error.message };
+      }
+      
+      console.log('Configurações criadas com sucesso:', data);
       result = { success: true, data };
     }
     

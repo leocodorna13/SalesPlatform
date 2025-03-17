@@ -1,194 +1,278 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import { getCurrentUser, getSiteSettings, updateSiteSettings } from '../../services/supabase';
+import { getSiteSettings, updateSiteSettings, getCurrentUser } from '../../services/supabase';
+
+// Definir interface para as configurações do site
+interface SiteSettings {
+  id: string;
+  heroTitle: string;
+  heroDescription: string;
+  heroImageUrl: string;
+  contactPhone: string;
+  contactWhatsapp: string;
+  paymentMethods: string;
+  whatsappMessage: string;
+  projectName: string;
+}
+
+// Definir interface para o resultado da operação
+interface OperationResult {
+  success: boolean;
+  message: string;
+  data?: SiteSettings;
+}
+
+// Definir interface para o resultado da operação de atualização
+interface UpdateResult {
+  success: boolean;
+  message?: string;
+  data?: SiteSettings;
+}
 
 // Verificar autenticação
 const user = await getCurrentUser();
 if (!user) {
-  return Astro.redirect('/login');
+  return Astro.redirect('/admin/login');
 }
 
 // Buscar configurações atuais
-const settings = await getSiteSettings();
+const settings = await getSiteSettings() as SiteSettings;
+
+// Verificar se as configurações foram carregadas
+if (!settings) {
+  return Astro.redirect('/admin/login?error=Não+foi+possível+carregar+as+configurações');
+}
 
 // Processar formulário
-let message = '';
-let success = false;
+let result: OperationResult = {
+  success: false,
+  message: ''
+};
 
 if (Astro.request.method === 'POST') {
   try {
     const formData = await Astro.request.formData();
     
-    const newSettings = {
-      heroTitle: formData.get('heroTitle'),
-      heroDescription: formData.get('heroDescription'),
-      heroImageUrl: formData.get('heroImageUrl'),
-      contactPhone: formData.get('contactPhone'),
-      contactWhatsapp: formData.get('contactWhatsapp'),
-      paymentMethods: formData.get('paymentMethods'),
-      whatsappMessage: formData.get('whatsappMessage')
+    console.log('Processando formulário de configurações');
+    
+    // Extrair dados do formulário
+    const updatedSettings: SiteSettings = {
+      id: settings.id,
+      projectName: formData.get('projectName') as string || settings.projectName || 'Desapegos',
+      heroTitle: formData.get('heroTitle') as string || '',
+      heroDescription: formData.get('heroDescription') as string || '',
+      heroImageUrl: formData.get('heroImageUrl') as string || '',
+      contactPhone: formData.get('contactPhone') as string || '',
+      contactWhatsapp: formData.get('contactWhatsapp') as string || '',
+      paymentMethods: formData.get('paymentMethods') as string || '',
+      whatsappMessage: formData.get('whatsappMessage') as string || ''
     };
     
-    const result = await updateSiteSettings(newSettings);
+    console.log('Dados do formulário:', updatedSettings);
     
-    if (result.success) {
-      message = 'Configurações atualizadas com sucesso!';
-      success = true;
+    // Atualizar configurações
+    const updateResult = await updateSiteSettings(updatedSettings) as UpdateResult;
+    console.log('Resultado da atualização:', updateResult);
+    
+    if (updateResult && updateResult.success) {
+      result = {
+        success: true,
+        message: 'Configurações atualizadas com sucesso!',
+        data: updateResult.data
+      };
+      
+      // Atualizar as configurações na página
+      Object.assign(settings, updateResult.data);
     } else {
-      message = `Erro ao atualizar configurações: ${result.message}`;
-      success = false;
+      result = {
+        success: false,
+        message: updateResult?.message || 'Erro ao atualizar configurações. Tente novamente.'
+      };
     }
   } catch (error) {
     console.error('Erro ao processar formulário:', error);
-    message = 'Erro ao processar formulário';
-    success = false;
+    result = {
+      success: false,
+      message: 'Ocorreu um erro ao processar sua solicitação. Tente novamente.'
+    };
   }
 }
 ---
 
 <AdminLayout title="Configurações do Site">
-  <div class="container px-6 mx-auto">
-    <h2 class="text-2xl font-semibold text-gray-900 mb-6">
-      Configurações do Site
-    </h2>
+  <div class="max-w-4xl mx-auto px-4 py-8">
+    <h1 class="text-2xl font-bold text-gray-900 mb-6">Configurações do Site</h1>
     
-    {message && (
-      <div class={`mb-6 p-4 rounded-lg ${success ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-        {message}
+    {result.message && (
+      <div class={`p-4 mb-6 rounded-md ${result.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+        {result.message}
       </div>
     )}
     
-    <div class="bg-white rounded-lg shadow-md overflow-hidden">
-      <form method="POST" class="p-6 space-y-6">
-        <div class="border-b border-gray-200 pb-6">
-          <h3 class="text-lg font-medium text-gray-900 mb-4">Hero Section</h3>
+    <form method="POST" class="space-y-8">
+      <!-- Seção: Informações Gerais -->
+      <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Informações Gerais</h2>
+        
+        <div class="space-y-6">
+          <!-- Nome do Projeto -->
+          <div>
+            <label for="projectName" class="block text-sm font-medium text-gray-700 mb-1">
+              Nome do Projeto
+            </label>
+            <div class="text-xs text-gray-500 mb-2">
+              Este nome será exibido no título das páginas e no rodapé do site.
+            </div>
+            <input
+              type="text"
+              id="projectName"
+              name="projectName"
+              value={settings.projectName || 'Desapegos'}
+              class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            />
+          </div>
           
-          <div class="grid grid-cols-1 gap-6">
-            <div>
-              <label for="heroTitle" class="block text-sm font-medium text-gray-700 mb-1">
-                Título Principal
-              </label>
-              <input
-                type="text"
-                id="heroTitle"
-                name="heroTitle"
-                value={settings?.heroTitle || ''}
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              />
+          <!-- Título do Hero -->
+          <div>
+            <label for="heroTitle" class="block text-sm font-medium text-gray-700 mb-1">
+              Título Principal
+            </label>
+            <div class="text-xs text-gray-500 mb-2">
+              Este título será exibido em destaque na página inicial.
             </div>
-            
-            <div>
-              <label for="heroDescription" class="block text-sm font-medium text-gray-700 mb-1">
-                Descrição
-              </label>
-              <textarea
-                id="heroDescription"
-                name="heroDescription"
-                rows="3"
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              >{settings?.heroDescription || ''}</textarea>
+            <input
+              type="text"
+              id="heroTitle"
+              name="heroTitle"
+              value={settings.heroTitle}
+              class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            />
+          </div>
+          
+          <!-- Descrição do Hero -->
+          <div>
+            <label for="heroDescription" class="block text-sm font-medium text-gray-700 mb-1">
+              Descrição Principal
+            </label>
+            <div class="text-xs text-gray-500 mb-2">
+              Esta descrição será exibida abaixo do título principal na página inicial.
             </div>
-            
-            <div>
-              <label for="heroImageUrl" class="block text-sm font-medium text-gray-700 mb-1">
-                URL da Imagem de Fundo
-              </label>
-              <input
-                type="text"
-                id="heroImageUrl"
-                name="heroImageUrl"
-                value={settings?.heroImageUrl || ''}
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              />
-              <p class="mt-1 text-sm text-gray-500">
-                URL da imagem de fundo para a seção principal. Recomendado: 1920x1080px.
-              </p>
+            <textarea
+              id="heroDescription"
+              name="heroDescription"
+              rows="3"
+              class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            >{settings.heroDescription}</textarea>
+          </div>
+          
+          <!-- URL da Imagem do Hero -->
+          <div>
+            <label for="heroImageUrl" class="block text-sm font-medium text-gray-700 mb-1">
+              URL da Imagem de Fundo
+            </label>
+            <div class="text-xs text-gray-500 mb-2">
+              Esta imagem será exibida como fundo da seção principal na página inicial.
             </div>
+            <input
+              type="text"
+              id="heroImageUrl"
+              name="heroImageUrl"
+              value={settings.heroImageUrl}
+              class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            />
           </div>
         </div>
+      </div>
+      
+      <!-- Seção: Informações de Contato -->
+      <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Informações de Contato</h2>
         
-        <div class="border-b border-gray-200 pb-6">
-          <h3 class="text-lg font-medium text-gray-900 mb-4">Informações de Contato</h3>
+        <div class="space-y-6">
+          <!-- Telefone de Contato -->
+          <div>
+            <label for="contactPhone" class="block text-sm font-medium text-gray-700 mb-1">
+              Telefone de Contato
+            </label>
+            <div class="text-xs text-gray-500 mb-2">
+              Este telefone será exibido no rodapé do site para contato.
+            </div>
+            <input
+              type="text"
+              id="contactPhone"
+              name="contactPhone"
+              value={settings.contactPhone}
+              class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            />
+          </div>
           
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label for="contactPhone" class="block text-sm font-medium text-gray-700 mb-1">
-                Telefone
-              </label>
-              <input
-                type="text"
-                id="contactPhone"
-                name="contactPhone"
-                value={settings?.contactPhone || ''}
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              />
+          <!-- WhatsApp de Contato -->
+          <div>
+            <label for="contactWhatsapp" class="block text-sm font-medium text-gray-700 mb-1">
+              WhatsApp de Contato
+            </label>
+            <div class="text-xs text-gray-500 mb-2">
+              Este número será usado para o botão de WhatsApp no rodapé e nas páginas de produto.
+              Formato: 5511999999999 (com código do país e DDD, sem espaços ou caracteres especiais)
             </div>
-            
-            <div>
-              <label for="contactWhatsapp" class="block text-sm font-medium text-gray-700 mb-1">
-                WhatsApp (com DDD)
-              </label>
-              <input
-                type="text"
-                id="contactWhatsapp"
-                name="contactWhatsapp"
-                value={settings?.contactWhatsapp || ''}
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              />
-              <p class="mt-1 text-sm text-gray-500">
-                Número que receberá mensagens de interesse (ex: 11999999999)
-              </p>
-            </div>
+            <input
+              type="text"
+              id="contactWhatsapp"
+              name="contactWhatsapp"
+              value={settings.contactWhatsapp}
+              class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            />
           </div>
         </div>
+      </div>
+      
+      <!-- Seção: Configurações de Pagamento e Mensagens -->
+      <div class="bg-white shadow rounded-lg p-6">
+        <h2 class="text-lg font-medium text-gray-900 mb-4">Pagamento e Mensagens</h2>
         
-        <div>
-          <h3 class="text-lg font-medium text-gray-900 mb-4">Configurações de Venda</h3>
+        <div class="space-y-6">
+          <!-- Formas de Pagamento -->
+          <div>
+            <label for="paymentMethods" class="block text-sm font-medium text-gray-700 mb-1">
+              Formas de Pagamento
+            </label>
+            <div class="text-xs text-gray-500 mb-2">
+              Estas formas de pagamento serão exibidas nas páginas de produto.
+            </div>
+            <textarea
+              id="paymentMethods"
+              name="paymentMethods"
+              rows="3"
+              class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            >{settings.paymentMethods}</textarea>
+          </div>
           
-          <div class="grid grid-cols-1 gap-6">
-            <div>
-              <label for="paymentMethods" class="block text-sm font-medium text-gray-700 mb-1">
-                Formas de Pagamento
-              </label>
-              <input
-                type="text"
-                id="paymentMethods"
-                name="paymentMethods"
-                value={settings?.paymentMethods || ''}
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              />
-              <p class="mt-1 text-sm text-gray-500">
-                Descreva as formas de pagamento aceitas
-              </p>
+          <!-- Mensagem de WhatsApp -->
+          <div>
+            <label for="whatsappMessage" class="block text-sm font-medium text-gray-700 mb-1">
+              Mensagem Padrão do WhatsApp
+            </label>
+            <div class="text-xs text-gray-500 mb-2">
+              Esta mensagem será enviada quando um usuário clicar no botão de WhatsApp em um produto.
             </div>
-            
-            <div>
-              <label for="whatsappMessage" class="block text-sm font-medium text-gray-700 mb-1">
-                Mensagem padrão do WhatsApp
-              </label>
-              <input
-                type="text"
-                id="whatsappMessage"
-                name="whatsappMessage"
-                value={settings?.whatsappMessage || ''}
-                class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-              />
-              <p class="mt-1 text-sm text-gray-500">
-                Mensagem que será enviada quando alguém demonstrar interesse
-              </p>
-            </div>
+            <textarea
+              id="whatsappMessage"
+              name="whatsappMessage"
+              rows="3"
+              class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            >{settings.whatsappMessage}</textarea>
           </div>
         </div>
-        
-        <div class="flex justify-end">
-          <button
-            type="submit"
-            class="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500 focus:ring-offset-2"
-          >
-            Salvar Configurações
-          </button>
-        </div>
-      </form>
-    </div>
+      </div>
+      
+      <div class="flex justify-end">
+        <button
+          type="submit"
+          class="inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+        >
+          Salvar Configurações
+        </button>
+      </div>
+    </form>
   </div>
 </AdminLayout>
