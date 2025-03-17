@@ -53,11 +53,28 @@ if (requireAuth) {
     <title>{title} | Admin</title>
   </head>
   <body class="bg-gray-100">
-    <div class="flex h-screen">
+    <div class="flex h-screen flex-col md:flex-row">
+      <!-- Mobile Header -->
+      <header class="bg-primary-800 text-white p-4 flex justify-between items-center md:hidden">
+        <h2 class="text-xl font-bold">Desapego dos Martins</h2>
+        <button id="mobile-menu-toggle" class="text-white focus:outline-none">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </header>
+
       <!-- Sidebar -->
-      <aside class="w-64 bg-primary-800 text-white">
+      <aside id="sidebar" class="w-full md:w-64 bg-primary-800 text-white md:h-screen md:flex md:flex-col fixed inset-0 z-50 transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 ease-in-out">
         <div class="p-4">
-          <h2 class="text-xl font-bold text-white mb-6">Desapego dos Martins</h2>
+          <div class="flex justify-between items-center mb-6">
+            <h2 class="text-xl font-bold text-white">Desapego dos Martins</h2>
+            <button id="sidebar-close" class="text-white md:hidden">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
           <nav>
             <ul class="space-y-2">
               <li>
@@ -97,24 +114,30 @@ if (requireAuth) {
             <h1 class="text-xl font-semibold text-gray-800 m-0">{title}</h1>
             {user && (
               <div class="flex items-center">
-                <span class="text-sm text-gray-600 mr-4">{user.email}</span>
-                <a href="/" class="text-sm text-primary-600 hover:text-primary-800">Ver site</a>
+                <span class="text-sm text-gray-600 mr-4 hidden sm:inline">{user.email}</span>
+                <a href="/" class="text-sm text-primary-600 hover:text-primary-800 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7m-7-7v14" />
+                  </svg>
+                  Ver site
+                </a>
               </div>
             )}
           </div>
         </header>
-
-        <main class="flex-1 overflow-y-auto p-6">
+        <main class="flex-1 overflow-x-hidden overflow-y-auto p-4">
           <slot />
         </main>
       </div>
     </div>
 
+    <!-- Overlay for mobile sidebar -->
+    <div id="sidebar-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden md:hidden"></div>
+
     <script>
-      // Lógica para logout
+      // Logout functionality
       document.getElementById('logout-btn')?.addEventListener('click', async () => {
         try {
-          // Usar fetch para chamar a função de logout do Supabase
           const response = await fetch('/admin/logout-handler', {
             method: 'POST',
           });
@@ -126,6 +149,49 @@ if (requireAuth) {
           }
         } catch (error) {
           console.error('Erro ao fazer logout:', error);
+        }
+      });
+
+      // Mobile sidebar toggle
+      const sidebar = document.getElementById('sidebar');
+      const sidebarOverlay = document.getElementById('sidebar-overlay');
+      const mobileMenuToggle = document.getElementById('mobile-menu-toggle');
+      const sidebarClose = document.getElementById('sidebar-close');
+
+      function openSidebar() {
+        sidebar?.classList.remove('-translate-x-full');
+        sidebarOverlay?.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+      }
+
+      function closeSidebar() {
+        sidebar?.classList.add('-translate-x-full');
+        sidebarOverlay?.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+      }
+
+      mobileMenuToggle?.addEventListener('click', openSidebar);
+      sidebarClose?.addEventListener('click', closeSidebar);
+      sidebarOverlay?.addEventListener('click', closeSidebar);
+
+      // Close sidebar when clicking on a link (mobile)
+      const sidebarLinks = sidebar?.querySelectorAll('a');
+      sidebarLinks?.forEach(link => {
+        link.addEventListener('click', () => {
+          if (window.innerWidth < 768) {
+            closeSidebar();
+          }
+        });
+      });
+
+      // Handle resize events
+      window.addEventListener('resize', () => {
+        if (window.innerWidth >= 768) {
+          sidebar?.classList.remove('-translate-x-full');
+          sidebarOverlay?.classList.add('hidden');
+          document.body.classList.remove('overflow-hidden');
+        } else {
+          sidebar?.classList.add('-translate-x-full');
         }
       });
     </script>

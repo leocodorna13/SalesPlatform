@@ -1,6 +1,6 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import { getProducts, updateProductStatus, deleteProduct, testImageUpload, getCurrentUser } from '../../services/supabase';
+import { getProducts, updateProductStatus, deleteProduct, testImageUpload, getCurrentUser, batchProductAction } from '../../services/supabase';
 
 // Verificar autenticação primeiro
 const user = await getCurrentUser();
@@ -15,7 +15,7 @@ interface ProductImage {
 }
 
 // Processar ações do formulário
-let message = '';
+let flashMessage = '';
 let messageType = '';
 let actionResult = null;
 
@@ -24,27 +24,72 @@ if (Astro.request.method === 'POST') {
     const formData = await Astro.request.formData();
     const action = formData.get('action')?.toString();
     const productId = formData.get('productId')?.toString();
+    const productIds = formData.getAll('productIds[]').map(id => id.toString());
     
-    console.log(`Processando ação: ${action} para produto: ${productId}`);
+    console.log(`Processando ação: ${action} para produto(s): ${productId || productIds.join(', ')}`);
     
     if (action === 'mark-sold' && productId) {
       actionResult = await updateProductStatus(productId, 'sold');
-      message = actionResult 
+      flashMessage = actionResult 
         ? 'Produto marcado como vendido com sucesso!' 
         : 'Falha ao marcar produto como vendido. Verifique o console para mais detalhes.';
       messageType = actionResult ? 'success' : 'error';
     } else if (action === 'mark-available' && productId) {
       actionResult = await updateProductStatus(productId, 'available');
-      message = actionResult 
+      flashMessage = actionResult 
         ? 'Produto marcado como disponível com sucesso!' 
         : 'Falha ao marcar produto como disponível. Verifique o console para mais detalhes.';
       messageType = actionResult ? 'success' : 'error';
     } else if (action === 'delete' && productId) {
       actionResult = await deleteProduct(productId);
-      message = actionResult 
+      flashMessage = actionResult 
         ? 'Produto excluído com sucesso!' 
         : 'Falha ao excluir produto. Verifique o console para mais detalhes.';
       messageType = actionResult ? 'success' : 'error';
+    } else if (action === 'batch-mark-sold' && productIds.length > 0) {
+      let successCount = 0;
+      for (const id of productIds) {
+        const result = await updateProductStatus(id, 'sold');
+        if (result) successCount++;
+      }
+      flashMessage = successCount > 0 
+        ? `${successCount} produto(s) marcado(s) como vendido(s) com sucesso!` 
+        : 'Falha ao marcar produtos como vendidos. Verifique o console para mais detalhes.';
+      messageType = successCount > 0 ? 'success' : 'error';
+    } else if (action === 'batch-mark-available' && productIds.length > 0) {
+      let successCount = 0;
+      for (const id of productIds) {
+        const result = await updateProductStatus(id, 'available');
+        if (result) successCount++;
+      }
+      flashMessage = successCount > 0 
+        ? `${successCount} produto(s) marcado(s) como disponível(is) com sucesso!` 
+        : 'Falha ao marcar produtos como disponíveis. Verifique o console para mais detalhes.';
+      messageType = successCount > 0 ? 'success' : 'error';
+    } else if (action === 'batch-delete' && productIds.length > 0) {
+      let successCount = 0;
+      for (const id of productIds) {
+        const result = await deleteProduct(id);
+        if (result) successCount++;
+      }
+      flashMessage = successCount > 0 
+        ? `${successCount} produto(s) excluído(s) com sucesso!` 
+        : 'Falha ao excluir produtos. Verifique o console para mais detalhes.';
+      messageType = successCount > 0 ? 'success' : 'error';
+    } else if (action === 'batch-markHidden' && productIds.length > 0) {
+      const result = await batchProductAction(productIds, 'markHidden');
+      messageType = result && typeof result === 'object' && 'success' in result && result.success ? 'success' : 'error';
+      flashMessage = result && typeof result === 'object' && 'message' in result ? 
+                    (typeof result.message === 'string' ? result.message : 'Operação concluída') : 
+                    (result && typeof result === 'object' && 'error' in result ? 
+                      `Erro: ${typeof result.error === 'string' ? result.error : 'Erro desconhecido'}` : 'Operação concluída');
+    } else if (action === 'batch-markVisible' && productIds.length > 0) {
+      const result = await batchProductAction(productIds, 'markVisible');
+      messageType = result && typeof result === 'object' && 'success' in result && result.success ? 'success' : 'error';
+      flashMessage = result && typeof result === 'object' && 'message' in result ? 
+                    (typeof result.message === 'string' ? result.message : 'Operação concluída') : 
+                    (result && typeof result === 'object' && 'error' in result ? 
+                      `Erro: ${typeof result.error === 'string' ? result.error : 'Erro desconhecido'}` : 'Operação concluída');
     } else if (action === 'test-upload') {
       // Testar upload de imagem
       const result = await testImageUpload();
@@ -53,18 +98,18 @@ if (Astro.request.method === 'POST') {
         const success = 'success' in result ? result.success : false;
         const errorDetails = 'error' in result ? result.error : null;
         
-        message = success 
+        flashMessage = success 
           ? 'Teste de upload concluído com sucesso! O sistema de armazenamento de imagens está funcionando corretamente.'
           : `Erro no teste de upload: ${errorDetails ? (typeof errorDetails === 'string' ? errorDetails : JSON.stringify(errorDetails)) : 'Erro desconhecido'}`;
         messageType = success ? 'success' : 'error';
       } else {
-        message = 'Resultado do teste de upload inválido';
+        flashMessage = 'Resultado do teste de upload inválido';
         messageType = 'error';
       }
     }
   } catch (error) {
     console.error('Erro ao processar ação:', error);
-    message = `Erro ao processar ação: ${error instanceof Error ? error.message : String(error)}`;
+    flashMessage = `Erro ao processar ação: ${error instanceof Error ? error.message : String(error)}`;
     messageType = 'error';
   }
 }
@@ -114,9 +159,9 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
     </form>
   </div>
   
-  {message && (
+  {flashMessage && (
     <div class={`p-4 mb-6 rounded-lg ${messageType === 'success' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-      <p>{message}</p>
+      <p>{flashMessage}</p>
       {actionResult === false && (
         <p class="mt-2 text-sm">
           <strong>Nota:</strong> Verifique se você está autenticado corretamente.
@@ -131,20 +176,56 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
     <p>Total de produtos: {products.length}</p>
   </div>
 
+  <!-- Ações em lote -->
+  <div id="batch-actions" class="mb-4 p-4 bg-white rounded-lg shadow hidden">
+    <div class="flex flex-wrap items-center justify-between gap-2">
+      <div>
+        <span class="text-sm font-medium" id="selected-count">0 produtos selecionados</span>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button type="button" id="batch-mark-available" class="btn btn-sm btn-outline">
+          Marcar como disponível
+        </button>
+        <button type="button" id="batch-mark-sold" class="btn btn-sm btn-outline">
+          Marcar como vendido
+        </button>
+        <button type="button" id="batch-mark-hidden" class="btn btn-sm btn-outline">
+          Marcar como oculto
+        </button>
+        <button type="button" id="batch-mark-visible" class="btn btn-sm btn-outline">
+          Marcar como visível
+        </button>
+        <button type="button" id="batch-delete" class="btn btn-sm btn-outline btn-error">
+          Excluir
+        </button>
+        <button type="button" id="batch-cancel" class="btn btn-sm btn-ghost">
+          Cancelar
+        </button>
+      </div>
+    </div>
+  </div>
+
   <div class="bg-white rounded-lg shadow overflow-hidden">
     <div class="flex border-b border-gray-200 p-4">
+      <div class="w-10 font-medium text-gray-500">
+        <input type="checkbox" id="select-all" class="checkbox checkbox-sm" />
+      </div>
       <div class="w-16 font-medium text-gray-500">Imagem</div>
       <div class="flex-1 font-medium text-gray-500">Produto</div>
       <div class="w-32 font-medium text-gray-500">Preço</div>
       <div class="w-32 font-medium text-gray-500">Status</div>
       <div class="w-32 font-medium text-gray-500">Interesse</div>
+      <div class="w-32 font-medium text-gray-500">Visualizações</div>
       <div class="w-32 font-medium text-gray-500">Ações</div>
     </div>
     
     {products.length > 0 ? (
       <div class="divide-y divide-gray-200">
         {products.map((product) => (
-          <div class="flex items-center p-4 hover:bg-gray-50">
+          <div class="flex items-center p-4 hover:bg-gray-50 product-row">
+            <div class="w-10">
+              <input type="checkbox" class="checkbox checkbox-sm product-checkbox" data-product-id={product.id} />
+            </div>
             <div class="w-16">
               <div class="relative w-12 h-12 rounded overflow-hidden">
                 <img 
@@ -156,6 +237,13 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
                   <div class="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
                     <div class="bg-red-600 text-white text-xs font-bold py-1 px-2 transform -rotate-45">
                       Vendido
+                    </div>
+                  </div>
+                )}
+                {product.status === 'hidden' && (
+                  <div class="absolute inset-0 bg-black bg-opacity-30 flex items-center justify-center">
+                    <div class="bg-gray-600 text-white text-xs font-bold py-1 px-2 transform -rotate-45">
+                      Oculto
                     </div>
                   </div>
                 )}
@@ -175,15 +263,22 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
               <span class={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                 product.status === 'available' 
                   ? 'bg-green-100 text-green-800' 
-                  : 'bg-red-100 text-red-800'
+                  : product.status === 'sold' 
+                    ? 'bg-red-100 text-red-800' 
+                    : 'bg-gray-100 text-gray-800'
               }`}>
-                {product.status === 'available' ? 'Disponível' : 'Vendido'}
+                {product.status === 'available' ? 'Disponível' : product.status === 'sold' ? 'Vendido' : 'Oculto'}
               </span>
             </div>
             
             <div class="w-32 text-center">
               <span class="text-sm font-medium text-gray-900">{product.interest_count}</span>
               <span class="text-xs text-gray-500 block">interessados</span>
+            </div>
+            
+            <div class="w-32 text-center">
+              <span class="text-sm font-medium text-gray-900">{product.views || 0}</span>
+              <span class="text-xs text-gray-500 block">visualizações</span>
             </div>
             
             <div class="w-32 flex space-x-2">
@@ -211,13 +306,17 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
               <button 
                 type="button"
                 class="text-gray-400 hover:text-gray-500 status-toggle" 
-                title={product.status === 'available' ? 'Marcar como vendido' : 'Marcar como disponível'}
+                title={product.status === 'available' ? 'Marcar como vendido' : product.status === 'sold' ? 'Marcar como disponível' : 'Marcar como visível'}
                 data-product-id={product.id}
                 data-current-status={product.status}
               >
                 {product.status === 'available' ? (
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                ) : product.status === 'sold' ? (
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z" />
                   </svg>
                 ) : (
                   <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -254,6 +353,16 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
   // Elementos do DOM
   const statusButtons = document.querySelectorAll('.status-toggle');
   const deleteButtons = document.querySelectorAll('.delete-product');
+  const productCheckboxes = document.querySelectorAll('.product-checkbox');
+  const selectAllCheckbox = document.getElementById('select-all') as HTMLInputElement | null;
+  const batchActions = document.getElementById('batch-actions');
+  const selectedCount = document.getElementById('selected-count');
+  const batchMarkAvailable = document.getElementById('batch-mark-available');
+  const batchMarkSold = document.getElementById('batch-mark-sold');
+  const batchMarkHidden = document.getElementById('batch-mark-hidden');
+  const batchMarkVisible = document.getElementById('batch-mark-visible');
+  const batchDelete = document.getElementById('batch-delete');
+  const batchCancel = document.getElementById('batch-cancel');
   
   // Função para recarregar a página após uma ação bem-sucedida
   const reloadAfterAction = async (formData: FormData) => {
@@ -282,10 +391,10 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
       const element = button as HTMLElement;
       const productId = element.dataset.productId;
       const currentStatus = element.dataset.currentStatus;
-      const newStatus = currentStatus === 'available' ? 'sold' : 'available';
-      const action = currentStatus === 'available' ? 'mark-sold' : 'mark-available';
+      const newStatus = currentStatus === 'available' ? 'sold' : currentStatus === 'sold' ? 'available' : 'visible';
+      const action = currentStatus === 'available' ? 'mark-sold' : currentStatus === 'sold' ? 'mark-available' : 'mark-visible';
       
-      if (confirm(`Deseja realmente marcar este produto como ${newStatus === 'available' ? 'disponível' : 'vendido'}?`)) {
+      if (confirm(`Deseja realmente marcar este produto como ${newStatus === 'available' ? 'disponível' : newStatus === 'sold' ? 'vendido' : 'visível'}?`)) {
         const formData = new FormData();
         formData.append('action', action);
         formData.append('productId', productId || '');
@@ -310,5 +419,178 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
         reloadAfterAction(formData);
       }
     });
+  });
+
+  // Função para atualizar a contagem de itens selecionados
+  const updateSelectedCount = () => {
+    const checkedBoxes = document.querySelectorAll('.product-checkbox:checked');
+    const count = checkedBoxes.length;
+    
+    if (count > 0 && batchActions && selectedCount) {
+      batchActions.classList.remove('hidden');
+      selectedCount.textContent = `${count} produto${count > 1 ? 's' : ''} selecionado${count > 1 ? 's' : ''}`;
+    } else if (batchActions) {
+      batchActions.classList.add('hidden');
+    }
+  };
+
+  // Event listener para checkboxes de produtos
+  productCheckboxes.forEach(checkbox => {
+    checkbox.addEventListener('change', updateSelectedCount);
+  });
+
+  // Event listener para o checkbox "selecionar todos"
+  if (selectAllCheckbox) {
+    selectAllCheckbox.addEventListener('change', () => {
+      const isChecked = selectAllCheckbox.checked;
+      
+      productCheckboxes.forEach(checkbox => {
+        (checkbox as HTMLInputElement).checked = isChecked;
+      });
+      
+      updateSelectedCount();
+    });
+  }
+
+  // Função para obter IDs dos produtos selecionados
+  const getSelectedProductIds = () => {
+    return Array.from(document.querySelectorAll('.product-checkbox:checked'))
+      .map(checkbox => (checkbox as HTMLElement).dataset.productId);
+  };
+
+  // Event listeners para ações em lote
+  if (batchMarkAvailable) {
+    batchMarkAvailable.addEventListener('click', () => {
+      const selectedIds = getSelectedProductIds();
+      
+      if (selectedIds.length === 0) return;
+      
+      if (confirm(`Deseja realmente marcar ${selectedIds.length} produto(s) como disponível(is)?`)) {
+        const formData = new FormData();
+        formData.append('action', 'batch-mark-available');
+        
+        selectedIds.forEach(id => {
+          formData.append('productIds[]', id || '');
+        });
+        
+        reloadAfterAction(formData);
+      }
+    });
+  }
+
+  if (batchMarkSold) {
+    batchMarkSold.addEventListener('click', () => {
+      const selectedIds = getSelectedProductIds();
+      
+      if (selectedIds.length === 0) return;
+      
+      if (confirm(`Deseja realmente marcar ${selectedIds.length} produto(s) como vendido(s)?`)) {
+        const formData = new FormData();
+        formData.append('action', 'batch-mark-sold');
+        
+        selectedIds.forEach(id => {
+          formData.append('productIds[]', id || '');
+        });
+        
+        reloadAfterAction(formData);
+      }
+    });
+  }
+
+  if (batchMarkHidden) {
+    batchMarkHidden.addEventListener('click', () => {
+      const selectedIds = getSelectedProductIds();
+      
+      if (selectedIds.length === 0) return;
+      
+      if (confirm(`Deseja realmente marcar ${selectedIds.length} produto(s) como oculto(s)?`)) {
+        const formData = new FormData();
+        formData.append('action', 'batch-mark-hidden');
+        
+        selectedIds.forEach(id => {
+          formData.append('productIds[]', id || '');
+        });
+        
+        reloadAfterAction(formData);
+      }
+    });
+  }
+
+  if (batchMarkVisible) {
+    batchMarkVisible.addEventListener('click', () => {
+      const selectedIds = getSelectedProductIds();
+      
+      if (selectedIds.length === 0) return;
+      
+      if (confirm(`Deseja realmente marcar ${selectedIds.length} produto(s) como visível(is)?`)) {
+        const formData = new FormData();
+        formData.append('action', 'batch-mark-visible');
+        
+        selectedIds.forEach(id => {
+          formData.append('productIds[]', id || '');
+        });
+        
+        reloadAfterAction(formData);
+      }
+    });
+  }
+
+  if (batchDelete) {
+    batchDelete.addEventListener('click', () => {
+      const selectedIds = getSelectedProductIds();
+      
+      if (selectedIds.length === 0) return;
+      
+      if (confirm(`Deseja realmente excluir ${selectedIds.length} produto(s)? Esta ação não pode ser desfeita.`)) {
+        const formData = new FormData();
+        formData.append('action', 'batch-delete');
+        
+        selectedIds.forEach(id => {
+          formData.append('productIds[]', id || '');
+        });
+        
+        reloadAfterAction(formData);
+      }
+    });
+  }
+
+  if (batchCancel) {
+    batchCancel.addEventListener('click', () => {
+      productCheckboxes.forEach(checkbox => {
+        (checkbox as HTMLInputElement).checked = false;
+      });
+      
+      if (selectAllCheckbox) {
+        selectAllCheckbox.checked = false;
+      }
+      
+      if (batchActions) {
+        batchActions.classList.add('hidden');
+      }
+    });
+  }
+
+  // Verificar se há parâmetro de sucesso de upload em massa na URL
+  document.addEventListener('DOMContentLoaded', () => {
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.get('bulk_success') === 'true') {
+      const messageDiv = document.createElement('div');
+      messageDiv.className = 'p-4 mb-6 rounded-lg bg-green-100 text-green-700';
+      messageDiv.innerHTML = '<p>Produtos em massa criados com sucesso!</p>';
+      
+      const container = document.querySelector('.mb-6');
+      if (container && container.parentNode) {
+        container.parentNode.insertBefore(messageDiv, container.nextSibling);
+        
+        // Remover a mensagem após 5 segundos
+        setTimeout(() => {
+          messageDiv.remove();
+          // Limpar o parâmetro da URL
+          const url = new URL(window.location.href);
+          url.searchParams.delete('bulk_success');
+          window.history.replaceState({}, '', url);
+        }, 5000);
+      }
+    }
   });
 </script>

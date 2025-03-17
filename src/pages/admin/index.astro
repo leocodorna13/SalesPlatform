@@ -1,7 +1,8 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import AdminPanel from '../../components/AdminPanel.astro';
-import { supabase, getCurrentUser } from '../../services/supabase';
+import ViewsMetricsCard from '../../components/ViewsMetricsCard.astro';
+import { getCurrentUser, getDashboardStats } from '../../services/supabase';
 
 // Verificar autenticação primeiro
 const user = await getCurrentUser();
@@ -9,33 +10,45 @@ if (!user) {
   return Astro.redirect('/admin/login?redirect=' + encodeURIComponent(Astro.url.pathname));
 }
 
-// Buscar estatísticas para o dashboard
-const { data: products, error: productsError } = await supabase
-  .from('products')
-  .select('id, status, views');
+// Definir tipo para as estatísticas
+interface Stats {
+  totalProducts: number;
+  availableProducts: number;
+  soldProducts: number;
+  interestCount: number;
+  totalViews: number;
+  mostViewedProducts: Array<{
+    id: string;
+    title: string;
+    views: number;
+  }>;
+}
 
-const { data: interested, error: interestedError } = await supabase
-  .from('interests')
-  .select('id');
+// Buscar estatísticas para o dashboard e converter para o tipo correto
+const statsResult = await getDashboardStats() as Stats;
 
-// Calcular estatísticas
-const totalProducts = products?.length || 0;
-const availableProducts = products?.filter(p => p.status === 'available').length || 0;
-const soldProducts = products?.filter(p => p.status === 'sold').length || 0;
-
-// Calcular total de visualizações
-const totalViews = products?.reduce((sum, product) => sum + (product.views || 0), 0) || 0;
-const totalInterested = interested?.length || 0;
-
-const stats = {
-  totalProducts,
-  availableProducts,
-  soldProducts,
-  totalViews,
-  totalInterested
+// Garantir valores padrão para evitar erros
+const stats: Stats = {
+  totalProducts: statsResult.totalProducts ?? 0,
+  availableProducts: statsResult.availableProducts ?? 0,
+  soldProducts: statsResult.soldProducts ?? 0,
+  interestCount: statsResult.interestCount ?? 0,
+  totalViews: statsResult.totalViews ?? 0,
+  mostViewedProducts: statsResult.mostViewedProducts ?? []
 };
 ---
 
 <AdminLayout title="Painel Administrativo">
-  <AdminPanel stats={stats} />
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+    <div class="lg:col-span-2">
+      <AdminPanel stats={stats} />
+    </div>
+    <div>
+      <ViewsMetricsCard 
+        title="Métricas de Visualizações" 
+        totalViews={stats.totalViews}
+        mostViewedProducts={stats.mostViewedProducts}
+      />
+    </div>
+  </div>
 </AdminLayout>

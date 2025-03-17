@@ -180,24 +180,19 @@ export async function getProductById(id) {
 
 /**
  * Cria um novo produto
- * @param {object} productData - Dados do produto
+ * @param {Object} productData - Dados do produto
  * @param {Array} imageFiles - Arquivos de imagem
- * @returns {Promise<object|null>} - Produto criado ou null se falhar
+ * @returns {Promise<Object|null>} - Produto criado ou null se falhar
  */
 export async function createProduct(productData, imageFiles) {
   try {
     console.log('Criando produto:', productData);
-    console.log('Arquivos de imagem recebidos:', imageFiles);
     
-    // Garantir que o bucket existe
-    await createBucketIfNotExists('product-images');
-    
-    // Verificar se os arquivos são válidos
+    // Verificar se há arquivos de imagem válidos
     const validFiles = [];
+    
     if (imageFiles && imageFiles.length > 0) {
-      for (let i = 0; i < imageFiles.length; i++) {
-        const file = imageFiles[i];
-        // Verificar se é um objeto File válido ou se tem conteúdo
+      for (const file of imageFiles) {
         if (file && 
             typeof file === 'object' && 
             ((file instanceof File && file.size > 0) || 
@@ -210,6 +205,9 @@ export async function createProduct(productData, imageFiles) {
     }
     
     console.log(`${validFiles.length} arquivos válidos encontrados`);
+    
+    // Garantir que o bucket existe
+    await ensureBucketExists('product-images');
     
     // Criar o produto
     const { data: product, error } = await supabase
@@ -300,18 +298,6 @@ export async function createProduct(productData, imageFiles) {
       }
       
       console.log(`Upload concluído para ${uploadedImages.length} de ${validFiles.length} imagens`);
-      
-      // Atualizar o produto com a contagem de imagens
-      if (uploadedImages.length > 0) {
-        const { error: updateError } = await supabase
-          .from('products')
-          .update({ has_images: true })
-          .eq('id', product.id);
-          
-        if (updateError) {
-          console.error('Erro ao atualizar flag de imagens do produto:', updateError);
-        }
-      }
     } else {
       console.log('Nenhuma imagem válida para upload');
     }
@@ -650,25 +636,38 @@ export async function getDashboardStats() {
     
     if (productsError) throw productsError;
     
+    // Total de produtos disponíveis
+    const availableProducts = products.filter(p => p.status === 'available').length;
+    
+    // Total de produtos vendidos
+    const soldProducts = products.filter(p => p.status === 'sold').length;
+    
+    // Total de visualizações
+    const totalViews = products.reduce((sum, product) => sum + (product.views || 0), 0);
+    
+    // Produtos mais visualizados
+    const { data: mostViewedProducts, error: viewsError } = await supabase
+      .from('products')
+      .select('id, title, views')
+      .order('views', { ascending: false })
+      .limit(5);
+    
+    if (viewsError) throw viewsError;
+    
     // Total de interessados
-    const { count: interestedCount, error: interestedError } = await supabase
+    const { count: interestCount, error: interestError } = await supabase
       .from('interested_users')
       .select('id', { count: 'exact' });
     
-    if (interestedError) throw interestedError;
-    
-    // Calcular estatísticas
-    const totalProducts = products.length;
-    const availableProducts = products.filter(p => p.status === 'available').length;
-    const soldProducts = products.filter(p => p.status === 'sold').length;
-    const totalViews = products.reduce((sum, p) => sum + (p.views || 0), 0);
+    if (interestError) throw interestError;
     
     return {
-      totalProducts,
+      totalProducts: products.length,
       availableProducts,
       soldProducts,
+      interestCount,
       totalViews,
-      interestedCount: interestedCount || 0
+      mostViewedProducts
     };
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error);
@@ -676,9 +675,55 @@ export async function getDashboardStats() {
       totalProducts: 0,
       availableProducts: 0,
       soldProducts: 0,
+      interestCount: 0,
       totalViews: 0,
-      interestedCount: 0
+      mostViewedProducts: []
     };
+  }
+}
+
+/**
+ * Verifica se um bucket existe e cria se não existir
+ * @param {string} bucketName - Nome do bucket
+ * @returns {Promise<boolean>} - true se o bucket existe ou foi criado com sucesso
+ */
+export async function ensureBucketExists(bucketName) {
+  try {
+    // Verificar se o bucket já existe
+    const { data: buckets, error: listError } = await supabase.storage
+      .listBuckets();
+    
+    if (listError) {
+      console.error('Erro ao listar buckets:', listError);
+      return false;
+    }
+    
+    const bucketExists = buckets.some(bucket => bucket.name === bucketName);
+    
+    if (bucketExists) {
+      console.log(`Bucket ${bucketName} já existe.`);
+      return true;
+    }
+    
+    // Se não existe, criar o bucket
+    console.log(`Bucket ${bucketName} não existe. Criando...`);
+    
+    // Verificar se o usuário tem permissão para criar buckets
+    const { error: createError } = await supabase.storage
+      .createBucket(bucketName, {
+        public: true
+      });
+    
+    if (createError) {
+      console.error(`Erro ao criar bucket ${bucketName}:`, createError);
+      return false;
+    }
+    
+    console.log(`Bucket ${bucketName} criado com sucesso.`);
+    return true;
+  } catch (error) {
+    console.error('Erro ao verificar/criar bucket:', error);
+    return false;
   }
 }
 
@@ -848,13 +893,16 @@ export async function findOrCreateCategory(categoryName) {
 }
 
 /**
- * Cria múltiplos produtos em uma única operação
- * @param {Array} productsData - Array de objetos com dados dos produtos e arquivos de imagem
- * @returns {Promise<Array|null>} - Array de produtos criados ou null se falhar
+ * Cria múltiplos produtos com suas imagens
+ * @param {Array<Object>} productsData - Array de dados dos produtos
+ * @returns {Promise<Array>} - Array de produtos criados
  */
 export async function createBulkProducts(productsData) {
   try {
     const createdProducts = [];
+    
+    // Verificar se o bucket existe
+    await ensureBucketExists('product-images');
     
     // Processar cada produto
     for (const productData of productsData) {
@@ -873,6 +921,7 @@ export async function createBulkProducts(productsData) {
           price,
           description,
           category_id,
+          status: 'available',
           created_at: new Date().toISOString()
         }])
         .select()
@@ -885,34 +934,53 @@ export async function createBulkProducts(productsData) {
       
       // Fazer upload da imagem
       if (image && product) {
-        const fileExt = image.name.split('.').pop();
-        const fileName = `${product.id}-${Date.now()}.${fileExt}`;
-        const filePath = `products/${fileName}`;
-        
-        const { error: uploadError } = await supabase.storage
-          .from('images')
-          .upload(filePath, image);
-        
-        if (uploadError) {
-          console.error('Erro ao fazer upload da imagem:', uploadError);
-          continue;
-        }
-        
-        // Obter URL pública da imagem
-        const { data: publicURL } = supabase.storage
-          .from('images')
-          .getPublicUrl(filePath);
-        
-        // Atualizar produto com URL da imagem
-        const { error: updateError } = await supabase
-          .from('products')
-          .update({
-            image_url: publicURL.publicUrl
-          })
-          .eq('id', product.id);
-        
-        if (updateError) {
-          console.error('Erro ao atualizar produto com URL da imagem:', updateError);
+        try {
+          const fileExt = image.name.split('.').pop();
+          const timestamp = new Date().getTime();
+          const fileName = `${product.id}/${timestamp}.${fileExt}`;
+          const filePath = `products/${fileName}`;
+          
+          // Fazer upload do arquivo
+          const { data: uploadData, error: uploadError } = await supabase.storage
+            .from('product-images')
+            .upload(filePath, image, {
+              cacheControl: '3600',
+              upsert: true,
+              contentType: image.type
+            });
+          
+          if (uploadError) {
+            console.error('Erro ao fazer upload da imagem:', uploadError);
+            continue;
+          }
+          
+          // Obter URL pública da imagem
+          const { data: publicURLData } = supabase.storage
+            .from('product-images')
+            .getPublicUrl(filePath);
+          
+          if (!publicURLData || !publicURLData.publicUrl) {
+            console.error('Falha ao gerar URL pública para a imagem');
+            continue;
+          }
+          
+          // Salvar referência da imagem no banco
+          const { data: imageData, error: imageError } = await supabase
+            .from('product_images')
+            .insert([{
+              product_id: product.id,
+              image_url: publicURLData.publicUrl,
+              is_primary: true
+            }])
+            .select();
+          
+          if (imageError) {
+            console.error('Erro ao salvar referência da imagem:', imageError);
+          } else {
+            console.log('Imagem salva com sucesso para o produto:', product.id);
+          }
+        } catch (uploadErr) {
+          console.error('Exceção durante o upload da imagem:', uploadErr);
         }
       }
       
@@ -923,5 +991,85 @@ export async function createBulkProducts(productsData) {
   } catch (error) {
     console.error('Erro ao criar produtos em massa:', error);
     throw error;
+  }
+}
+
+/**
+ * Executa ações em lote para múltiplos produtos
+ * @param {Array<string>} productIds - IDs dos produtos
+ * @param {string} action - Ação a ser executada ('markSold', 'markAvailable', 'markHidden', 'markVisible', 'delete')
+ * @returns {Promise<object>} - Resultado da operação
+ */
+export async function batchProductAction(productIds, action) {
+  if (!productIds || productIds.length === 0) {
+    return { success: false, error: 'Nenhum produto selecionado' };
+  }
+  
+  try {
+    let result;
+    
+    switch (action) {
+      case 'markSold':
+        result = await supabase
+          .from('products')
+          .update({ status: 'sold', updated_at: new Date().toISOString() })
+          .in('id', productIds);
+        break;
+        
+      case 'markAvailable':
+        result = await supabase
+          .from('products')
+          .update({ status: 'available', updated_at: new Date().toISOString() })
+          .in('id', productIds);
+        break;
+        
+      case 'markHidden':
+        result = await supabase
+          .from('products')
+          .update({ visible: false, updated_at: new Date().toISOString() })
+          .in('id', productIds);
+        break;
+        
+      case 'markVisible':
+        result = await supabase
+          .from('products')
+          .update({ visible: true, updated_at: new Date().toISOString() })
+          .in('id', productIds);
+        break;
+        
+      case 'delete':
+        // Primeiro excluímos as imagens relacionadas
+        const { error: imagesError } = await supabase
+          .from('product_images')
+          .delete()
+          .in('product_id', productIds);
+          
+        if (imagesError) throw imagesError;
+        
+        // Depois excluímos os produtos
+        result = await supabase
+          .from('products')
+          .delete()
+          .in('id', productIds);
+        break;
+        
+      default:
+        return { success: false, error: 'Ação inválida' };
+    }
+    
+    if (result.error) throw result.error;
+    
+    return { 
+      success: true, 
+      message: `${productIds.length} produtos foram ${
+        action === 'markSold' ? 'marcados como vendidos' : 
+        action === 'markAvailable' ? 'disponibilizados' : 
+        action === 'markHidden' ? 'ocultados' : 
+        action === 'markVisible' ? 'tornados visíveis' : 
+        'excluídos'} com sucesso.` 
+    };
+  } catch (error) {
+    console.error('Erro ao executar ação em lote:', error);
+    return { success: false, error: error.message };
   }
 }

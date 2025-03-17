@@ -1,16 +1,50 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { getProductById, registerInterest } from '../../services/supabase';
+import { getProductById, registerInterest, incrementProductViews } from '../../services/supabase';
+
+// Definir interface para o produto
+interface ProductImage {
+  id: string;
+  image_url: string;
+  is_primary: boolean;
+}
+
+interface Product {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  status: 'available' | 'sold';
+  product_images: ProductImage[];
+  categories: {
+    id: string;
+    name: string;
+    slug: string;
+  };
+  views: number;
+  created_at: string;
+}
 
 // Obter o ID do produto da URL
 const { id } = Astro.params;
 
+// Verificar se o ID existe
+if (!id) {
+  return Astro.redirect('/');
+}
+
 // Buscar detalhes do produto
-const product = await getProductById(id);
+const product = await getProductById(id) as Product | null;
 
 // Verificar se o produto existe
 if (!product) {
   return Astro.redirect('/');
+}
+
+// Incrementar visualizações do produto
+// Apenas incrementa visualizações em requisições GET (não em POST de formulário)
+if (Astro.request.method === 'GET') {
+  await incrementProductViews(id);
 }
 
 // Processar formulário de interesse
@@ -43,7 +77,7 @@ if (Astro.request.method === 'POST') {
 }
 
 // Formatar preço
-const formatPrice = (price) => {
+const formatPrice = (price: number) => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL'
@@ -52,6 +86,7 @@ const formatPrice = (price) => {
 
 // Encontrar a imagem principal
 const mainImage = product.product_images.find(img => img.is_primary) || product.product_images[0];
+
 ---
 
 <Layout title={product.title}>

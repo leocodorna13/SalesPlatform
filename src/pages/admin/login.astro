@@ -11,12 +11,17 @@ if (Astro.request.method === 'POST') {
     const email = formData.get('email');
     const password = formData.get('password');
     
-    const data = await loginAdmin(email, password);
-    
-    if (data) {
-      return Astro.redirect('/admin');
+    // Garantir que email e password são strings
+    if (typeof email === 'string' && typeof password === 'string') {
+      const data = await loginAdmin(email, password);
+      
+      if (data) {
+        return Astro.redirect('/admin');
+      } else {
+        error = 'Credenciais inválidas. Tente novamente.';
+      }
     } else {
-      error = 'Credenciais inválidas. Tente novamente.';
+      error = 'E-mail e senha são obrigatórios.';
     }
   } catch (e) {
     console.error('Erro ao fazer login:', e);

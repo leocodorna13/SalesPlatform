@@ -1,0 +1,181 @@
+---
+interface Props {
+  selectedCount: number;
+}
+
+const { selectedCount } = Astro.props;
+---
+
+<div id="batch-actions-toolbar" class="fixed bottom-0 left-0 right-0 bg-white shadow-lg border-t border-gray-200 transform transition-transform duration-300 translate-y-full z-50">
+  <div class="container mx-auto px-4 py-3">
+    <div class="flex items-center justify-between">
+      <div class="flex items-center">
+        <span class="font-medium text-gray-700 mr-2">{selectedCount} produtos selecionados</span>
+        <button id="clear-selection" class="text-sm text-gray-500 hover:text-gray-700">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+          </svg>
+          Limpar seleção
+        </button>
+      </div>
+      
+      <div class="flex flex-wrap gap-2">
+        <button id="batch-mark-sold" class="btn-sm bg-green-600 hover:bg-green-700 text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          Marcar como vendidos
+        </button>
+        
+        <button id="batch-mark-available" class="btn-sm bg-blue-600 hover:bg-blue-700 text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          Disponibilizar
+        </button>
+        
+        <button id="batch-mark-hidden" class="btn-sm bg-yellow-600 hover:bg-yellow-700 text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13.875 18.825A10.05 10.05 0 0112 19c-4.478 0-8.268-2.943-9.543-7a9.97 9.97 0 011.563-3.029m5.858.908a3 3 0 114.243 4.243M9.878 9.878l4.242 4.242M9.88 9.88l-3.29-3.29m7.532 7.532l3.29 3.29M3 3l3.59 3.59m0 0A9.953 9.953 0 0112 5c4.478 0 8.268 2.943 9.543 7a10.025 10.025 0 01-4.132 5.411m0 0L21 21" />
+          </svg>
+          Ocultar
+        </button>
+        
+        <button id="batch-mark-visible" class="btn-sm bg-purple-600 hover:bg-purple-700 text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+          </svg>
+          Mostrar
+        </button>
+        
+        <button id="batch-delete" class="btn-sm bg-red-600 hover:bg-red-700 text-white">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+          </svg>
+          Excluir
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .btn-sm {
+    @apply py-1 px-3 rounded text-sm font-medium flex items-center;
+  }
+</style>
+
+<script>
+  // Definir o tipo para a janela global
+  declare global {
+    interface Window {
+      updateBatchActionsToolbar: (selectedCount: number) => void;
+    }
+  }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const toolbar = document.getElementById('batch-actions-toolbar');
+    const clearSelectionBtn = document.getElementById('clear-selection');
+    const batchMarkSoldBtn = document.getElementById('batch-mark-sold');
+    const batchMarkAvailableBtn = document.getElementById('batch-mark-available');
+    const batchMarkHiddenBtn = document.getElementById('batch-mark-hidden');
+    const batchMarkVisibleBtn = document.getElementById('batch-mark-visible');
+    const batchDeleteBtn = document.getElementById('batch-delete');
+    
+    // Função para mostrar/esconder a barra de ações
+    window.updateBatchActionsToolbar = (selectedCount: number) => {
+      if (toolbar) {
+        if (selectedCount > 0) {
+          toolbar.classList.remove('translate-y-full');
+        } else {
+          toolbar.classList.add('translate-y-full');
+        }
+      }
+    };
+    
+    // Limpar seleção
+    if (clearSelectionBtn) {
+      clearSelectionBtn.addEventListener('click', () => {
+        document.querySelectorAll('.product-checkbox:checked').forEach(checkbox => {
+          (checkbox as HTMLInputElement).checked = false;
+        });
+        window.updateBatchActionsToolbar(0);
+      });
+    }
+    
+    // Função para executar ação em lote
+    const executeBatchAction = async (action: string) => {
+      const selectedIds = Array.from(document.querySelectorAll('.product-checkbox:checked'))
+        .map(checkbox => (checkbox as HTMLInputElement).getAttribute('data-product-id'));
+      
+      if (selectedIds.length === 0) return;
+      
+      // Confirmar ação
+      let confirmMessage = '';
+      switch (action) {
+        case 'markSold':
+          confirmMessage = `Marcar ${selectedIds.length} produtos como vendidos?`;
+          break;
+        case 'markAvailable':
+          confirmMessage = `Marcar ${selectedIds.length} produtos como disponíveis?`;
+          break;
+        case 'markHidden':
+          confirmMessage = `Ocultar ${selectedIds.length} produtos?`;
+          break;
+        case 'markVisible':
+          confirmMessage = `Tornar ${selectedIds.length} produtos visíveis?`;
+          break;
+        case 'delete':
+          confirmMessage = `Excluir ${selectedIds.length} produtos permanentemente?`;
+          break;
+      }
+      
+      if (!confirm(confirmMessage)) return;
+      
+      // Criar formulário para enviar
+      const form = document.createElement('form');
+      form.method = 'POST';
+      form.style.display = 'none';
+      
+      const actionInput = document.createElement('input');
+      actionInput.name = 'action';
+      actionInput.value = `batch-${action}`;
+      form.appendChild(actionInput);
+      
+      selectedIds.forEach(id => {
+        if (id) {
+          const input = document.createElement('input');
+          input.name = 'productIds[]';
+          input.value = id;
+          form.appendChild(input);
+        }
+      });
+      
+      document.body.appendChild(form);
+      form.submit();
+    };
+    
+    // Adicionar event listeners para os botões
+    if (batchMarkSoldBtn) {
+      batchMarkSoldBtn.addEventListener('click', () => executeBatchAction('markSold'));
+    }
+    
+    if (batchMarkAvailableBtn) {
+      batchMarkAvailableBtn.addEventListener('click', () => executeBatchAction('markAvailable'));
+    }
+    
+    if (batchMarkHiddenBtn) {
+      batchMarkHiddenBtn.addEventListener('click', () => executeBatchAction('markHidden'));
+    }
+    
+    if (batchMarkVisibleBtn) {
+      batchMarkVisibleBtn.addEventListener('click', () => executeBatchAction('markVisible'));
+    }
+    
+    if (batchDeleteBtn) {
+      batchDeleteBtn.addEventListener('click', () => executeBatchAction('delete'));
+    }
+  });
+</script>
