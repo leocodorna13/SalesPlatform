@@ -1,0 +1,138 @@
+---
+// Props para personalização do componente
+interface Props {
+  placeholder?: string;
+  buttonText?: string;
+  categories?: Array<{id: string, name: string}>;
+}
+
+const { 
+  placeholder = "Buscar produtos...",
+  buttonText = "Buscar",
+  categories = []
+} = Astro.props;
+---
+
+<div id="searchContainer" class="search-container w-full sticky top-4 z-40 py-2 transition-all duration-300">
+  <div class="search-bar glass w-full rounded-full shadow-lg overflow-hidden">
+    <div class="flex items-center">
+      <input 
+        type="text" 
+        id="searchInput"
+        placeholder={placeholder}
+        class="flex-1 py-3 px-6 bg-transparent text-gray-800 placeholder-gray-500 focus:outline-none"
+      />
+      <div class="flex items-center pr-2">
+        <button 
+          type="button"
+          id="searchButton"
+          class="bg-primary-600 hover:bg-primary-700 text-white p-2 rounded-full transition-colors"
+          aria-label="Buscar"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+          </svg>
+        </button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+  .glass {
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(8px);
+    border: 1px solid rgba(255, 255, 255, 0.3);
+  }
+  
+  .search-container {
+    position: sticky;
+    top: 1rem;
+    z-index: 40;
+    background: rgba(255, 255, 255, 0.8);
+    backdrop-filter: blur(8px);
+    transition: all 0.3s ease;
+  }
+</style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const searchInput = document.getElementById('searchInput') as HTMLInputElement;
+    const searchButton = document.getElementById('searchButton');
+    
+    if (!searchInput) return;
+    
+    // Função para normalizar texto (remover acentos e caracteres especiais)
+    function normalizeText(text: string): string {
+      return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    }
+    
+    // Função para filtrar produtos
+    function filterProducts(query: string) {
+      const normalizedQuery = normalizeText(query.trim());
+      
+      // Selecionar todos os produtos na página
+      const products = document.querySelectorAll('.product-card, .product-item');
+      
+      products.forEach(product => {
+        const title = normalizeText(product.querySelector('h3')?.textContent || '');
+        const description = normalizeText(product.querySelector('p')?.textContent || '');
+        const category = normalizeText(product.querySelector('.badge')?.textContent || '');
+        
+        if (normalizedQuery === '' || 
+            title.includes(normalizedQuery) || 
+            description.includes(normalizedQuery) || 
+            category.includes(normalizedQuery)) {
+          (product as HTMLElement).style.display = '';
+        } else {
+          (product as HTMLElement).style.display = 'none';
+        }
+      });
+      
+      // Verificar se há produtos visíveis
+      const visibleProducts = Array.from(products).filter(p => (p as HTMLElement).style.display !== 'none');
+      
+      // Mostrar mensagem de nenhum produto encontrado se necessário
+      const noResultsMsg = document.getElementById('noResults');
+      if (noResultsMsg) {
+        if (visibleProducts.length === 0 && normalizedQuery !== '') {
+          (noResultsMsg as HTMLElement).style.display = 'block';
+        } else {
+          (noResultsMsg as HTMLElement).style.display = 'none';
+        }
+      }
+    }
+    
+    // Filtrar em tempo real ao digitar
+    searchInput.addEventListener('input', () => {
+      filterProducts(searchInput.value);
+    });
+    
+    // Filtrar ao clicar no botão
+    if (searchButton) {
+      searchButton.addEventListener('click', () => {
+        filterProducts(searchInput.value);
+      });
+    }
+    
+    // Escutar evento de mudança de categoria
+    document.addEventListener('categoryChanged', (e: any) => {
+      const categoryButtons = document.querySelectorAll('.category-btn');
+      const selectedButton = Array.from(categoryButtons).find(btn => 
+        btn.classList.contains('active')
+      ) as HTMLElement;
+      
+      if (selectedButton && selectedButton.textContent) {
+        // Se não for "Todos", adicionar o nome da categoria ao input de pesquisa
+        if (selectedButton.dataset.category !== 'all') {
+          searchInput.value = selectedButton.textContent.trim();
+        } else {
+          searchInput.value = '';
+        }
+        
+        // Disparar o evento de input para filtrar os produtos
+        searchInput.dispatchEvent(new Event('input'));
+      }
+    });
+  });
+</script>

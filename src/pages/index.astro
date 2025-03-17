@@ -2,7 +2,9 @@
 import Layout from '../layouts/Layout.astro';
 import ProductGrid from '../components/ProductGrid.astro';
 import CategoryFilter from '../components/CategoryFilter.astro';
-import { getProducts, getCategories } from '../services/supabase';
+import SearchBar from '../components/SearchBar.astro';
+import WhatsAppButton from '../components/WhatsAppButton.astro';
+import { getProducts, getCategories, getSiteSettings } from '../services/supabase';
 
 // Buscar todas as categorias
 const categories = await getCategories();
@@ -12,57 +14,173 @@ const products = await getProducts('available');
 
 // Produtos em destaque (os 4 mais recentes)
 const featuredProducts = products.slice(0, 4);
+
+// Definir tipos para as configurações do site
+interface SiteSettings {
+  heroTitle: string;
+  heroDescription: string;
+  heroImageUrl: string;
+  contactWhatsapp: string;
+  [key: string]: any;
+}
+
+// Buscar configurações do site
+const siteSettingsData = await getSiteSettings();
+const siteSettings: SiteSettings = siteSettingsData ? siteSettingsData as SiteSettings : {
+  heroTitle: "Desapego dos Martins",
+  heroDescription: "Encontre produtos de qualidade a preços acessíveis. Todos os itens estão em ótimo estado e prontos para um novo lar.",
+  heroImageUrl: "/images/hero-background.jpg",
+  contactWhatsapp: ""
+};
 ---
 
 <Layout title="Desapego dos Martins">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <!-- Banner principal -->
-    <div class="relative bg-gradient-to-r from-primary-600 to-primary-800 rounded-xl overflow-hidden mb-12">
-      <div class="absolute inset-0 opacity-10 bg-pattern"></div>
-      <div class="relative z-10 px-8 py-16 md:px-16 md:py-20 text-white">
-        <h1 class="text-3xl md:text-4xl font-bold mb-4">Produtos à venda</h1>
-        <p class="text-lg md:text-xl mb-6 max-w-2xl">
-          Encontre produtos de qualidade a preços acessíveis. Todos os itens estão em ótimo estado.
+  <!-- Hero Section -->
+  <section class="relative min-h-[70vh] flex items-center">
+    <div class="absolute inset-0 bg-gradient-to-r from-primary-900/90 to-primary-800/80 z-10"></div>
+    <div class="absolute inset-0 overflow-hidden">
+      <img 
+        src={siteSettings.heroImageUrl || "/images/hero-background.jpg"} 
+        alt="Hero Background" 
+        class="w-full h-full object-cover"
+        loading="eager"
+      />
+    </div>
+    <div class="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-white">
+      <div class="max-w-3xl">
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 animate-fade-in">
+          {siteSettings.heroTitle}
+        </h1>
+        <p class="text-xl md:text-2xl mb-8 opacity-90 max-w-2xl animate-fade-in animation-delay-200">
+          {siteSettings.heroDescription}
         </p>
-        <a href="#produtos" class="inline-block bg-white text-primary-700 font-medium px-6 py-3 rounded-lg hover:bg-gray-100 transition-colors">
-          Ver produtos
+        <div class="flex flex-col sm:flex-row gap-4 animate-fade-in animation-delay-400">
+          <a href="#produtos" class="btn btn-accent text-lg px-8 py-4 rounded-lg">
+            Ver produtos
+          </a>
+          <a href="#categorias" class="btn btn-outline text-white border-white hover:bg-white/10 text-lg px-8 py-4 rounded-lg">
+            Explorar categorias
+          </a>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Barra de pesquisa flutuante -->
+    <div class="absolute bottom-0 left-0 right-0 z-30 transform translate-y-1/2 search-container-wrapper">
+      <div class="max-w-3xl mx-auto px-4">
+        <SearchBar categories={categories} />
+      </div>
+    </div>
+  </section>
+
+  <!-- Categorias -->
+  <section id="categorias" class="py-16 bg-gray-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl font-bold text-gray-900">Categorias</h2>
+        <p class="mt-4 text-lg text-gray-600 max-w-3xl mx-auto">
+          Explore nossos produtos por categoria e encontre exatamente o que você está procurando.
+        </p>
+      </div>
+      
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+        {categories.map(category => (
+          <a 
+            href={`/categoria/${category.slug}`} 
+            class="group bg-white rounded-lg shadow-md overflow-hidden transform transition-transform hover:scale-105 hover:shadow-lg"
+          >
+            <div class="p-6 text-center">
+              <h3 class="text-lg font-medium text-gray-900 group-hover:text-primary-600 transition-colors">
+                {category.name}
+              </h3>
+              <p class="mt-2 text-sm text-gray-500">
+                {category.product_count || 0} produtos
+              </p>
+            </div>
+          </a>
+        ))}
+      </div>
+    </div>
+  </section>
+
+  <!-- Produtos em Destaque -->
+  <section id="produtos" class="py-16">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <h2 class="text-3xl font-bold text-gray-900">Produtos em Destaque</h2>
+        <p class="mt-4 text-lg text-gray-600 max-w-3xl mx-auto">
+          Confira nossos produtos mais recentes, todos em ótimo estado e prontos para um novo lar.
+        </p>
+      </div>
+      
+      <ProductGrid products={featuredProducts} />
+      
+      <div class="mt-12 text-center">
+        <a href="/categoria/todos" class="btn btn-primary">
+          Ver todos os produtos
         </a>
       </div>
-    </div>
-    
-    <!-- Produtos em destaque -->
-    {featuredProducts.length > 0 && (
-      <div class="mb-16">
-        <h2 class="text-2xl font-bold text-gray-900 mb-6">Produtos em destaque</h2>
-        <ProductGrid products={featuredProducts} />
+      
+      <!-- Mensagem de nenhum produto encontrado (inicialmente oculta) -->
+      <div id="noResults" class="hidden mt-8 text-center py-16 bg-gray-50 rounded-lg">
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        </svg>
+        <h3 class="text-xl font-semibold text-gray-900 mb-2">Nenhum produto encontrado</h3>
+        <p class="text-gray-600">
+          Tente buscar com outras palavras ou explorar as categorias.
+        </p>
       </div>
-    )}
-    
-    <!-- Filtro de categorias e todos os produtos -->
-    <div id="produtos">
-      <h2 class="text-2xl font-bold text-gray-900 mb-6">Todos os produtos</h2>
-      
-      <CategoryFilter categories={categories} currentCategory="todos" />
-      
-      {products.length > 0 ? (
-        <ProductGrid products={products} />
-      ) : (
-        <div class="text-center py-16 bg-gray-50 rounded-lg">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">Nenhum produto disponível</h3>
-          <p class="text-gray-600">
-            No momento não há produtos disponíveis para venda.
-          </p>
-        </div>
-      )}
     </div>
-  </div>
+  </section>
+  
+  <!-- WhatsApp Button -->
+  {siteSettings.contactWhatsapp && (
+    <WhatsAppButton phoneNumber={siteSettings.contactWhatsapp} />
+  )}
 </Layout>
 
 <style>
-  .bg-pattern {
-    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='0.2'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  .search-container-wrapper.fixed {
+    position: fixed;
+    top: 4.5rem; /* Ajustado para ficar abaixo do header */
+    left: 0;
+    right: 0;
+    transform: none;
+    z-index: 30; /* Reduzido para ficar abaixo do z-index do header (40) */
+    transition: all 0.3s ease;
+  }
+  
+  .search-container-wrapper.fixed .search-container {
+    max-width: 800px;
+    margin: 0 auto;
+  }
+  
+  @media (max-width: 768px) {
+    .search-container-wrapper.fixed {
+      padding: 0 1rem;
+    }
   }
 </style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    const searchWrapper = document.querySelector('.search-container-wrapper');
+    const heroSection = document.querySelector('section');
+    
+    if (!searchWrapper || !heroSection) return;
+    
+    const heroBottom = heroSection.getBoundingClientRect().bottom;
+    const searchOriginalPosition = searchWrapper.getBoundingClientRect().top;
+    
+    window.addEventListener('scroll', () => {
+      const scrollPosition = window.scrollY;
+      
+      if (scrollPosition > heroBottom - 100) {
+        searchWrapper.classList.add('fixed');
+      } else {
+        searchWrapper.classList.remove('fixed');
+      }
+    });
+  });
+</script>

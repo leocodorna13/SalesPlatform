@@ -45,7 +45,7 @@ const formattedPrice = new Intl.NumberFormat('pt-BR', {
   <div class="p-4">
     <div class="flex justify-between items-start mb-2">
       <h3 class="text-lg font-medium text-gray-900 line-clamp-2 m-0">{title}</h3>
-      {category && category.name && <span class="badge badge-available">{category.name}</span>}
+      {category && category.name && <span class="badge bg-primary-100 text-primary-800 text-xs px-2 py-1 rounded-full">{category.name}</span>}
     </div>
     
     <p class="text-xl font-bold text-primary-700 mb-3">{formattedPrice}</p>

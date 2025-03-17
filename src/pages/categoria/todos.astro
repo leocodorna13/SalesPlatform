@@ -3,35 +3,27 @@ import Layout from '../../layouts/Layout.astro';
 import ProductGrid from '../../components/ProductGrid.astro';
 import CategoryFilter from '../../components/CategoryFilter.astro';
 import SearchBar from '../../components/SearchBar.astro';
-import { getProductsByCategorySlug, getCategories } from '../../services/supabase';
-
-// Obter o slug da categoria da URL
-const { slug } = Astro.params;
-
-// Verificar se o slug existe
-if (!slug) {
-  return Astro.redirect('/');
-}
+import { getProducts, getCategories } from '../../services/supabase';
 
 // Buscar todas as categorias
 const categories = await getCategories();
 
-// Buscar produtos da categoria
-const products = await getProductsByCategorySlug(slug);
+// Buscar todos os produtos disponíveis
+const products = await getProducts('available');
 
-// Obter o nome da categoria atual
-const currentCategory = categories.find(cat => cat.slug === slug);
+// Categoria atual é "todos"
+const currentCategory = 'todos';
 ---
 
-<Layout title={`${currentCategory?.name || 'Categoria'} | Desapego dos Martins`}>
+<Layout title="Todas as Categorias | Desapego dos Martins">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Cabeçalho da categoria -->
     <div class="mb-8">
       <h1 class="text-3xl font-bold text-gray-900 mb-2">
-        {currentCategory?.name || 'Categoria'}
+        Todas as Categorias
       </h1>
       <p class="text-gray-600">
-        Produtos disponíveis nesta categoria
+        Todos os produtos disponíveis em nossa loja
       </p>
     </div>
     
@@ -41,7 +33,7 @@ const currentCategory = categories.find(cat => cat.slug === slug);
     </div>
     
     <!-- Filtro de categorias -->
-    <CategoryFilter categories={categories} currentCategory={slug} />
+    <CategoryFilter categories={categories} currentCategory={currentCategory} />
     
     <!-- Produtos da categoria -->
     <div id="categoryProducts">
@@ -54,7 +46,7 @@ const currentCategory = categories.find(cat => cat.slug === slug);
           </svg>
           <h3 class="text-xl font-semibold text-gray-900 mb-2">Nenhum produto disponível</h3>
           <p class="text-gray-600">
-            No momento não há produtos disponíveis nesta categoria.
+            No momento não há produtos disponíveis.
           </p>
         </div>
       )}
@@ -74,7 +66,7 @@ const currentCategory = categories.find(cat => cat.slug === slug);
 </Layout>
 
 <script>
-  // Quando a página carregar, pré-selecionar a categoria atual
+  // Quando a página carregar, inicializar a categoria "todos"
   document.addEventListener('DOMContentLoaded', () => {
     // Prevenir redirecionamento ao clicar nos botões de categoria
     document.querySelectorAll('.category-btn').forEach(button => {
@@ -83,23 +75,12 @@ const currentCategory = categories.find(cat => cat.slug === slug);
       });
     });
     
-    // Inicializar a categoria atual
-    const currentSlug = window.location.pathname.split('/').pop();
-    
-    if (!currentSlug) return;
-    
-    // Encontrar o botão da categoria atual e ativá-lo
-    const categoryButtons = document.querySelectorAll('.category-btn');
-    
-    categoryButtons.forEach(button => {
-      const buttonSlug = button.getAttribute('data-slug');
-      
-      if (buttonSlug === currentSlug) {
-        // Simular um clique no botão da categoria atual para inicializar a pesquisa
-        setTimeout(() => {
-          (button as HTMLElement).click();
-        }, 100);
-      }
-    });
+    // Encontrar o botão da categoria "todos" e ativá-lo
+    const allCategoryButton = document.querySelector('[data-category="all"]');
+    if (allCategoryButton) {
+      setTimeout(() => {
+        (allCategoryButton as HTMLElement).click();
+      }, 100);
+    }
   });
 </script>

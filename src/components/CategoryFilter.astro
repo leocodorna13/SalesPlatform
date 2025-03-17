@@ -22,28 +22,72 @@ const { categories, currentCategory = 'todos' } = Astro.props;
   </div>
   
   <div class="flex flex-wrap gap-2 p-4">
-    <a 
-      href="/" 
-      class={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+    <button 
+      type="button"
+      data-category="all"
+      data-name="Todos"
+      class={`category-btn px-4 py-2 rounded-full text-sm font-medium transition-colors ${
         currentCategory === 'todos' 
-          ? 'bg-primary-100 text-primary-800 hover:bg-primary-200' 
+          ? 'active bg-primary-100 text-primary-800 hover:bg-primary-200' 
           : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
       }`}
     >
       Todos
-    </a>
+    </button>
     
     {categories.map(category => (
-      <a 
-        href={`/categoria/${category.slug}`} 
-        class={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+      <button 
+        type="button"
+        data-category={category.id}
+        data-slug={category.slug}
+        data-name={category.name}
+        class={`category-btn px-4 py-2 rounded-full text-sm font-medium transition-colors ${
           currentCategory === category.slug 
-            ? 'bg-primary-100 text-primary-800 hover:bg-primary-200' 
+            ? 'active bg-primary-100 text-primary-800 hover:bg-primary-200' 
             : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
         }`}
       >
         {category.name}
-      </a>
+      </button>
     ))}
   </div>
 </div>
+
+<script>
+  // Adicionar event listeners para os botões de categoria
+  document.addEventListener('DOMContentLoaded', () => {
+    const categoryButtons = document.querySelectorAll('.category-btn');
+    const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
+    
+    categoryButtons.forEach(button => {
+      button.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        if (!target || !('dataset' in target)) return;
+        
+        const categoryId = target.dataset.category || 'all';
+        const categoryName = target.dataset.name || '';
+        
+        // Atualizar botão ativo
+        categoryButtons.forEach(btn => btn.classList.remove('active'));
+        target.classList.add('active');
+        
+        // Atualizar o input de pesquisa com o nome da categoria
+        if (searchInput) {
+          if (categoryId === 'all') {
+            searchInput.value = '';
+          } else {
+            searchInput.value = categoryName;
+          }
+          // Disparar evento de input para filtrar os produtos
+          searchInput.dispatchEvent(new Event('input'));
+        }
+        
+        // Disparar evento personalizado para notificar a barra de pesquisa
+        const event = new CustomEvent('categoryChanged', {
+          detail: { categoryId, categoryName }
+        });
+        document.dispatchEvent(event);
+      });
+    });
+  });
+</script>

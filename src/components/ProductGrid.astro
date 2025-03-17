@@ -1,6 +1,12 @@
 ---
 import ProductCard from './ProductCard.astro';
 
+interface ProductImage {
+  id: string;
+  image_url: string;
+  is_primary: boolean;
+}
+
 interface Product {
   id: string;
   title: string;
@@ -10,11 +16,7 @@ interface Product {
     name: string;
     slug: string;
   } | null;
-  product_images: {
-    id: string;
-    image_url: string;
-    is_primary: boolean;
-  }[];
+  product_images: ProductImage[];
   views_count: number;
   interest_count: number;
 }
@@ -30,30 +32,35 @@ const { products, showSold = true } = Astro.props;
 const filteredProducts = showSold ? products : products.filter(p => p.status === 'available');
 
 // Encontrar a imagem principal para cada produto
-const getMainImage = (images) => {
+const getMainImage = (images: ProductImage[]) => {
   if (!images || images.length === 0) return null;
-  const primary = images.find(img => img.is_primary);
+  const primary = images.find((img: ProductImage) => img.is_primary);
   return primary ? primary.image_url : images[0].image_url;
 };
 ---
 
-<div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
+<div class="product-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
   {filteredProducts.length > 0 ? (
     filteredProducts.map((product) => (
-      <ProductCard
-        id={product.id}
-        title={product.title}
-        price={product.price}
-        status={product.status}
-        imageUrl={getMainImage(product.product_images)}
-        category={product.categories || null}
-        viewsCount={product.views_count || 0}
-        interestCount={product.interest_count || 0}
-      />
+      <div class="product-item" data-product-id={product.id}>
+        <ProductCard
+          id={product.id}
+          title={product.title}
+          price={product.price}
+          status={product.status}
+          imageUrl={getMainImage(product.product_images)}
+          category={product.categories || null}
+          viewsCount={product.views_count || 0}
+          interestCount={product.interest_count || 0}
+        />
+      </div>
     ))
   ) : (
     <div class="col-span-full text-center py-12">
       <p class="text-gray-500 text-lg">Nenhum produto encontrado.</p>
     </div>
   )}
+</div>
+<div id="noResults" class="text-center py-8 hidden">
+  <p class="text-gray-500">Nenhum produto encontrado</p>
 </div>

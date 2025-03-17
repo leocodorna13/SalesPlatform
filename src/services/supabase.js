@@ -163,6 +163,24 @@ export async function getAdminProducts(status = 'all') {
  */
 export async function getProductsByCategorySlug(categorySlug) {
   try {
+    // Se o slug for "todos", retornar todos os produtos disponíveis
+    if (categorySlug === 'todos') {
+      const { data, error } = await supabase
+        .from('products')
+        .select(`
+          *,
+          product_images (*),
+          categories (*)
+        `)
+        .eq('status', 'available')
+        .eq('visible', true)
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      return data || [];
+    }
+    
+    // Caso contrário, buscar produtos da categoria específica
     const { data: category, error: categoryError } = await supabase
       .from('categories')
       .select('id')
@@ -179,7 +197,7 @@ export async function getProductsByCategorySlug(categorySlug) {
         categories (*)
       `)
       .eq('category_id', category.id)
-      .eq('status', 'available') // Mostrar apenas produtos visíveis
+      .eq('status', 'available') // Mostrar apenas produtos disponíveis
       .eq('visible', true) // Mostrar apenas produtos visíveis
       .order('created_at', { ascending: false });
     
@@ -542,13 +560,34 @@ export async function deleteProduct(id) {
  */
 export async function getCategories() {
   try {
-    const { data, error } = await supabase
+    // Buscar categorias
+    const { data: categories, error } = await supabase
       .from('categories')
       .select('*')
       .order('name', { ascending: true });
     
     if (error) throw error;
-    return data || [];
+    
+    // Para cada categoria, buscar a contagem de produtos
+    const categoriesWithCount = await Promise.all(
+      (categories || []).map(async (category) => {
+        // Buscar a contagem de produtos disponíveis nesta categoria
+        const { count, error: countError } = await supabase
+          .from('products')
+          .select('id', { count: 'exact', head: true })
+          .eq('category_id', category.id)
+          .eq('status', 'available');
+        
+        if (countError) {
+          console.error(`Erro ao contar produtos para categoria ${category.id}:`, countError);
+          return { ...category, product_count: 0 };
+        }
+        
+        return { ...category, product_count: count || 0 };
+      })
+    );
+    
+    return categoriesWithCount || [];
   } catch (error) {
     console.error('Erro ao buscar categorias:', error);
     return [];
@@ -1399,5 +1438,137 @@ export async function toggleProductVisibility(productId) {
   } catch (error) {
     console.error('Erro ao alternar visibilidade do produto:', error);
     return { success: false, error: error.message };
+  }
+}
+
+// ======= Funções de Configurações do Site =======
+
+/**
+ * Busca configurações do site
+ * @returns {Promise<object|null>} - Configurações do site ou null se não encontradas
+ */
+export async function getSiteSettings() {
+  try {
+    const { data, error } = await supabase
+      .from('site_settings')
+      .select('*')
+      .single();
+    
+    if (error) {
+      // Se a tabela não existir ou não tiver dados, retornamos configurações padrão
+      if (error.code === 'PGRST116') {
+        return {
+          heroTitle: "Desapego dos Martins",
+          heroDescription: "Encontre produtos de qualidade a preços acessíveis. Todos os itens estão em ótimo estado e prontos para um novo lar.",
+          heroImageUrl: "/images/hero-background.jpg",
+          contactPhone: "",
+          contactWhatsapp: "",
+          paymentMethods: "Pix, dinheiro, ou cartão parcelado com juros da maquininha",
+          whatsappMessage: "Olá, tenho interesse nesse desapego!"
+        };
+      }
+      console.error('Erro ao buscar configurações do site:', error);
+      return null;
+    }
+    
+    return data;
+  } catch (error) {
+    console.error('Erro ao buscar configurações do site:', error);
+    return null;
+  }
+}
+
+/**
+ * Atualiza configurações do site
+ * @param {object} settings - Novas configurações
+ * @returns {Promise<object>} - Resultado da operação
+ */
+export async function updateSiteSettings(settings) {
+  try {
+    // Verificar se já existem configurações
+    const { data: existingSettings } = await supabase
+      .from('site_settings')
+      .select('id')
+      .single();
+    
+    let result;
+    
+    if (existingSettings) {
+      // Atualizar configurações existentes
+      const { data, error } = await supabase
+        .from('site_settings')
+        .update(settings)
+        .eq('id', existingSettings.id)
+        .select()
+        .single();
+      
+      if (error) throw error;
+      result = { success: true, data };
+    } else {
+      // Criar novas configurações
+      const { data, error } = await supabase
+        .from('site_settings')
+        .insert([settings])
+        .select()
+        .single();
+      
+      if (error) throw error;
+      result = { success: true, data };
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Erro ao atualizar configurações do site:', error);
+    return { success: false, message: error.message };
+  }
+}
+
+/**
+ * Busca produtos com base em um termo de pesquisa
+ * @param {string} query - Termo de busca
+ * @param {string} categoryId - ID da categoria para filtrar (opcional)
+ * @returns {Promise<Array>} - Lista de produtos encontrados
+ */
+export async function searchProducts(query, categoryId) {
+  try {
+    // Construir a query base
+    let supabaseQuery = supabase
+      .from('products')
+      .select(`
+        *,
+        product_images (
+          id,
+          url,
+          is_primary
+        ),
+        categories (
+          id,
+          name,
+          slug
+        )
+      `)
+      .eq('status', 'available')
+      .order('created_at', { ascending: false });
+    
+    // Adicionar filtro de texto se houver query
+    if (query && query.trim() !== '') {
+      const searchTerm = `%${query.toLowerCase()}%`;
+      supabaseQuery = supabaseQuery.or(`title.ilike.${searchTerm},description.ilike.${searchTerm}`);
+    }
+    
+    // Adicionar filtro de categoria se especificado
+    if (categoryId && categoryId !== 'all') {
+      supabaseQuery = supabaseQuery.eq('category_id', categoryId);
+    }
+    
+    // Executar a query
+    const { data, error } = await supabaseQuery;
+    
+    if (error) throw error;
+    
+    return data || [];
+  } catch (error) {
+    console.error('Erro ao buscar produtos:', error);
+    return [];
   }
 }
