@@ -147,29 +147,33 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
 ---
 
 <AdminLayout title="Gerenciar Produtos">
-  <div class="mb-6 flex justify-between items-center">
+  <!-- Cabeçalho da página -->
+  <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
     <h1 class="text-2xl font-bold text-gray-900">Produtos</h1>
-    <a href="/admin/produtos/novo" class="btn btn-primary">
-      <span class="flex items-center">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+    <div class="flex items-center gap-2">
+      <a href="/admin/produtos/novo" class="btn btn-primary">
+        <span class="flex items-center">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+          </svg>
+          <span class="hidden xs:inline">Novo Produto</span>
+          <span class="xs:hidden">Novo</span>
+        </span>
+      </a>
+      <button 
+        type="button"
+        class="text-gray-400 hover:text-gray-500"
+        title="Testar Upload de Imagem"
+        onclick="document.getElementById('test-upload-form').submit()"
+      >
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L20 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-2-4h6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2m0-1h6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2a2 2 0 012 2v2" />
         </svg>
-        Novo Produto
-      </span>
-    </a>
-    <button 
-      type="button"
-      class="text-gray-400 hover:text-gray-500"
-      title="Testar Upload de Imagem"
-      onclick="document.getElementById('test-upload-form').submit()"
-    >
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16l4.586-4.586a2 2 0 012.828 0L20 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-2-4h6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2m0-1h6a2 2 0 012 2v6a2 2 0 01-2 2H6a2 2 0 01-2-2V6a2 2 0 012-2h2a2 2 0 012 2v2" />
-      </svg>
-    </button>
-    <form id="test-upload-form" method="POST">
-      <input type="hidden" name="action" value="test-upload">
-    </form>
+      </button>
+      <form id="test-upload-form" method="POST">
+        <input type="hidden" name="action" value="test-upload">
+      </form>
+    </div>
   </div>
   
   {flashMessage && (
@@ -185,28 +189,40 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
   
   <!-- Informações de depuração -->
   <div class="p-4 mb-6 bg-gray-100 rounded-lg">
-    <h3 class="font-medium mb-2">Informações de Depuração:</h3>
-    <p>Total de produtos: {products.length}</p>
+    <div class="flex flex-wrap gap-4">
+      <div>
+        <h3 class="font-medium mb-1">Total de produtos:</h3>
+        <p class="text-lg font-bold">{products.length}</p>
+      </div>
+      <div>
+        <h3 class="font-medium mb-1">Visíveis:</h3>
+        <p class="text-lg font-bold">{products.filter(p => p.visible).length}</p>
+      </div>
+      <div>
+        <h3 class="font-medium mb-1">Ocultos:</h3>
+        <p class="text-lg font-bold">{products.filter(p => !p.visible).length}</p>
+      </div>
+    </div>
   </div>
 
   <!-- Ações em lote -->
   <div id="batch-actions" class="mb-4 p-4 bg-white rounded-lg shadow hidden">
-    <div class="flex flex-wrap items-center justify-between gap-2">
+    <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
       <div>
         <span class="text-sm font-medium" id="selected-count">0 produtos selecionados</span>
       </div>
       <div class="flex flex-wrap gap-2">
         <button type="button" id="batch-mark-available" class="btn btn-sm btn-outline">
-          Marcar como disponível
+          <span class="hidden sm:inline">Marcar como</span> disponível
         </button>
         <button type="button" id="batch-mark-sold" class="btn btn-sm btn-outline">
-          Marcar como vendido
+          <span class="hidden sm:inline">Marcar como</span> vendido
         </button>
         <button type="button" id="batch-mark-hidden" class="btn btn-sm btn-outline">
-          Marcar como oculto
+          <span class="hidden sm:inline">Marcar como</span> oculto
         </button>
         <button type="button" id="batch-mark-visible" class="btn btn-sm btn-outline">
-          Marcar como visível
+          <span class="hidden sm:inline">Marcar como</span> visível
         </button>
         <button type="button" id="batch-delete" class="btn btn-sm btn-outline btn-error">
           Excluir
@@ -219,7 +235,8 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
   </div>
 
   <div class="bg-white rounded-lg shadow overflow-hidden">
-    <div class="flex border-b border-gray-200 p-4">
+    <!-- Cabeçalho da tabela - visível apenas em desktop -->
+    <div class="hidden md:flex border-b border-gray-200 p-4">
       <div class="w-10 font-medium text-gray-500">
         <input type="checkbox" id="select-all" class="checkbox checkbox-sm" />
       </div>
@@ -227,19 +244,22 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
       <div class="flex-1 font-medium text-gray-500">Produto</div>
       <div class="w-32 font-medium text-gray-500">Preço</div>
       <div class="w-32 font-medium text-gray-500">Status</div>
-      <div class="w-32 font-medium text-gray-500">Interesse</div>
-      <div class="w-32 font-medium text-gray-500">Visualizações</div>
+      <div class="w-32 font-medium text-gray-500 hidden lg:block">Interesse</div>
+      <div class="w-32 font-medium text-gray-500 hidden lg:block">Visualizações</div>
       <div class="w-32 font-medium text-gray-500">Ações</div>
     </div>
     
     {products.length > 0 ? (
       <div class="divide-y divide-gray-200">
         {products.map((product) => (
-          <div class={`flex items-center p-4 hover:bg-gray-50 product-row ${!product.visible ? 'bg-gray-50 opacity-70' : ''}`} data-product-id={product.id} data-visible={product.visible}>
+          <div class={`flex flex-wrap md:flex-nowrap items-center p-4 hover:bg-gray-50 product-row ${!product.visible ? 'bg-gray-50 opacity-70' : ''}`} data-product-id={product.id} data-visible={product.visible}>
+            <!-- Checkbox (sempre visível) -->
             <div class="w-10">
               <input type="checkbox" class="checkbox checkbox-sm product-checkbox" data-product-id={product.id} />
             </div>
-            <div class="w-16">
+            
+            <!-- Imagem e informações básicas do produto -->
+            <div class="flex flex-1 md:w-auto items-center space-x-3">
               <div class="relative w-12 h-12 rounded overflow-hidden">
                 <img 
                   src={getMainImage(product.product_images) || '/placeholder-product.jpg'} 
@@ -261,18 +281,45 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
                   </div>
                 )}
               </div>
+              
+              <div class="flex-1 min-w-0">
+                <h3 class="font-medium text-gray-900 truncate">{product.title}</h3>
+                <p class="text-sm text-gray-500">{product.categories?.name || 'Sem categoria'}</p>
+                
+                <!-- Preço em mobile -->
+                <p class="text-sm font-medium text-gray-900 md:hidden mt-1">
+                  {formatPrice(product.price)}
+                </p>
+                
+                <!-- Status em mobile -->
+                <div class="md:hidden mt-1">
+                  <span class={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    product.status === 'available' 
+                      ? 'bg-green-100 text-green-800' 
+                      : product.status === 'sold' 
+                        ? 'bg-red-100 text-red-800' 
+                        : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {product.status === 'available' ? 'Disponível' : product.status === 'sold' ? 'Vendido' : 'Oculto'}
+                  </span>
+                  
+                  <!-- Visibilidade em mobile -->
+                  <span class={`ml-2 inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${
+                    product.visible ? 'bg-blue-100 text-blue-800' : 'bg-gray-100 text-gray-800'
+                  }`}>
+                    {product.visible ? 'Visível' : 'Oculto'}
+                  </span>
+                </div>
+              </div>
             </div>
             
-            <div class="flex-1">
-              <h3 class="font-medium text-gray-900">{product.title}</h3>
-              <p class="text-sm text-gray-500">{product.categories?.name || 'Sem categoria'}</p>
-            </div>
-            
-            <div class="w-32 font-medium text-gray-900">
+            <!-- Preço (desktop) -->
+            <div class="w-32 font-medium text-gray-900 hidden md:block">
               {formatPrice(product.price)}
             </div>
             
-            <div class="w-32">
+            <!-- Status (desktop) -->
+            <div class="w-32 hidden md:block">
               <span class={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                 product.status === 'available' 
                   ? 'bg-green-100 text-green-800' 
@@ -284,17 +331,20 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
               </span>
             </div>
             
-            <div class="w-32 text-center">
+            <!-- Interesse (apenas desktop) -->
+            <div class="w-32 text-center hidden lg:block">
               <span class="text-sm font-medium text-gray-900">{product.interest_count}</span>
               <span class="text-xs text-gray-500 block">interessados</span>
             </div>
             
-            <div class="w-32 text-center">
+            <!-- Visualizações (apenas desktop) -->
+            <div class="w-32 text-center hidden lg:block">
               <span class="text-sm font-medium text-gray-900">{product.views || 0}</span>
               <span class="text-xs text-gray-500 block">visualizações</span>
             </div>
             
-            <div class="w-32 flex space-x-2">
+            <!-- Ações -->
+            <div class="w-full md:w-32 flex justify-end md:justify-start space-x-2 mt-3 md:mt-0">
               <a 
                 href={`/produto/${product.id}`} 
                 class="text-gray-400 hover:text-gray-500" 
