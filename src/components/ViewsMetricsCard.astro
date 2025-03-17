@@ -10,6 +10,10 @@ interface Props {
 }
 
 const { title, totalViews, mostViewedProducts } = Astro.props;
+
+// Log para depuração
+console.log('ViewsMetricsCard - totalViews:', totalViews);
+console.log('ViewsMetricsCard - mostViewedProducts:', mostViewedProducts);
 ---
 
 <div class="bg-white rounded-lg shadow-md overflow-hidden">
@@ -21,7 +25,7 @@ const { title, totalViews, mostViewedProducts } = Astro.props;
     <div class="flex items-center justify-between mb-6">
       <div>
         <p class="text-sm text-gray-500">Total de visualizações</p>
-        <p class="text-3xl font-bold text-gray-900">{totalViews.toLocaleString('pt-BR')}</p>
+        <p class="text-3xl font-bold text-gray-900">{totalViews?.toLocaleString('pt-BR') || '0'}</p>
       </div>
       
       <div class="h-16 w-16 bg-primary-100 rounded-full flex items-center justify-center">
@@ -35,7 +39,7 @@ const { title, totalViews, mostViewedProducts } = Astro.props;
     <div>
       <h4 class="text-sm font-medium text-gray-700 mb-3">Produtos mais visualizados</h4>
       
-      {mostViewedProducts.length > 0 ? (
+      {mostViewedProducts && mostViewedProducts.length > 0 ? (
         <div class="space-y-3">
           {mostViewedProducts.map((product, index) => (
             <div class="flex items-center justify-between py-2 border-b border-gray-100 last:border-0">
@@ -58,7 +62,7 @@ const { title, totalViews, mostViewedProducts } = Astro.props;
           ))}
         </div>
       ) : (
-        <p class="text-sm text-gray-500 py-4 text-center">Nenhuma visualização registrada</p>
+        <p class="text-sm text-gray-500 italic">Nenhuma visualização registrada</p>
       )}
     </div>
   </div>

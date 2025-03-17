@@ -1,42 +1,109 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import { getCategories, createCategory } from '../../services/supabase';
+import { getCategories, createCategory, deleteCategory, moveProductsBetweenCategories, getProductCountByCategory, updateCategory } from '../../services/supabase';
+
+// Definir interfaces para os resultados das operações
+interface OperationResult {
+  success: boolean;
+  message: string;
+  [key: string]: any;
+}
 
 // Buscar categorias
 const categories = await getCategories();
 
-// Processar formulário
+// Processar formulário de criação
 let message = '';
 let messageType = '';
 
+// Processar ações de formulário
 if (Astro.request.method === 'POST') {
   try {
     const formData = await Astro.request.formData();
-    const name = formData.get('name');
+    const action = formData.get('action');
     
-    // Criar slug a partir do nome
-    const slug = name
-      .toLowerCase()
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
-      .replace(/[^\w\s]/g, '')
-      .replace(/\s+/g, '-');
-    
-    const category = await createCategory(name, slug);
-    
-    if (category) {
-      message = 'Categoria criada com sucesso!';
-      messageType = 'success';
-    } else {
-      message = 'Ocorreu um erro ao criar a categoria. Tente novamente.';
-      messageType = 'error';
+    if (action === 'create') {
+      // Criar nova categoria
+      const nameValue = formData.get('name');
+      
+      if (nameValue && typeof nameValue === 'string') {
+        const name = nameValue;
+        
+        // Criar slug a partir do nome
+        const slug = name
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^\w\s]/g, '')
+          .replace(/\s+/g, '-');
+        
+        const result = await createCategory(name, slug) as OperationResult;
+        
+        if (result) {
+          message = result.message;
+          messageType = result.success ? 'success' : 'error';
+        } else {
+          message = 'Ocorreu um erro ao criar a categoria. Tente novamente.';
+          messageType = 'error';
+        }
+      }
+    } else if (action === 'delete') {
+      // Excluir categoria
+      const categoryId = formData.get('categoryId');
+      
+      if (categoryId && typeof categoryId === 'string') {
+        const result = await deleteCategory(categoryId) as OperationResult;
+        
+        message = result.message;
+        messageType = result.success ? 'success' : 'error';
+      }
+    } else if (action === 'move') {
+      // Mover produtos entre categorias
+      const fromCategoryId = formData.get('fromCategoryId');
+      const toCategoryId = formData.get('toCategoryId');
+      
+      if (fromCategoryId && toCategoryId && typeof fromCategoryId === 'string' && typeof toCategoryId === 'string') {
+        const result = await moveProductsBetweenCategories(fromCategoryId, toCategoryId) as OperationResult;
+        
+        message = result.message;
+        messageType = result.success ? 'success' : 'error';
+      }
+    } else if (action === 'update') {
+      // Atualizar categoria
+      const categoryId = formData.get('categoryId');
+      const nameValue = formData.get('name');
+      
+      if (categoryId && nameValue && typeof categoryId === 'string' && typeof nameValue === 'string') {
+        const name = nameValue;
+        
+        // Criar slug a partir do nome
+        const slug = name
+          .toLowerCase()
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/[^\w\s]/g, '')
+          .replace(/\s+/g, '-');
+        
+        const result = await updateCategory(categoryId, name, slug) as OperationResult;
+        
+        message = result.message;
+        messageType = result.success ? 'success' : 'error';
+      }
     }
-  } catch (error) {
-    console.error('Erro ao criar categoria:', error);
-    message = 'Ocorreu um erro ao criar a categoria. Tente novamente.';
+  } catch (error: any) {
+    console.error('Erro ao processar formulário:', error);
+    message = 'Ocorreu um erro ao processar sua solicitação. Tente novamente.';
     messageType = 'error';
   }
 }
+
+// Obter contagem de produtos por categoria
+const categoriesWithCount = await Promise.all(
+  categories.map(async (category) => {
+    const count = await getProductCountByCategory(category.id);
+    return { ...category, productCount: count };
+  })
+);
 ---
 
 <AdminLayout title="Gerenciar Categorias">
@@ -55,14 +122,27 @@ if (Astro.request.method === 'POST') {
         )}
         
         <div class="divide-y divide-gray-200">
-          {categories.length > 0 ? (
-            categories.map((category) => (
-              <div class="flex items-center justify-between p-4 hover:bg-gray-50">
+          {categoriesWithCount.length > 0 ? (
+            categoriesWithCount.map((category) => (
+              <div class="flex items-center justify-between p-4 hover:bg-gray-50" id={`category-${category.id}`} draggable="true" data-category-id={category.id} data-category-name={category.name} data-category-slug={category.slug}>
                 <div>
                   <h3 class="font-medium text-gray-900">{category.name}</h3>
                   <p class="text-sm text-gray-500">Slug: {category.slug}</p>
+                  <p class="text-xs text-gray-500 mt-1">Produtos: {category.productCount}</p>
                 </div>
                 <div class="flex space-x-2">
+                  <button 
+                    type="button"
+                    class="text-blue-400 hover:text-blue-500 edit-category" 
+                    title="Editar categoria"
+                    data-category-id={category.id}
+                    data-category-name={category.name}
+                    data-category-slug={category.slug}
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                    </svg>
+                  </button>
                   <a 
                     href={`/categoria/${category.slug}`} 
                     class="text-gray-400 hover:text-gray-500" 
@@ -74,6 +154,19 @@ if (Astro.request.method === 'POST') {
                       <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
                     </svg>
                   </a>
+                  {category.productCount === 0 && (
+                    <button
+                      type="button"
+                      class="text-red-400 hover:text-red-500 delete-category"
+                      title="Excluir categoria"
+                      data-category-id={category.id}
+                      data-category-name={category.name}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                    </button>
+                  )}
                 </div>
               </div>
             ))
@@ -84,6 +177,57 @@ if (Astro.request.method === 'POST') {
           )}
         </div>
       </div>
+      
+      <!-- Formulário para mover produtos -->
+      {categories.length > 1 && (
+        <div class="bg-white rounded-lg shadow overflow-hidden mt-6">
+          <div class="p-4 border-b border-gray-200">
+            <h2 class="text-lg font-medium text-gray-900">Mover Produtos</h2>
+          </div>
+          
+          <div class="p-4">
+            <form method="POST" class="space-y-4">
+              <input type="hidden" name="action" value="move" />
+              
+              <div>
+                <label for="fromCategoryId" class="label">De:</label>
+                <select 
+                  id="fromCategoryId" 
+                  name="fromCategoryId" 
+                  required
+                  class="input"
+                >
+                  <option value="">Selecione a categoria de origem</option>
+                  {categoriesWithCount.map((category) => (
+                    <option value={category.id} disabled={category.productCount === 0}>
+                      {category.name} ({category.productCount} produtos)
+                    </option>
+                  ))}
+                </select>
+              </div>
+              
+              <div>
+                <label for="toCategoryId" class="label">Para:</label>
+                <select 
+                  id="toCategoryId" 
+                  name="toCategoryId" 
+                  required
+                  class="input"
+                >
+                  <option value="">Selecione a categoria de destino</option>
+                  {categories.map((category) => (
+                    <option value={category.id}>{category.name}</option>
+                  ))}
+                </select>
+              </div>
+              
+              <button type="submit" class="btn btn-primary w-full">
+                Mover produtos
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
     
     <!-- Formulário para adicionar categoria -->
@@ -95,6 +239,8 @@ if (Astro.request.method === 'POST') {
         
         <div class="p-4">
           <form method="POST" class="space-y-4">
+            <input type="hidden" name="action" value="create" />
+            
             <div>
               <label for="name" class="label">Nome da categoria</label>
               <input 
@@ -118,4 +264,306 @@ if (Astro.request.method === 'POST') {
       </div>
     </div>
   </div>
+  
+  <!-- Modal de confirmação para exclusão -->
+  <div id="delete-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">Confirmar exclusão</h3>
+      <p class="text-gray-600 mb-6">Tem certeza que deseja excluir a categoria <span id="category-name-to-delete" class="font-semibold"></span>?</p>
+      
+      <form method="POST" id="delete-form">
+        <input type="hidden" name="action" value="delete" />
+        <input type="hidden" name="categoryId" id="category-id-to-delete" />
+        
+        <div class="flex justify-end space-x-3">
+          <button type="button" id="cancel-delete" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">
+            Cancelar
+          </button>
+          <button type="submit" class="px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700">
+            Excluir
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <!-- Modal de edição de categoria -->
+  <div id="edit-modal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+    <div class="bg-white rounded-lg p-6 max-w-md w-full">
+      <h3 class="text-lg font-medium text-gray-900 mb-4">Editar categoria</h3>
+      
+      <form method="POST" id="edit-form">
+        <input type="hidden" name="action" value="update" />
+        <input type="hidden" name="categoryId" id="category-id-to-edit" />
+        
+        <div class="mb-4">
+          <label for="edit-name" class="label">Nome da categoria</label>
+          <input 
+            type="text" 
+            id="edit-name" 
+            name="name" 
+            required
+            class="input"
+          />
+          <p class="text-xs text-gray-500 mt-1">
+            O slug será gerado automaticamente a partir do nome.
+          </p>
+        </div>
+        
+        <div class="flex justify-end space-x-3">
+          <button type="button" id="cancel-edit" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">
+            Cancelar
+          </button>
+          <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700">
+            Salvar alterações
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+  
+  <!-- Área de drop para arrastar e soltar categorias -->
+  <div id="drop-area" class="fixed bottom-0 right-0 m-6 p-4 bg-primary-600 text-white rounded-lg shadow-lg hidden">
+    <p class="text-sm font-medium">Solte aqui para mover produtos</p>
+  </div>
+  
+  <script>
+    // Manipulação do modal de exclusão
+    const deleteModal = document.getElementById('delete-modal');
+    const categoryNameToDelete = document.getElementById('category-name-to-delete');
+    const categoryIdToDelete = document.getElementById('category-id-to-delete') as HTMLInputElement;
+    const cancelDelete = document.getElementById('cancel-delete');
+    const deleteButtons = document.querySelectorAll('.delete-category');
+    
+    // Abrir modal de exclusão
+    deleteButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const categoryId = (button as HTMLElement).dataset?.categoryId;
+        const categoryName = (button as HTMLElement).dataset?.categoryName;
+        
+        if (categoryIdToDelete && categoryNameToDelete && categoryId && categoryName) {
+          categoryIdToDelete.value = categoryId;
+          categoryNameToDelete.textContent = categoryName;
+          deleteModal?.classList.remove('hidden');
+        }
+      });
+    });
+    
+    // Fechar modal de exclusão
+    if (cancelDelete) {
+      cancelDelete.addEventListener('click', () => {
+        deleteModal?.classList.add('hidden');
+      });
+    }
+    
+    // Fechar modal ao clicar fora
+    if (deleteModal) {
+      deleteModal.addEventListener('click', (e) => {
+        if (e.target === deleteModal) {
+          deleteModal.classList.add('hidden');
+        }
+      });
+    }
+    
+    // Manipulação do modal de edição
+    const editModal = document.getElementById('edit-modal');
+    const categoryIdToEdit = document.getElementById('category-id-to-edit') as HTMLInputElement;
+    const editNameInput = document.getElementById('edit-name') as HTMLInputElement;
+    const cancelEdit = document.getElementById('cancel-edit');
+    const editButtons = document.querySelectorAll('.edit-category');
+    
+    // Abrir modal de edição
+    editButtons.forEach(button => {
+      button.addEventListener('click', () => {
+        const categoryId = (button as HTMLElement).dataset?.categoryId;
+        const categoryName = (button as HTMLElement).dataset?.categoryName;
+        
+        if (categoryIdToEdit && editNameInput && categoryId && categoryName) {
+          categoryIdToEdit.value = categoryId;
+          editNameInput.value = categoryName;
+          editModal?.classList.remove('hidden');
+        }
+      });
+    });
+    
+    // Fechar modal de edição
+    if (cancelEdit) {
+      cancelEdit.addEventListener('click', () => {
+        editModal?.classList.add('hidden');
+      });
+    }
+    
+    // Fechar modal ao clicar fora
+    if (editModal) {
+      editModal.addEventListener('click', (e) => {
+        if (e.target === editModal) {
+          editModal.classList.add('hidden');
+        }
+      });
+    }
+    
+    // Funcionalidade de arrastar e soltar
+    const categoryItems = document.querySelectorAll('[draggable="true"]');
+    const dropArea = document.getElementById('drop-area');
+    let draggedCategoryId: string | null = null;
+    let draggedCategoryName: string | null = null;
+    
+    // Iniciar arrastar
+    categoryItems.forEach(item => {
+      item.addEventListener('dragstart', (e) => {
+        draggedCategoryId = (item as HTMLElement).dataset?.categoryId || null;
+        draggedCategoryName = (item as HTMLElement).dataset?.categoryName || null;
+        
+        if (e instanceof DragEvent && draggedCategoryId) {
+          e.dataTransfer?.setData('text/plain', draggedCategoryId);
+          item.classList.add('opacity-50');
+          
+          // Mostrar área de drop apenas se houver produtos na categoria
+          const productCountText = item.querySelector('.text-xs')?.textContent;
+          const productCount = productCountText ? parseInt(productCountText.match(/\d+/)?.[0] || '0') : 0;
+          
+          if (productCount > 0) {
+            setTimeout(() => {
+              dropArea?.classList.remove('hidden');
+            }, 100);
+          }
+        }
+      });
+      
+      item.addEventListener('dragend', () => {
+        item.classList.remove('opacity-50');
+        dropArea?.classList.add('hidden');
+      });
+    });
+    
+    // Configurar área de drop
+    if (dropArea) {
+      dropArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropArea.classList.add('bg-primary-700');
+      });
+      
+      dropArea.addEventListener('dragleave', () => {
+        dropArea.classList.remove('bg-primary-700');
+      });
+      
+      dropArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        dropArea.classList.add('hidden');
+        dropArea.classList.remove('bg-primary-700');
+        
+        // Mostrar modal de seleção de categoria de destino
+        if (draggedCategoryId && draggedCategoryName) {
+          showMoveModal(draggedCategoryId, draggedCategoryName);
+        }
+      });
+    }
+    
+    // Modal para selecionar categoria de destino
+    function showMoveModal(fromCategoryId: string, fromCategoryName: string) {
+      const moveModal = document.createElement('div');
+      moveModal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      moveModal.id = 'move-modal';
+      
+      const categories = Array.from(document.querySelectorAll('[data-category-id]'))
+        .map(el => ({ 
+          id: (el as HTMLElement).dataset?.categoryId, 
+          name: (el as HTMLElement).dataset?.categoryName 
+        }))
+        .filter(cat => cat.id !== fromCategoryId && cat.id && cat.name);
+      
+      moveModal.innerHTML = `
+        <div class="bg-white rounded-lg p-6 max-w-md w-full">
+          <h3 class="text-lg font-medium text-gray-900 mb-4">Mover produtos</h3>
+          <p class="text-gray-600 mb-4">Selecione a categoria de destino para mover os produtos de <span class="font-semibold">${fromCategoryName}</span>:</p>
+          
+          <form method="POST">
+            <input type="hidden" name="action" value="move" />
+            <input type="hidden" name="fromCategoryId" value="${fromCategoryId}" />
+            
+            <div class="mb-4">
+              <select name="toCategoryId" class="input w-full" required>
+                <option value="">Selecione a categoria de destino</option>
+                ${categories.map(cat => cat.id && cat.name ? `<option value="${cat.id}">${cat.name}</option>` : '').join('')}
+              </select>
+            </div>
+            
+            <div class="flex justify-end space-x-3">
+              <button type="button" id="cancel-move" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">
+                Cancelar
+              </button>
+              <button type="submit" class="px-4 py-2 bg-primary-600 text-white rounded hover:bg-primary-700">
+                Mover
+              </button>
+            </div>
+          </form>
+        </div>
+      `;
+      
+      document.body.appendChild(moveModal);
+      
+      // Fechar modal
+      const cancelMoveButton = document.getElementById('cancel-move');
+      if (cancelMoveButton) {
+        cancelMoveButton.addEventListener('click', () => {
+          document.body.removeChild(moveModal);
+        });
+      }
+      
+      // Fechar modal ao clicar fora
+      moveModal.addEventListener('click', (e) => {
+        if (e.target === moveModal) {
+          document.body.removeChild(moveModal);
+        }
+      });
+    }
+    
+    // Desabilitar opção de selecionar a mesma categoria no formulário de mover produtos
+    const fromCategorySelect = document.getElementById('fromCategoryId') as HTMLSelectElement;
+    const toCategorySelect = document.getElementById('toCategoryId') as HTMLSelectElement;
+    
+    if (fromCategorySelect && toCategorySelect) {
+      fromCategorySelect.addEventListener('change', () => {
+        const selectedFromId = fromCategorySelect.value;
+        
+        // Resetar opções do select de destino
+        Array.from(toCategorySelect.options).forEach(option => {
+          option.disabled = option.value === selectedFromId;
+        });
+      });
+    }
+  </script>
+
+<style>
+  /* Estilos para arrastar e soltar */
+  [draggable="true"] {
+    cursor: grab;
+  }
+  
+  [draggable="true"]:active {
+    cursor: grabbing;
+  }
+  
+  #drop-area {
+    transition: all 0.2s ease;
+    z-index: 40;
+  }
+  
+  /* Estilos para formulários */
+  .label {
+    @apply block text-sm font-medium text-gray-700 mb-1;
+  }
+  
+  .input {
+    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm;
+  }
+  
+  .btn {
+    @apply inline-flex justify-center rounded-md border border-transparent px-4 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2;
+  }
+  
+  .btn-primary {
+    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+  }
+</style>
 </AdminLayout>

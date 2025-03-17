@@ -580,10 +580,29 @@ export async function getCategoryBySlug(slug) {
  * Cria uma nova categoria
  * @param {string} name - Nome da categoria
  * @param {string} slug - Slug da categoria
- * @returns {Promise<object|null>} - Categoria criada ou null se falhar
+ * @returns {Promise<object>} - Resultado da operação com success e message
  */
 export async function createCategory(name, slug) {
   try {
+    // Verificar se o slug já existe
+    const { data: existingCategory, error: checkError } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('slug', slug)
+      .single();
+    
+    if (checkError && checkError.code !== 'PGRST116') {
+      // PGRST116 é o código para "não encontrado", que é o que queremos
+      throw checkError;
+    }
+    
+    if (existingCategory) {
+      return { 
+        success: false, 
+        message: 'Já existe uma categoria com este slug. Por favor, escolha outro nome.' 
+      };
+    }
+    
     const { data, error } = await supabase
       .from('categories')
       .insert([{ name, slug }])
@@ -591,10 +610,112 @@ export async function createCategory(name, slug) {
       .single();
     
     if (error) throw error;
-    return data;
+    
+    return { 
+      success: true, 
+      message: 'Categoria criada com sucesso.',
+      category: data
+    };
   } catch (error) {
     console.error('Erro ao criar categoria:', error);
-    return null;
+    return { 
+      success: false, 
+      message: 'Erro ao criar categoria: ' + (error.message || 'Erro desconhecido')
+    };
+  }
+}
+
+/**
+ * Exclui uma categoria
+ * @param {string} id - ID da categoria
+ * @returns {Promise<object>} - Resultado da operação com success e message
+ */
+export async function deleteCategory(id) {
+  try {
+    // Verificar se existem produtos nesta categoria
+    const { count, error: countError } = await supabase
+      .from('products')
+      .select('id', { count: 'exact' })
+      .eq('category_id', id);
+    
+    if (countError) throw countError;
+    
+    // Se existirem produtos, não permitir a exclusão
+    if (count > 0) {
+      return { success: false, message: 'Não é possível excluir uma categoria que contém produtos.' };
+    }
+    
+    // Excluir a categoria
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .eq('id', id);
+    
+    if (error) throw error;
+    return { success: true, message: 'Categoria excluída com sucesso.' };
+  } catch (error) {
+    console.error('Erro ao excluir categoria:', error);
+    return { success: false, message: 'Erro ao excluir categoria: ' + error.message };
+  }
+}
+
+/**
+ * Move produtos de uma categoria para outra
+ * @param {string} fromCategoryId - ID da categoria de origem
+ * @param {string} toCategoryId - ID da categoria de destino
+ * @returns {Promise<object>} - Resultado da operação
+ */
+export async function moveProductsBetweenCategories(fromCategoryId, toCategoryId) {
+  try {
+    // Verificar se as categorias existem
+    const { data: categories, error: categoriesError } = await supabase
+      .from('categories')
+      .select('id')
+      .in('id', [fromCategoryId, toCategoryId]);
+    
+    if (categoriesError) throw categoriesError;
+    
+    if (categories.length !== 2) {
+      return { success: false, message: 'Uma ou ambas as categorias não existem.' };
+    }
+    
+    // Atualizar os produtos
+    const { data: products, error: updateError } = await supabase
+      .from('products')
+      .update({ category_id: toCategoryId })
+      .eq('category_id', fromCategoryId)
+      .select('id');
+    
+    if (updateError) throw updateError;
+    
+    return { 
+      success: true, 
+      message: `${products.length} produtos movidos com sucesso.`,
+      count: products.length
+    };
+  } catch (error) {
+    console.error('Erro ao mover produtos entre categorias:', error);
+    return { success: false, message: 'Erro ao mover produtos: ' + error.message };
+  }
+}
+
+/**
+ * Obtém o número de produtos em uma categoria
+ * @param {string} categoryId - ID da categoria
+ * @returns {Promise<number>} - Número de produtos
+ */
+export async function getProductCountByCategory(categoryId) {
+  try {
+    const { count, error } = await supabase
+      .from('products')
+      .select('id', { count: 'exact' })
+      .eq('category_id', categoryId);
+    
+    if (error) throw error;
+    return count;
+  } catch (error) {
+    console.error('Erro ao contar produtos por categoria:', error);
+    return 0;
   }
 }
 
@@ -627,6 +748,59 @@ export async function getProductsByCategory(categoryId, status = null) {
   } catch (error) {
     console.error('Erro ao buscar produtos por categoria:', error);
     return [];
+  }
+}
+
+/**
+ * Atualiza uma categoria existente
+ * @param {string} id - ID da categoria
+ * @param {string} name - Novo nome da categoria
+ * @param {string} slug - Novo slug da categoria
+ * @returns {Promise<object>} - Resultado da operação
+ */
+export async function updateCategory(id, name, slug) {
+  try {
+    // Verificar se o slug já existe em outra categoria
+    const { data: existingCategory, error: checkError } = await supabase
+      .from('categories')
+      .select('id')
+      .eq('slug', slug)
+      .neq('id', id)
+      .single();
+    
+    if (checkError && checkError.code !== 'PGRST116') {
+      // PGRST116 é o código para "não encontrado", que é o que queremos
+      throw checkError;
+    }
+    
+    if (existingCategory) {
+      return { 
+        success: false, 
+        message: 'Já existe uma categoria com este slug. Por favor, escolha outro nome.' 
+      };
+    }
+    
+    // Atualizar a categoria
+    const { data, error } = await supabase
+      .from('categories')
+      .update({ name, slug })
+      .eq('id', id)
+      .select()
+      .single();
+    
+    if (error) throw error;
+    
+    return { 
+      success: true, 
+      message: 'Categoria atualizada com sucesso.',
+      category: data
+    };
+  } catch (error) {
+    console.error('Erro ao atualizar categoria:', error);
+    return { 
+      success: false, 
+      message: 'Erro ao atualizar categoria: ' + error.message 
+    };
   }
 }
 
@@ -697,12 +871,31 @@ export async function incrementProductViews(productId) {
  */
 export async function getDashboardStats() {
   try {
+    console.log('Iniciando busca de estatísticas para o dashboard...');
+    
     // Total de produtos
     const { data: products, error: productsError } = await supabase
       .from('products')
-      .select('id, status, views');
+      .select('id, status, views, title');
     
-    if (productsError) throw productsError;
+    console.log('Resposta da consulta de produtos:', { products, error: productsError });
+    
+    if (productsError) {
+      console.error('Erro ao buscar produtos:', productsError);
+      throw productsError;
+    }
+    
+    if (!products || products.length === 0) {
+      console.warn('Nenhum produto encontrado na consulta');
+      return {
+        totalProducts: 0,
+        availableProducts: 0,
+        soldProducts: 0,
+        interestCount: 0,
+        totalViews: 0,
+        mostViewedProducts: []
+      };
+    }
     
     // Total de produtos disponíveis
     const availableProducts = products.filter(p => p.status === 'available').length;
@@ -711,32 +904,49 @@ export async function getDashboardStats() {
     const soldProducts = products.filter(p => p.status === 'sold').length;
     
     // Total de visualizações
-    const totalViews = products.reduce((sum, product) => sum + (product.views || 0), 0);
+    const totalViews = products.reduce((sum, product) => {
+      const views = product.views || 0;
+      console.log(`Produto ${product.id} (${product.title}) tem ${views} visualizações`);
+      return sum + views;
+    }, 0);
     
-    // Produtos mais visualizados
-    const { data: mostViewedProducts, error: viewsError } = await supabase
-      .from('products')
-      .select('id, title, views')
-      .order('views', { ascending: false })
-      .limit(5);
-    
-    if (viewsError) throw viewsError;
+    // Produtos mais visualizados (usando os produtos já buscados para evitar outra consulta)
+    const mostViewedProducts = [...products]
+      .sort((a, b) => (b.views || 0) - (a.views || 0))
+      .slice(0, 5)
+      .map(p => ({
+        id: p.id,
+        title: p.title,
+        views: p.views || 0
+      }));
     
     // Total de interessados
     const { count: interestCount, error: interestError } = await supabase
       .from('interested_users')
       .select('id', { count: 'exact' });
     
-    if (interestError) throw interestError;
+    console.log('Resposta da consulta de interessados:', { interestCount, error: interestError });
     
-    return {
+    if (interestError) {
+      console.error('Erro ao buscar interessados:', interestError);
+      throw interestError;
+    }
+    
+    console.log('Dashboard stats - Total views:', totalViews);
+    console.log('Dashboard stats - Most viewed products:', mostViewedProducts);
+    
+    const result = {
       totalProducts: products.length,
       availableProducts,
       soldProducts,
-      interestCount,
+      interestCount: interestCount || 0,
       totalViews,
       mostViewedProducts
     };
+    
+    console.log('Resultado final das estatísticas:', result);
+    
+    return result;
   } catch (error) {
     console.error('Erro ao buscar estatísticas:', error);
     return {

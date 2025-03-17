@@ -17,6 +17,9 @@ interface Props {
 }
 
 const { stats } = Astro.props;
+
+// Log para depuração
+console.log('AdminPanel - stats:', JSON.stringify(stats, null, 2));
 ---
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
@@ -49,9 +52,7 @@ const { stats } = Astro.props;
       <p class="text-sm text-gray-500">Total de visualizações</p>
     </div>
     <div class="mt-2">
-      <p class="text-sm text-gray-600">
-        Média: {stats.totalProducts > 0 ? Math.round(stats.totalViews / stats.totalProducts) : 0} por produto
-      </p>
+      <p class="text-sm text-gray-500">Média: {stats.totalProducts > 0 ? (stats.totalViews / stats.totalProducts).toFixed(1) : '0'} por produto</p>
     </div>
   </div>
   
@@ -65,9 +66,11 @@ const { stats } = Astro.props;
   </div>
 </div>
 
-<div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-  <a href="/admin/produtos/novo" class="card p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex items-center">
-    <div class="bg-primary-100 p-3 rounded-full mr-4">
+<!-- Ações rápidas -->
+<div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+  <!-- Adicionar produto -->
+  <a href="/admin/produtos/novo" class="card p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex items-center space-x-4">
+    <div class="h-12 w-12 bg-primary-100 rounded-full flex items-center justify-center">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
       </svg>
@@ -78,10 +81,11 @@ const { stats } = Astro.props;
     </div>
   </a>
   
-  <a href="/admin/produtos/bulk" class="card p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex items-center">
-    <div class="bg-primary-100 p-3 rounded-full mr-4">
+  <!-- Upload em massa -->
+  <a href="/admin/produtos/upload" class="card p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex items-center space-x-4">
+    <div class="h-12 w-12 bg-primary-100 rounded-full flex items-center justify-center">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
       </svg>
     </div>
     <div>
@@ -90,10 +94,11 @@ const { stats } = Astro.props;
     </div>
   </a>
   
-  <a href="/admin/categorias" class="card p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex items-center">
-    <div class="bg-primary-100 p-3 rounded-full mr-4">
+  <!-- Gerenciar categorias -->
+  <a href="/admin/categorias" class="card p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex items-center space-x-4">
+    <div class="h-12 w-12 bg-primary-100 rounded-full flex items-center justify-center">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
       </svg>
     </div>
     <div>
@@ -102,10 +107,11 @@ const { stats } = Astro.props;
     </div>
   </a>
   
-  <a href="/admin/interessados" class="card p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex items-center">
-    <div class="bg-primary-100 p-3 rounded-full mr-4">
+  <!-- Ver interessados -->
+  <a href="/admin/interessados" class="card p-6 bg-white rounded-lg shadow-md hover:shadow-lg transition-shadow flex items-center space-x-4">
+    <div class="h-12 w-12 bg-primary-100 rounded-full flex items-center justify-center">
       <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 text-primary-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
       </svg>
     </div>
     <div>
