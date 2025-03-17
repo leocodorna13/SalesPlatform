@@ -21,6 +21,7 @@ interface SiteSettings {
   heroDescription: string;
   heroImageUrl: string;
   contactWhatsapp: string;
+  projectName: string;
   [key: string]: any;
 }
 
@@ -30,11 +31,12 @@ const siteSettings: SiteSettings = siteSettingsData ? siteSettingsData as SiteSe
   heroTitle: "Desapego dos Martins",
   heroDescription: "Encontre produtos de qualidade a preços acessíveis. Todos os itens estão em ótimo estado e prontos para um novo lar.",
   heroImageUrl: "/images/hero-background.jpg",
-  contactWhatsapp: ""
+  contactWhatsapp: "",
+  projectName: "Desapego dos Martins"
 };
 ---
 
-<Layout title="Desapego dos Martins">
+<Layout title={siteSettings.projectName || "Desapego dos Martins"}>
   <!-- Hero Section -->
   <section class="relative min-h-[70vh] flex items-center">
     <div class="absolute inset-0 bg-gradient-to-r from-primary-900/90 to-primary-800/80 z-10"></div>
@@ -134,10 +136,11 @@ const siteSettings: SiteSettings = siteSettingsData ? siteSettingsData as SiteSe
     </div>
   </section>
   
-  <!-- WhatsApp Button -->
-  {siteSettings.contactWhatsapp && (
-    <WhatsAppButton phoneNumber={siteSettings.contactWhatsapp} />
-  )}
+  <!-- WhatsApp flutuante -->
+  <WhatsAppButton 
+    floating={true} 
+    buttonText="Fale conosco" 
+  />
 </Layout>
 
 <style>

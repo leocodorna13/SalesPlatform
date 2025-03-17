@@ -3,7 +3,8 @@ import Layout from '../../layouts/Layout.astro';
 import ProductGrid from '../../components/ProductGrid.astro';
 import CategoryFilter from '../../components/CategoryFilter.astro';
 import SearchBar from '../../components/SearchBar.astro';
-import { getProductsByCategorySlug, getCategories } from '../../services/supabase';
+import WhatsAppButton from '../../components/WhatsAppButton.astro';
+import { getProductsByCategorySlug, getCategories, getSiteSettings } from '../../services/supabase';
 
 // Obter o slug da categoria da URL
 const { slug } = Astro.params;
@@ -21,9 +22,15 @@ const products = await getProductsByCategorySlug(slug);
 
 // Obter o nome da categoria atual
 const currentCategory = categories.find(cat => cat.slug === slug);
+
+// Buscar configurações do site
+const siteSettings = await getSiteSettings();
+const projectName = siteSettings && typeof siteSettings === 'object' && 'projectName' in siteSettings 
+  ? siteSettings.projectName as string 
+  : 'Desapego dos Martins';
 ---
 
-<Layout title={`${currentCategory?.name || 'Categoria'} | Desapego dos Martins`}>
+<Layout title={`${currentCategory?.name || 'Categoria'} | ${projectName}`}>
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <!-- Cabeçalho da categoria -->
     <div class="mb-8">
@@ -71,6 +78,12 @@ const currentCategory = categories.find(cat => cat.slug === slug);
       </div>
     </div>
   </div>
+  
+  <!-- WhatsApp flutuante -->
+  <WhatsAppButton 
+    floating={true} 
+    buttonText="Fale conosco" 
+  />
 </Layout>
 
 <script>

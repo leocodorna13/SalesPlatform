@@ -846,14 +846,14 @@ export async function updateCategory(id, name, slug) {
 // ======= Funções de Interessados =======
 
 /**
- * Registra interesse em um produto
+ * Registra o interesse de um usuário em um produto
  * @param {object} userData - Dados do usuário interessado
  * @returns {Promise<boolean>} - true se o registro foi bem-sucedido
  */
 export async function registerInterest(userData) {
   try {
     const { error } = await supabase
-      .from('interested_users')
+      .from('interests')
       .insert([{
         name: userData.name,
         email: userData.email,
@@ -864,8 +864,8 @@ export async function registerInterest(userData) {
     
     if (error) throw error;
     
-    // Incrementar o contador de visualizações
-    await incrementProductViews(userData.product_id);
+    // Incrementar o contador de interesses
+    await incrementProductInterest(userData.product_id);
     
     return true;
   } catch (error) {
@@ -899,6 +899,49 @@ export async function incrementProductViews(productId) {
     if (error) throw error;
   } catch (error) {
     console.error('Erro ao incrementar visualizações:', error);
+  }
+}
+
+/**
+ * Incrementa o contador de interesses de um produto
+ * @param {string} productId - ID do produto
+ * @returns {Promise<boolean>} - true se o incremento foi bem-sucedido
+ */
+export async function incrementProductInterest(productId) {
+  try {
+    console.log('Incrementando interesse para produto:', productId);
+    
+    // Buscar o produto atual
+    const { data: product, error: fetchError } = await supabase
+      .from('products')
+      .select('interest_count')
+      .eq('id', productId)
+      .single();
+    
+    if (fetchError) {
+      console.error('Erro ao buscar produto:', fetchError);
+      throw fetchError;
+    }
+    
+    // Incrementar os interesses
+    const currentCount = product.interest_count || 0;
+    console.log('Contador atual:', currentCount);
+    
+    const { error } = await supabase
+      .from('products')
+      .update({ interest_count: currentCount + 1 })
+      .eq('id', productId);
+    
+    if (error) {
+      console.error('Erro ao atualizar contador:', error);
+      throw error;
+    }
+    
+    console.log('Contador incrementado para:', currentCount + 1);
+    return true;
+  } catch (error) {
+    console.error('Erro ao incrementar interesses:', error);
+    return false;
   }
 }
 
@@ -961,7 +1004,7 @@ export async function getDashboardStats() {
     
     // Total de interessados
     const { count: interestCount, error: interestError } = await supabase
-      .from('interested_users')
+      .from('interests')
       .select('id', { count: 'exact' });
     
     console.log('Resposta da consulta de interessados:', { interestCount, error: interestError });
