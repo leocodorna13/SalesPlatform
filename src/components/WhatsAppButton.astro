@@ -2,99 +2,109 @@
 import { getSiteSettings } from '../services/supabase';
 
 interface Props {
-  phoneNumber?: string;
-  message?: string;
-  floating?: boolean;
-  buttonText?: string;
-  productTitle?: string;
-  productLink?: string;
+  productName?: string;
   productId?: string;
-  registerInterest?: boolean;
+  buttonText?: string;
+  floating?: boolean;
+  customMessage?: string;
+  customPhone?: string;
 }
+
+const { 
+  productName, 
+  productId, 
+  buttonText = "Contato via WhatsApp", 
+  floating = false,
+  customMessage,
+  customPhone
+} = Astro.props;
 
 // Buscar configurações do site
 const siteSettings = await getSiteSettings();
-const defaultWhatsapp = siteSettings && typeof siteSettings === 'object' && 'contactWhatsapp' in siteSettings 
-  ? siteSettings.contactWhatsapp as string 
-  : '';
-const defaultMessage = siteSettings && typeof siteSettings === 'object' && 'whatsappMessage' in siteSettings 
-  ? siteSettings.whatsappMessage as string 
-  : 'Olá, tenho interesse!';
 
-const { 
-  phoneNumber = defaultWhatsapp, 
-  message = defaultMessage, 
-  floating = true,
-  buttonText = "Enviar mensagem",
-  productTitle = "",
-  productLink = "",
-  productId = "",
-  registerInterest = false
-} = Astro.props;
+// Formatar número de telefone (remover caracteres não numéricos)
+const phone = customPhone || (siteSettings?.contactWhatsapp || '').replace(/\D/g, '');
+const formattedPhone = phone.startsWith('55') ? phone : `55${phone}`;
 
-// Formatar número para WhatsApp (remover caracteres não numéricos)
-const formattedPhone = phoneNumber.replace(/\D/g, '');
+// Mensagem padrão do WhatsApp
+let defaultMessage = siteSettings?.whatsappMessage || 'Olá, gostaria de mais informações sobre seus produtos.';
 
-// Criar URL do WhatsApp com mensagem simplificada
-let whatsappMessage = message;
-if (productLink) {
-  whatsappMessage = `${message}\n${productLink}`;
+// Se for um produto específico, personalizar a mensagem
+if (productName) {
+  defaultMessage = `Olá, gostaria de mais informações sobre o produto "${productName}" (ID: ${productId}).`;
 }
 
-const encodedMessage = encodeURIComponent(whatsappMessage);
-const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
+// Usar mensagem personalizada se fornecida
+const message = customMessage || defaultMessage;
 
-// ID único para o formulário
-const formId = productId ? `interest-form-${productId}` : 'interest-form';
+// Codificar a mensagem para URL
+const encodedMessage = encodeURIComponent(message);
+
+// URL do WhatsApp
+const whatsappUrl = `https://wa.me/${formattedPhone}?text=${encodedMessage}`;
 ---
 
 {floating ? (
-  <a 
-    href={whatsappUrl}
-    target="_blank"
-    rel="noopener noreferrer"
-    class="fixed bottom-6 right-6 z-50 flex items-center justify-center w-16 h-16 bg-green-500 hover:bg-green-600 rounded-full shadow-lg transition-colors animate-bounce-subtle"
-    aria-label="Contato via WhatsApp"
-  >
-    <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-      <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-    </svg>
-  </a>
-) : (
-  <>
-    {registerInterest && productId && (
-      <form method="POST" id={formId} class="hidden">
-        <input type="hidden" name="register_interest" value="true" />
-        <input type="hidden" name="product_id" value={productId} />
-      </form>
-    )}
-    
+  <div class="fixed bottom-6 right-6 z-50 animate-bounce-subtle">
     <a 
-      href={whatsappUrl}
-      target="_blank"
+      href={whatsappUrl} 
+      target="_blank" 
       rel="noopener noreferrer"
-      class="flex items-center justify-center gap-2 w-full py-4 px-6 bg-green-500 hover:bg-green-600 text-white font-medium rounded-lg transition-colors"
-      onclick={registerInterest ? `document.getElementById('${formId}')?.submit(); return true;` : undefined}
+      class="flex items-center gap-3 bg-gradient-to-r from-green-500 to-green-600 text-white px-5 py-3.5 rounded-full shadow-lg hover:shadow-xl transform hover:-translate-y-1 transition-all duration-300 group"
+      aria-label="Contato via WhatsApp"
     >
-      <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="currentColor" viewBox="0 0 24 24">
-        <path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/>
-      </svg>
-      {buttonText}
+      <div class="relative">
+        <div class="absolute inset-0 bg-white rounded-full animate-ping-slow opacity-60 group-hover:opacity-80"></div>
+        <i class="fab fa-whatsapp text-2xl relative z-10"></i>
+      </div>
+      <span class="font-medium">{buttonText}</span>
+      <i class="fas fa-arrow-right opacity-0 group-hover:opacity-100 transform group-hover:translate-x-1 transition-all"></i>
     </a>
-  </>
+  </div>
+) : (
+  <a 
+    href={whatsappUrl} 
+    target="_blank" 
+    rel="noopener noreferrer"
+    class="inline-flex items-center gap-2 bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-2.5 rounded-lg shadow-md hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-300"
+  >
+    <i class="fab fa-whatsapp text-xl"></i>
+    <span>{buttonText}</span>
+  </a>
 )}
 
 <style>
+  /* Animação de pulsar suave */
+  @keyframes ping-slow {
+    0% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+    50% {
+      transform: scale(1.2);
+      opacity: 0.3;
+    }
+    100% {
+      transform: scale(1);
+      opacity: 0.6;
+    }
+  }
+  
+  .animate-ping-slow {
+    animation: ping-slow 2s infinite;
+  }
+  
+  /* Animação de salto suave */
   @keyframes bounce-subtle {
     0%, 100% {
       transform: translateY(0);
     }
     50% {
-      transform: translateY(-5px);
+      transform: translateY(-6px);
     }
   }
   
   .animate-bounce-subtle {
-    animation: bounce-subtle 3s infinite;
+    animation: bounce-subtle 3s ease-in-out infinite;
   }
 </style>

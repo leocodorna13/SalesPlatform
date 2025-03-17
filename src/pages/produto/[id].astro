@@ -2,7 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import ProductGrid from '../../components/ProductGrid.astro';
 import WhatsAppButton from '../../components/WhatsAppButton.astro';
-import { getProductById, registerInterest, incrementProductViews, getRelatedProducts, getSiteSettings } from '../../services/supabase';
+import { getProductById, registerInterest, getRelatedProducts, getSiteSettings, getProductInterestCount, supabase } from '../../services/supabase';
 
 // Definir interface para o produto
 interface ProductImage {
@@ -45,12 +45,6 @@ if (!product || !product.visible) {
   return Astro.redirect('/');
 }
 
-// Incrementar visualizações do produto
-// Apenas incrementa visualizações em requisições GET (não em POST de formulário)
-if (Astro.request.method === 'GET') {
-  await incrementProductViews(id);
-}
-
 // Buscar produtos relacionados
 const relatedProducts = await getRelatedProducts(id, product.categories.id);
 
@@ -61,6 +55,32 @@ const whatsappMessage = siteSettings && typeof siteSettings === 'object' && 'wha
 const paymentMethods = siteSettings && typeof siteSettings === 'object' && 'paymentMethods' in siteSettings ? siteSettings.paymentMethods as string : 'Pix, dinheiro, ou cartão parcelado com juros da maquininha';
 const projectName = siteSettings && typeof siteSettings === 'object' && 'projectName' in siteSettings ? siteSettings.projectName as string : 'Desapego dos Martins';
 
+// Obter contagem de interesses
+const interestCount = await getProductInterestCount(id);
+console.log('Contagem de interesses para produto', id, ':', interestCount);
+
+// Verificar diretamente no banco de dados
+const { data: interestsData, error: interestsError } = await supabase
+  .from('interests')
+  .select('id, product_id')
+  .eq('product_id', id);
+
+console.log('Verificação direta de interesses para produto', id, ':', interestsData?.length || 0, 'registros');
+console.log('Dados dos interesses:', interestsData);
+
+// Teste com ID fixo
+const { data: testData, error: testError } = await supabase
+  .from('interests')
+  .select('id, product_id')
+  .eq('product_id', 25);
+
+console.log('Teste com ID fixo (25):', testData?.length || 0, 'registros');
+console.log('Dados do teste:', testData);
+
+if (interestsError) {
+  console.error('Erro na verificação direta:', interestsError);
+}
+
 // Processar formulário de interesse
 let formSubmitted = false;
 let formError = '';
@@ -69,26 +89,37 @@ if (Astro.request.method === 'POST') {
   try {
     const formData = await Astro.request.formData();
     const isRegisterInterest = formData.get('register_interest') === 'true';
+    const productId = formData.get('product_id');
     
-    if (isRegisterInterest) {
+    console.log('Formulário recebido:', { isRegisterInterest, productId });
+    
+    if (isRegisterInterest && productId) {
       // Registrar interesse
+      console.log('Chamando registerInterest com:', {
+        product_id: productId.toString(),
+        name: 'Interesse via WhatsApp',
+        email: 'whatsapp@interesse.com',
+        phone: whatsappNumber || '0000000000'
+      });
+      
       const result = await registerInterest({
-        product_id: id,
+        product_id: productId.toString(),
         name: 'Interesse via WhatsApp',
         email: 'whatsapp@interesse.com',
         phone: whatsappNumber || '0000000000',
         message: whatsappMessage || 'Interesse via botão'
       });
       
-      if (result === true) {
-        formSubmitted = true;
-      } else {
-        formError = 'Ocorreu um erro ao registrar seu interesse. Tente novamente.';
+      console.log('Resultado do registerInterest:', result);
+      
+      formSubmitted = result;
+      if (!result) {
+        formError = 'Erro ao registrar interesse. Tente novamente.';
       }
     }
   } catch (error) {
-    console.error('Erro ao processar interesse:', error);
-    formError = 'Ocorreu um erro ao processar sua solicitação. Tente novamente.';
+    console.error('Erro ao processar formulário:', error);
+    formError = 'Erro ao processar formulário. Tente novamente.';
   }
 }
 
@@ -210,17 +241,16 @@ const productLink = createWhatsAppLink(id, product.title, formatPrice(product.pr
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-yellow-500 mr-1" viewBox="0 0 20 20" fill="currentColor">
                       <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
                     </svg>
-                    <span class="text-sm text-gray-600">{product.interest_count || 0} pessoas demonstraram interesse</span>
+                    <span class="text-sm text-gray-600">{interestCount} pessoas demonstraram interesse</span>
                   </div>
                 </div>
                 
                 <WhatsAppButton 
                   floating={false}
                   buttonText="Tenho interesse neste produto"
-                  productLink={productLink}
-                  message={whatsappMessage}
+                  productName={product.title}
                   productId={id}
-                  registerInterest={true}
+                  customMessage={whatsappMessage}
                 />
               </div>
             ) : (

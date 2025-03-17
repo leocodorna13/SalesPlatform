@@ -5,89 +5,147 @@
 
 interface Props {
   categories: Array<{
-    id: number;
+    id: string;
     name: string;
     slug: string;
-    description?: string;
+    product_count?: number;
   }>;
-  currentCategory?: string;
+  activeCategory?: string;
 }
 
-const { categories, currentCategory = 'todos' } = Astro.props;
+const { categories = [], activeCategory = 'all' } = Astro.props;
 ---
 
-<div class="bg-white rounded-lg shadow-sm mb-8 overflow-hidden">
-  <div class="px-4 py-3 bg-gray-50 border-b border-gray-200">
-    <h2 class="text-lg font-medium text-gray-900">Categorias</h2>
-  </div>
-  
-  <div class="flex flex-wrap gap-2 p-4">
-    <button 
-      type="button"
-      data-category="all"
-      data-name="Todos"
-      class={`category-btn px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-        currentCategory === 'todos' 
-          ? 'active bg-primary-100 text-primary-800 hover:bg-primary-200' 
-          : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-      }`}
-    >
-      Todos
-    </button>
+<div class="category-filter my-8">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+    <h3 class="text-lg font-medium text-neutral-800 mb-4">Filtrar por categoria</h3>
     
-    {categories.map(category => (
+    <div class="flex flex-wrap gap-2 animate-on-scroll">
       <button 
-        type="button"
-        data-category={category.id}
-        data-slug={category.slug}
-        data-name={category.name}
-        class={`category-btn px-4 py-2 rounded-full text-sm font-medium transition-colors ${
-          currentCategory === category.slug 
-            ? 'active bg-primary-100 text-primary-800 hover:bg-primary-200' 
-            : 'bg-gray-100 text-gray-800 hover:bg-gray-200'
-        }`}
+        data-category="all" 
+        data-name="Todos" 
+        class={`category-btn px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${activeCategory === 'all' ? 'bg-primary-600 text-white shadow-md' : 'bg-neutral-100 text-neutral-700 hover:bg-primary-100 hover:text-primary-700'}`}
       >
-        {category.name}
+        <i class="fas fa-border-all text-xs"></i>
+        <span>Todos</span>
       </button>
-    ))}
+      
+      {categories.map((category) => (
+        <button 
+          data-category={category.slug} 
+          data-name={category.name}
+          class={`category-btn px-4 py-2 rounded-full text-sm font-medium transition-all duration-300 flex items-center gap-1.5 ${activeCategory === category.slug ? 'bg-primary-600 text-white shadow-md' : 'bg-neutral-100 text-neutral-700 hover:bg-primary-100 hover:text-primary-700'}`}
+        >
+          <i class="fas fa-tag text-xs"></i>
+          <span>{category.name}</span>
+          {category.product_count !== undefined && (
+            <span class="ml-1 bg-white bg-opacity-20 text-xs px-1.5 py-0.5 rounded-full">
+              {category.product_count}
+            </span>
+          )}
+        </button>
+      ))}
+    </div>
   </div>
 </div>
 
 <script>
-  // Adicionar event listeners para os botões de categoria
   document.addEventListener('DOMContentLoaded', () => {
     const categoryButtons = document.querySelectorAll('.category-btn');
-    const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
+    const searchInput = document.getElementById('searchInput') as HTMLInputElement;
     
+    // Função para disparar evento de mudança de categoria
+    function dispatchCategoryEvent(category: string, name: string) {
+      const event = new CustomEvent('categoryChanged', {
+        detail: { category, name }
+      });
+      document.dispatchEvent(event);
+    }
+    
+    // Adicionar evento de clique aos botões de categoria
     categoryButtons.forEach(button => {
-      button.addEventListener('click', (e) => {
-        const target = e.target as HTMLElement;
-        if (!target || !('dataset' in target)) return;
+      button.addEventListener('click', () => {
+        // Remover classe ativa de todos os botões
+        categoryButtons.forEach(btn => {
+          btn.classList.remove('bg-primary-600', 'text-white', 'shadow-md');
+          btn.classList.add('bg-neutral-100', 'text-neutral-700');
+        });
         
-        const categoryId = target.dataset.category || 'all';
-        const categoryName = target.dataset.name || '';
+        // Adicionar classe ativa ao botão clicado
+        button.classList.remove('bg-neutral-100', 'text-neutral-700');
+        button.classList.add('bg-primary-600', 'text-white', 'shadow-md');
         
-        // Atualizar botão ativo
-        categoryButtons.forEach(btn => btn.classList.remove('active'));
-        target.classList.add('active');
+        // Obter categoria e nome
+        const category = button.getAttribute('data-category') || 'all';
+        const name = button.getAttribute('data-name') || 'Todos';
         
-        // Atualizar o input de pesquisa com o nome da categoria
-        if (searchInput) {
-          if (categoryId === 'all') {
-            searchInput.value = '';
-          } else {
-            searchInput.value = categoryName;
-          }
-          // Disparar evento de input para filtrar os produtos
-          searchInput.dispatchEvent(new Event('input'));
+        // Atualizar URL se necessário
+        if (window.location.pathname !== '/' && window.location.pathname !== '/index.html') {
+          window.location.href = category === 'all' ? '/' : `/categoria/${category}`;
+          return;
         }
         
-        // Disparar evento personalizado para notificar a barra de pesquisa
-        const event = new CustomEvent('categoryChanged', {
-          detail: { categoryId, categoryName }
-        });
-        document.dispatchEvent(event);
+        // Disparar evento de mudança de categoria
+        dispatchCategoryEvent(category, name);
+        
+        // Adicionar efeito de animação ao filtrar
+        const productGrid = document.querySelector('.product-grid');
+        if (productGrid) {
+          productGrid.classList.add('animate-fade');
+          setTimeout(() => {
+            productGrid.classList.remove('animate-fade');
+          }, 500);
+        }
       });
     });
+    
+    // Verificar URL para definir categoria ativa
+    const urlPath = window.location.pathname;
+    const categoryMatch = urlPath.match(/\/categoria\/([^\/]+)/);
+    
+    if (categoryMatch && categoryMatch[1]) {
+      const categorySlug = categoryMatch[1];
+      const categoryButton = document.querySelector(`[data-category="${categorySlug}"]`);
+      
+      if (categoryButton) {
+        // Simular clique no botão da categoria
+        categoryButton.dispatchEvent(new Event('click'));
+      }
+    } else if (urlPath === '/' || urlPath === '/index.html') {
+      // Na página inicial, verificar se há parâmetro de categoria na URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const categoryParam = urlParams.get('category');
+      
+      if (categoryParam) {
+        const categoryButton = document.querySelector(`[data-category="${categoryParam}"]`);
+        if (categoryButton) {
+          categoryButton.dispatchEvent(new Event('click'));
+        }
+      }
+    }
   });
 </script>
+
+<style>
+  /* Animação de fade para o grid de produtos */
+  @keyframes fade {
+    0% { opacity: 0.7; }
+    100% { opacity: 1; }
+  }
+  
+  .animate-fade {
+    animation: fade 0.5s ease-in-out;
+  }
+  
+  /* Animação para entrada dos elementos */
+  .animate-on-scroll > * {
+    opacity: 0;
+    transform: translateY(10px);
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+  
+  .animate-on-scroll > *.is-visible {
+    opacity: 1;
+    transform: translateY(0);
+  }
+</style>

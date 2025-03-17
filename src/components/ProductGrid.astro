@@ -1,5 +1,6 @@
 ---
 import ProductCard from './ProductCard.astro';
+import { supabase } from '../services/supabase';
 
 interface ProductImage {
   id: string;
@@ -37,11 +38,33 @@ const getMainImage = (images: ProductImage[]) => {
   const primary = images.find((img: ProductImage) => img.is_primary);
   return primary ? primary.image_url : images[0].image_url;
 };
+
+// Obter contagem de interesses para cada produto
+const interestCounts = await Promise.all(
+  filteredProducts.map(async (product) => {
+    const productId = typeof product.id === 'string' ? parseInt(product.id, 10) : product.id;
+    console.log('Buscando interesses para produto:', productId, 'tipo:', typeof productId, 'original:', product.id);
+    
+    // Teste direto com o ID
+    const { data, error } = await supabase
+      .from('interests')
+      .select('id')
+      .eq('product_id', productId);
+    
+    const count = data?.length || 0;
+    console.log(`Produto ${productId}: ${count} interesses`);
+    
+    return count;
+  })
+);
+
+console.log('Contagens de interesse:', interestCounts);
+
 ---
 
 <div class="product-grid grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6">
   {filteredProducts.length > 0 ? (
-    filteredProducts.map((product) => (
+    filteredProducts.map((product, index) => (
       <div class="product-item" data-product-id={product.id}>
         <ProductCard
           id={product.id}
@@ -49,9 +72,9 @@ const getMainImage = (images: ProductImage[]) => {
           price={product.price}
           status={product.status}
           imageUrl={getMainImage(product.product_images)}
-          category={product.categories || null}
+          category={product.categories}
           viewsCount={product.views_count || 0}
-          interestCount={product.interest_count || 0}
+          interestCount={interestCounts[index] || 0}
         />
       </div>
     ))

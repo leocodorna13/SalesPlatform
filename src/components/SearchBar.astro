@@ -1,138 +1,468 @@
 ---
-// Props para personalização do componente
 interface Props {
   placeholder?: string;
-  buttonText?: string;
-  categories?: Array<{id: string, name: string}>;
+  categories?: Array<{
+    id: string;
+    name: string;
+    slug: string;
+  }>;
 }
 
 const { 
-  placeholder = "Buscar produtos...",
-  buttonText = "Buscar",
-  categories = []
+  placeholder = "Buscar produtos...", 
+  categories = [] 
 } = Astro.props;
 ---
 
-<div id="searchContainer" class="search-container w-full sticky top-4 z-40 py-2 transition-all duration-300">
-  <div class="search-bar glass w-full rounded-full shadow-lg overflow-hidden">
-    <div class="flex items-center">
+<div class="search-container bg-white rounded-xl shadow-hover p-1 relative z-50">
+  <div class="flex items-center">
+    <!-- Ícone de busca -->
+    <div class="pl-4 text-primary-500">
+      <i class="fas fa-search text-lg"></i>
+    </div>
+    
+    <!-- Campo de busca -->
+    <div class="flex-grow">
       <input 
         type="text" 
-        id="searchInput"
-        placeholder={placeholder}
-        class="flex-1 py-3 px-6 bg-transparent text-gray-800 placeholder-gray-500 focus:outline-none"
+        id="searchInput" 
+        placeholder={placeholder} 
+        class="w-full py-3 px-3 text-neutral-700 bg-transparent border-none focus:outline-none focus:ring-0 placeholder-neutral-400 text-lg"
+        autocomplete="off"
       />
-      <div class="flex items-center pr-2">
-        <button 
-          type="button"
-          id="searchButton"
-          class="bg-primary-600 hover:bg-primary-700 text-white p-2 rounded-full transition-colors"
-          aria-label="Buscar"
-        >
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </button>
-      </div>
     </div>
+    
+    <!-- Botão de categorias (visível apenas se houver categorias) -->
+    {categories && categories.length > 0 && (
+      <div class="relative group">
+        <button 
+          id="categoryDropdownButton" 
+          class="flex items-center gap-2 py-3 px-4 text-primary-700 hover:text-primary-800 font-medium transition-colors rounded-lg hover:bg-primary-50"
+        >
+          <i class="fas fa-tag"></i>
+          <span>Categorias</span>
+          <i class="fas fa-chevron-down text-xs transition-transform group-hover:rotate-180"></i>
+        </button>
+        
+        <!-- Dropdown de categorias -->
+        <div 
+          id="categoryDropdown" 
+          class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-neutral-100 hidden z-50 overflow-hidden"
+        >
+          <div class="py-2 max-h-80 overflow-y-auto">
+            <button 
+              data-category="all" 
+              data-name="Todos" 
+              class="category-dropdown-item w-full text-left px-4 py-2 hover:bg-primary-50 text-neutral-700 hover:text-primary-700 transition-colors flex items-center gap-2"
+            >
+              <i class="fas fa-border-all text-primary-400"></i>
+              <span>Todos os produtos</span>
+            </button>
+            
+            <div class="border-t border-neutral-100 my-1"></div>
+            
+            {categories.map(category => (
+              <button 
+                data-category={category.slug} 
+                data-name={category.name} 
+                class="category-dropdown-item w-full text-left px-4 py-2 hover:bg-primary-50 text-neutral-700 hover:text-primary-700 transition-colors flex items-center gap-2"
+              >
+                <i class="fas fa-tag text-primary-400"></i>
+                <span>{category.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
+    
+    <!-- Botão de busca -->
+    <button 
+      id="searchButton" 
+      class="bg-primary-600 hover:bg-primary-700 text-white py-3 px-6 rounded-lg transition-colors ml-2 flex items-center gap-2"
+    >
+      <span>Buscar</span>
+      <i class="fas fa-arrow-right"></i>
+    </button>
+  </div>
+  
+  <!-- Chips de filtros ativos (inicialmente escondidos) -->
+  <div id="activeFilters" class="flex flex-wrap gap-2 pt-3 px-4 pb-2 hidden">
+    <!-- Os chips serão adicionados via JavaScript -->
   </div>
 </div>
 
-<style>
-  .glass {
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(8px);
-    border: 1px solid rgba(255, 255, 255, 0.3);
-  }
-  
-  .search-container {
-    position: sticky;
-    top: 1rem;
-    z-index: 40;
-    background: rgba(255, 255, 255, 0.8);
-    backdrop-filter: blur(8px);
-    transition: all 0.3s ease;
-  }
-</style>
-
 <script>
   document.addEventListener('DOMContentLoaded', () => {
-    const searchInput = document.getElementById('searchInput') as HTMLInputElement;
+    const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
     const searchButton = document.getElementById('searchButton');
+    const categoryDropdownButton = document.getElementById('categoryDropdownButton');
+    const categoryDropdown = document.getElementById('categoryDropdown');
+    const categoryItems = document.querySelectorAll('.category-dropdown-item');
+    const activeFilters = document.getElementById('activeFilters');
+    const productGrid = document.querySelector('.product-grid');
     
-    if (!searchInput) return;
+    let selectedCategory = 'all';
+    let selectedCategoryName = 'Todos';
+    let searchTimeout: ReturnType<typeof setTimeout> | null = null;
     
     // Função para normalizar texto (remover acentos e caracteres especiais)
-    function normalizeText(text: string): string {
+    const normalizeText = (text: string) => {
       return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    };
+    
+    // Função para realizar a busca em tempo real diretamente na página
+    const performLiveSearch = () => {
+      if (!searchInput) return;
+      
+      const searchTerm = searchInput.value.trim().toLowerCase();
+      const normalizedQuery = normalizeText(searchTerm);
+      
+      // Limpar timeout anterior
+      if (searchTimeout) {
+        clearTimeout(searchTimeout);
+      }
+      
+      // Definir timeout para evitar muitas buscas durante digitação
+      searchTimeout = setTimeout(() => {
+        const productCards = document.querySelectorAll('.product-card');
+        let visibleCount = 0;
+        
+        // Filtrar produtos
+        productCards.forEach(card => {
+          const title = normalizeText(card.querySelector('h3')?.textContent || '');
+          const category = normalizeText(card.querySelector('.badge')?.textContent || '');
+          const price = card.querySelector('.text-accent-600')?.textContent || '';
+          
+          // Verificar se o produto corresponde à pesquisa
+          const matchesSearch = !searchTerm || title.includes(normalizedQuery) || category.includes(normalizedQuery) || price.includes(normalizedQuery);
+          
+          // Verificar se o produto corresponde à categoria selecionada
+          const cardCategory = card.getAttribute('data-category');
+          const matchesCategory = selectedCategory === 'all' || cardCategory === selectedCategory;
+          
+          // Mostrar ou esconder o produto
+          if (matchesSearch && matchesCategory) {
+            card.classList.remove('hidden');
+            card.classList.add('animate-fade-in');
+            visibleCount++;
+          } else {
+            card.classList.add('hidden');
+            card.classList.remove('animate-fade-in');
+          }
+        });
+        
+        // Mostrar mensagem se não houver resultados
+        const noResultsElement = document.getElementById('noResults');
+        if (noResultsElement) {
+          if (visibleCount === 0) {
+            noResultsElement.classList.remove('hidden');
+            noResultsElement.textContent = `Nenhum resultado encontrado para "${searchTerm}"`;
+          } else {
+            noResultsElement.classList.add('hidden');
+          }
+        } else if (visibleCount === 0 && productGrid) {
+          // Criar elemento de "nenhum resultado" se não existir
+          const noResults = document.createElement('div');
+          noResults.id = 'noResults';
+          noResults.className = 'w-full py-16 text-center text-neutral-500';
+          noResults.innerHTML = `
+            <div class="flex flex-col items-center">
+              <i class="fas fa-search text-neutral-300 text-4xl mb-4"></i>
+              <p class="text-lg">Nenhum resultado encontrado para "${searchTerm}"</p>
+              <button id="clearSearch" class="mt-4 text-primary-600 hover:text-primary-800 font-medium">
+                <i class="fas fa-times-circle mr-1"></i> Limpar busca
+              </button>
+            </div>
+          `;
+          productGrid.parentNode?.insertBefore(noResults, productGrid.nextSibling);
+          
+          // Adicionar evento para limpar busca
+          document.getElementById('clearSearch')?.addEventListener('click', () => {
+            if (searchInput) {
+              searchInput.value = '';
+              performLiveSearch();
+            }
+          });
+        }
+        
+        // Adicionar contador de resultados
+        const resultsCountElement = document.getElementById('resultsCount');
+        if (resultsCountElement) {
+          resultsCountElement.textContent = `${visibleCount} ${visibleCount === 1 ? 'produto encontrado' : 'produtos encontrados'}`;
+          resultsCountElement.classList.toggle('hidden', visibleCount === 0);
+        } else if (visibleCount > 0 && productGrid) {
+          const resultsCount = document.createElement('div');
+          resultsCount.id = 'resultsCount';
+          resultsCount.className = 'text-sm text-neutral-500 mb-4';
+          resultsCount.textContent = `${visibleCount} ${visibleCount === 1 ? 'produto encontrado' : 'produtos encontrados'}`;
+          productGrid.parentNode?.insertBefore(resultsCount, productGrid);
+        }
+        
+        // Adicionar efeito de animação ao filtrar
+        if (productGrid) {
+          productGrid.classList.add('animate-fade');
+          setTimeout(() => {
+            productGrid.classList.remove('animate-fade');
+          }, 500);
+        }
+      }, 300); // 300ms de delay
+    };
+    
+    // Função para realizar a busca e navegar
+    const performSearch = () => {
+      const searchTerm = searchInput?.value.trim();
+      
+      if (searchTerm || selectedCategory !== 'all') {
+        let url = '/categoria/todos';
+        
+        // Se tiver uma categoria específica, usa a URL da categoria
+        if (selectedCategory !== 'all') {
+          url = `/categoria/${selectedCategory}`;
+        }
+        
+        // Adiciona o termo de busca como parâmetro se existir
+        if (searchTerm) {
+          url += `?q=${encodeURIComponent(searchTerm)}`;
+        }
+        
+        window.location.href = url;
+      }
+    };
+    
+    // Evento de input no campo de busca
+    if (searchInput) {
+      searchInput.addEventListener('input', performLiveSearch);
+      
+      // Focar no input ao clicar na barra de pesquisa
+      document.querySelector('.search-container')?.addEventListener('click', (e) => {
+        if (!categoryDropdownButton?.contains(e.target as Node) && !categoryDropdown?.contains(e.target as Node)) {
+          searchInput.focus();
+        }
+      });
     }
     
-    // Função para filtrar produtos
-    function filterProducts(query: string) {
-      const normalizedQuery = normalizeText(query.trim());
+    // Evento de clique no botão de busca
+    if (searchButton) {
+      searchButton.addEventListener('click', performSearch);
+    }
+    
+    // Evento de pressionar Enter no campo de busca
+    if (searchInput) {
+      searchInput.addEventListener('keypress', (e) => {
+        if (e.key === 'Enter') {
+          performSearch();
+        }
+      });
+    }
+    
+    // Toggle do dropdown de categorias
+    if (categoryDropdownButton && categoryDropdown) {
+      categoryDropdownButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        categoryDropdown.classList.toggle('hidden');
+      });
       
-      // Selecionar todos os produtos na página
-      const products = document.querySelectorAll('.product-card, .product-item');
-      
-      products.forEach(product => {
-        const title = normalizeText(product.querySelector('h3')?.textContent || '');
-        const description = normalizeText(product.querySelector('p')?.textContent || '');
-        const category = normalizeText(product.querySelector('.badge')?.textContent || '');
-        
-        if (normalizedQuery === '' || 
-            title.includes(normalizedQuery) || 
-            description.includes(normalizedQuery) || 
-            category.includes(normalizedQuery)) {
-          (product as HTMLElement).style.display = '';
-        } else {
-          (product as HTMLElement).style.display = 'none';
+      // Fechar dropdown ao clicar fora
+      document.addEventListener('click', () => {
+        if (!categoryDropdown.classList.contains('hidden')) {
+          categoryDropdown.classList.add('hidden');
         }
       });
       
-      // Verificar se há produtos visíveis
-      const visibleProducts = Array.from(products).filter(p => (p as HTMLElement).style.display !== 'none');
-      
-      // Mostrar mensagem de nenhum produto encontrado se necessário
-      const noResultsMsg = document.getElementById('noResults');
-      if (noResultsMsg) {
-        if (visibleProducts.length === 0 && normalizedQuery !== '') {
-          (noResultsMsg as HTMLElement).style.display = 'block';
-        } else {
-          (noResultsMsg as HTMLElement).style.display = 'none';
-        }
-      }
+      // Evitar que o clique dentro do dropdown o feche
+      categoryDropdown.addEventListener('click', (e) => {
+        e.stopPropagation();
+      });
     }
     
-    // Filtrar em tempo real ao digitar
-    searchInput.addEventListener('input', () => {
-      filterProducts(searchInput.value);
+    // Selecionar categoria do dropdown
+    categoryItems.forEach(item => {
+      item.addEventListener('click', () => {
+        const category = item.getAttribute('data-category');
+        const categoryName = item.getAttribute('data-name');
+        
+        if (category && categoryName) {
+          selectedCategory = category;
+          selectedCategoryName = categoryName;
+          
+          // Atualizar texto do botão de categorias
+          if (categoryDropdownButton) {
+            const buttonText = categoryDropdownButton.querySelector('span');
+            if (buttonText) {
+              buttonText.textContent = category === 'all' ? 'Categorias' : categoryName;
+            }
+          }
+          
+          // Fechar dropdown
+          if (categoryDropdown) {
+            categoryDropdown.classList.add('hidden');
+          }
+          
+          // Mostrar filtro ativo
+          updateActiveFilters();
+          
+          // Atualizar resultados de pesquisa
+          performLiveSearch();
+        }
+      });
     });
     
-    // Filtrar ao clicar no botão
-    if (searchButton) {
-      searchButton.addEventListener('click', () => {
-        filterProducts(searchInput.value);
-      });
+    // Atualizar chips de filtros ativos
+    const updateActiveFilters = () => {
+      if (!activeFilters) return;
+      
+      // Limpar filtros atuais
+      activeFilters.innerHTML = '';
+      
+      let hasActiveFilters = false;
+      
+      // Adicionar chip de categoria se não for "Todos"
+      if (selectedCategory !== 'all') {
+        const categoryChip = document.createElement('div');
+        categoryChip.className = 'inline-flex items-center gap-2 bg-primary-100 text-primary-700 px-3 py-1.5 rounded-full text-sm font-medium';
+        categoryChip.innerHTML = `
+          <i class="fas fa-tag text-xs"></i>
+          <span>${selectedCategoryName}</span>
+          <button class="ml-1 text-primary-500 hover:text-primary-700" data-clear="category">
+            <i class="fas fa-times-circle"></i>
+          </button>
+        `;
+        activeFilters.appendChild(categoryChip);
+        hasActiveFilters = true;
+        
+        // Evento para limpar categoria
+        const clearButton = categoryChip.querySelector('[data-clear="category"]');
+        if (clearButton) {
+          clearButton.addEventListener('click', () => {
+            selectedCategory = 'all';
+            selectedCategoryName = 'Todos';
+            
+            // Atualizar texto do botão
+            if (categoryDropdownButton) {
+              const buttonText = categoryDropdownButton.querySelector('span');
+              if (buttonText) {
+                buttonText.textContent = 'Categorias';
+              }
+            }
+            
+            updateActiveFilters();
+            performLiveSearch();
+          });
+        }
+      }
+      
+      // Adicionar chip de termo de busca se existir
+      if (searchInput && searchInput.value.trim()) {
+        const searchChip = document.createElement('div');
+        searchChip.className = 'inline-flex items-center gap-2 bg-accent-100 text-accent-700 px-3 py-1.5 rounded-full text-sm font-medium';
+        searchChip.innerHTML = `
+          <i class="fas fa-search text-xs"></i>
+          <span>${searchInput.value.trim()}</span>
+          <button class="ml-1 text-accent-500 hover:text-accent-700" data-clear="search">
+            <i class="fas fa-times-circle"></i>
+          </button>
+        `;
+        activeFilters.appendChild(searchChip);
+        hasActiveFilters = true;
+        
+        // Evento para limpar termo de busca
+        const clearButton = searchChip.querySelector('[data-clear="search"]');
+        if (clearButton) {
+          clearButton.addEventListener('click', () => {
+            if (searchInput) {
+              searchInput.value = '';
+              updateActiveFilters();
+              performLiveSearch();
+            }
+          });
+        }
+      }
+      
+      // Mostrar ou esconder a seção de filtros ativos
+      if (hasActiveFilters) {
+        activeFilters.classList.remove('hidden');
+      } else {
+        activeFilters.classList.add('hidden');
+      }
+    };
+    
+    // Inicializar filtros ativos
+    updateActiveFilters();
+    
+    // Verificar se há parâmetros na URL para preencher a busca
+    const urlParams = new URLSearchParams(window.location.search);
+    const queryParam = urlParams.get('q');
+    
+    if (queryParam && searchInput) {
+      searchInput.value = queryParam;
+      performLiveSearch();
     }
     
-    // Escutar evento de mudança de categoria
-    document.addEventListener('categoryChanged', (e: any) => {
-      const categoryButtons = document.querySelectorAll('.category-btn');
-      const selectedButton = Array.from(categoryButtons).find(btn => 
-        btn.classList.contains('active')
-      ) as HTMLElement;
-      
-      if (selectedButton && selectedButton.textContent) {
-        // Se não for "Todos", adicionar o nome da categoria ao input de pesquisa
-        if (selectedButton.dataset.category !== 'all') {
-          searchInput.value = selectedButton.textContent.trim();
-        } else {
-          searchInput.value = '';
-        }
-        
-        // Disparar o evento de input para filtrar os produtos
-        searchInput.dispatchEvent(new Event('input'));
+    // Adicionar atributo data-category aos cards de produto
+    document.querySelectorAll('.product-card').forEach(card => {
+      const categoryElement = card.querySelector('.badge');
+      if (categoryElement) {
+        const categoryText = categoryElement.textContent?.trim();
+        const categorySlug = normalizeText(categoryText || '')
+          .replace(/\s+/g, '-')
+          .replace(/[^\w\-]+/g, '');
+        card.setAttribute('data-category', categorySlug);
       }
     });
   });
 </script>
+
+<style>
+  /* Animação para o dropdown */
+  #categoryDropdown {
+    transform-origin: top right;
+    transition: opacity 0.2s, transform 0.2s;
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  
+  #categoryDropdown:not(.hidden) {
+    opacity: 1;
+    transform: scale(1);
+  }
+  
+  /* Estilo para o scrollbar do dropdown */
+  #categoryDropdown div::-webkit-scrollbar {
+    width: 6px;
+  }
+  
+  #categoryDropdown div::-webkit-scrollbar-track {
+    background: #f1f1f1;
+    border-radius: 10px;
+  }
+  
+  #categoryDropdown div::-webkit-scrollbar-thumb {
+    background: #ddd;
+    border-radius: 10px;
+  }
+  
+  #categoryDropdown div::-webkit-scrollbar-thumb:hover {
+    background: #ccc;
+  }
+  
+  /* Animação de fade para o grid de produtos */
+  @keyframes fade {
+    0% { opacity: 0.7; }
+    100% { opacity: 1; }
+  }
+  
+  .animate-fade {
+    animation: fade 0.5s ease-in-out;
+  }
+  
+  /* Animação para os cards de produto */
+  @keyframes fadeIn {
+    0% { opacity: 0; transform: translateY(10px); }
+    100% { opacity: 1; transform: translateY(0); }
+  }
+  
+  .animate-fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+</style>

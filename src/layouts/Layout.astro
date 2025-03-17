@@ -28,63 +28,103 @@ const projectName = siteSettings && typeof siteSettings === 'object' && 'project
     <!-- Google Fonts -->
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&family=Playfair+Display:wght@400;500;600;700&family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome Icons -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" integrity="sha512-iecdLmaskl7CVkqkXNQ/ZH/XLlvWZOJyj7Yy7tcenmpD1ypASozpmT/E0iPtmFIB46ZmdtAc9eNBvH0H/ZpiBw==" crossorigin="anonymous" referrerpolicy="no-referrer" />
     
     <!-- Descrição para SEO -->
     <meta name="description" content={description || `${projectName} - Produtos de qualidade a preços acessíveis`} />
   </head>
-  <body class="bg-gray-50 min-h-screen flex flex-col font-jakarta">
-    <header class="bg-white shadow-sm sticky top-0 z-40">
+  <body class="bg-neutral-50 min-h-screen flex flex-col font-sans relative">
+    <!-- Padrão de fundo sutil -->
+    <div class="fixed inset-0 bg-pattern-dots opacity-50 pointer-events-none z-0"></div>
+    
+    <header class="bg-white shadow-soft sticky top-0 z-40 border-b border-neutral-200">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
           <div class="flex items-center">
-            <a href="/" class="flex-shrink-0 flex items-center">
-              <span class="text-2xl font-bold text-primary-600">{projectName}</span>
+            <a href="/" class="flex-shrink-0 flex items-center group">
+              <span class="text-2xl font-bold font-heading text-primary-600 group-hover:text-primary-700 transition-colors">
+                <i class="fas fa-store-alt mr-2"></i>{projectName}
+              </span>
             </a>
             <nav class="hidden md:ml-8 md:flex md:space-x-8">
-              <a href="/" class="text-gray-700 hover:text-primary-600 px-3 py-2 text-sm font-medium">Início</a>
-              <a href="/categoria/todos" class="text-gray-700 hover:text-primary-600 px-3 py-2 text-sm font-medium">Categorias</a>
-              <a href="/#produtos" class="text-gray-700 hover:text-primary-600 px-3 py-2 text-sm font-medium">Produtos</a>
+              <a href="/" class="text-neutral-700 hover:text-primary-600 px-3 py-2 text-sm font-medium flex items-center">
+                <i class="fas fa-home mr-1.5"></i>Início
+              </a>
+              <a href="/categoria/todos" class="text-neutral-700 hover:text-primary-600 px-3 py-2 text-sm font-medium flex items-center">
+                <i class="fas fa-tags mr-1.5"></i>Categorias
+              </a>
+              <a href="/#produtos" class="text-neutral-700 hover:text-primary-600 px-3 py-2 text-sm font-medium flex items-center">
+                <i class="fas fa-shopping-basket mr-1.5"></i>Produtos
+              </a>
             </nav>
           </div>
           <div class="flex items-center">
-            <a href="/admin" class="text-gray-700 hover:text-primary-600 px-3 py-2 text-sm font-medium">
-              Admin
+            <a href="/admin" class="text-neutral-700 hover:text-primary-600 px-3 py-2 text-sm font-medium flex items-center">
+              <i class="fas fa-user-cog mr-1.5"></i>Admin
             </a>
           </div>
         </div>
       </div>
     </header>
     
-    <main class="flex-grow">
+    <main class="flex-grow relative z-10">
       <slot />
     </main>
     
-    <footer class="bg-gray-800 text-white">
+    <footer class="bg-neutral-900 text-white relative z-10">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
         <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
-          <div>
-            <h3 class="text-xl font-bold mb-4">{projectName}</h3>
-            <p class="text-gray-300">
+          <div class="animate-fade-in" style="--animation-delay: 0.1s;">
+            <h3 class="text-xl font-bold font-heading mb-4 text-accent-400">{projectName}</h3>
+            <p class="text-neutral-300">
               Produtos de qualidade a preços acessíveis. Todos os itens estão em ótimo estado e prontos para um novo lar.
             </p>
+            <div class="mt-4 flex space-x-4">
+              <a href="#" class="text-neutral-400 hover:text-accent-400 transition-colors">
+                <i class="fab fa-instagram text-xl"></i>
+              </a>
+              <a href="#" class="text-neutral-400 hover:text-accent-400 transition-colors">
+                <i class="fab fa-facebook text-xl"></i>
+              </a>
+              <a href="#" class="text-neutral-400 hover:text-accent-400 transition-colors">
+                <i class="fab fa-whatsapp text-xl"></i>
+              </a>
+            </div>
           </div>
-          <div>
-            <h3 class="text-xl font-bold mb-4">Links rápidos</h3>
+          <div class="animate-fade-in" style="--animation-delay: 0.2s;">
+            <h3 class="text-xl font-bold font-heading mb-4 text-accent-400">Links rápidos</h3>
             <ul class="space-y-2">
-              <li><a href="/" class="text-gray-300 hover:text-white">Início</a></li>
-              <li><a href="/categoria/todos" class="text-gray-300 hover:text-white">Categorias</a></li>
-              <li><a href="/#produtos" class="text-gray-300 hover:text-white">Produtos</a></li>
+              <li>
+                <a href="/" class="text-neutral-300 hover:text-white transition-colors flex items-center">
+                  <i class="fas fa-chevron-right text-xs mr-2 text-accent-400"></i>Início
+                </a>
+              </li>
+              <li>
+                <a href="/categoria/todos" class="text-neutral-300 hover:text-white transition-colors flex items-center">
+                  <i class="fas fa-chevron-right text-xs mr-2 text-accent-400"></i>Categorias
+                </a>
+              </li>
+              <li>
+                <a href="/#produtos" class="text-neutral-300 hover:text-white transition-colors flex items-center">
+                  <i class="fas fa-chevron-right text-xs mr-2 text-accent-400"></i>Produtos
+                </a>
+              </li>
             </ul>
           </div>
-          <div>
-            <h3 class="text-xl font-bold mb-4">Contato</h3>
-            <p class="text-gray-300">
+          <div class="animate-fade-in" style="--animation-delay: 0.3s;">
+            <h3 class="text-xl font-bold font-heading mb-4 text-accent-400">Contato</h3>
+            <p class="text-neutral-300 mb-4">
               Entre em contato através do WhatsApp para mais informações sobre os produtos.
             </p>
+            <a href="#" class="inline-flex items-center px-4 py-2 rounded-lg bg-accent-500 hover:bg-accent-600 text-white transition-colors">
+              <i class="fab fa-whatsapp mr-2"></i> Fale conosco
+            </a>
           </div>
         </div>
-        <div class="border-t border-gray-700 mt-8 pt-8 text-center text-gray-400">
+        <div class="border-t border-neutral-800 mt-8 pt-8 text-center text-neutral-400">
           <p>&copy; {new Date().getFullYear()} {projectName}. Todos os direitos reservados.</p>
         </div>
       </div>
@@ -94,21 +134,33 @@ const projectName = siteSettings && typeof siteSettings === 'object' && 'project
 
 <style is:global>
   :root {
-    --primary-50: #f0f9ff;
-    --primary-100: #e0f2fe;
-    --primary-200: #bae6fd;
-    --primary-300: #7dd3fc;
-    --primary-400: #38bdf8;
-    --primary-500: #0ea5e9;
-    --primary-600: #4F6F52;
-    --primary-700: #739072;
-    --primary-800: #075985;
-    --primary-900: #0c4a6e;
-    --primary-950: #082f49;
+    --primary-50: #f0f7ff;
+    --primary-100: #e0efff;
+    --primary-200: #c7e0ff;
+    --primary-300: #a1c9ff;
+    --primary-400: #75a8ff;
+    --primary-500: #4f83fb;
+    --primary-600: #3b64f0;
+    --primary-700: #2d4fdd;
+    --primary-800: #2843b3;
+    --primary-900: #273d8d;
     
-    --accent: #ECE3CE;
-    --background: #FEFEFE;
-    --text: #3A4D39;
+    --accent-50: #fff9ed;
+    --accent-100: #fff2d3;
+    --accent-200: #ffe2a5;
+    --accent-300: #ffcb6b;
+    --accent-400: #ffb037;
+    --accent-500: #ff9012;
+    --accent-600: #ff7308;
+    
+    --neutral-50: #f8f9fa;
+    --neutral-100: #f1f3f5;
+    --neutral-200: #e9ecef;
+    --neutral-800: #343a40;
+    --neutral-900: #212529;
+    
+    --background: var(--neutral-50);
+    --text: var(--neutral-900);
   }
   
   /* Estilos base */
@@ -117,29 +169,37 @@ const projectName = siteSettings && typeof siteSettings === 'object' && 'project
   }
   
   body {
-    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+    font-family: 'Poppins', system-ui, sans-serif;
     color: var(--text);
   }
   
   /* Utilitários */
-  .font-jakarta {
-    font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
+  .font-sans {
+    font-family: 'Poppins', system-ui, sans-serif;
+  }
+  
+  .font-heading {
+    font-family: 'Montserrat', system-ui, sans-serif;
+  }
+  
+  .font-display {
+    font-family: 'Playfair Display', serif;
   }
   
   .btn {
-    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-base font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors;
+    @apply inline-flex items-center justify-center px-4 py-2 border border-transparent rounded-md shadow-sm text-base font-medium focus:outline-none focus:ring-2 focus:ring-offset-2 transition-all;
   }
   
   .btn-primary {
-    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+    @apply bg-primary-600 text-white hover:bg-primary-700 hover:shadow-md focus:ring-primary-500;
   }
   
   .btn-outline {
-    @apply bg-white text-gray-700 border-gray-300 hover:bg-gray-50 focus:ring-primary-500;
+    @apply bg-white text-neutral-700 border-neutral-300 hover:bg-neutral-50 hover:text-primary-600 focus:ring-primary-500;
   }
   
   .btn-accent {
-    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+    @apply bg-accent-500 text-white hover:bg-accent-600 hover:shadow-md focus:ring-accent-400;
   }
   
   /* Animações */
@@ -148,8 +208,21 @@ const projectName = siteSettings && typeof siteSettings === 'object' && 'project
     to { opacity: 1; transform: translateY(0); }
   }
   
+  @keyframes slideUp {
+    from { opacity: 0; transform: translateY(20px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  
   .animate-fade-in {
-    animation: fadeIn 0.5s ease-out forwards;
+    opacity: 0;
+    animation: fadeIn 0.6s ease-out forwards;
+    animation-delay: var(--animation-delay, 0s);
+  }
+  
+  .animate-slide-up {
+    opacity: 0;
+    animation: slideUp 0.5s ease-out forwards;
+    animation-delay: var(--animation-delay, 0s);
   }
   
   /* Glassmorphism */
@@ -157,5 +230,11 @@ const projectName = siteSettings && typeof siteSettings === 'object' && 'project
     background: rgba(255, 255, 255, 0.8);
     backdrop-filter: blur(8px);
     border: 1px solid rgba(255, 255, 255, 0.3);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
+  }
+  
+  /* Animação de hover para links e botões */
+  a, button {
+    transition: all 0.2s ease;
   }
 </style>

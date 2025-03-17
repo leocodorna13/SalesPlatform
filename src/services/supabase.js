@@ -56,15 +56,12 @@ export async function getSession() {
  */
 export async function getCurrentUser() {
   try {
-    console.log('Verificando usuário atual...');
     const session = await getSession();
     
     if (!session) {
-      console.log('Nenhuma sessão encontrada');
       return null;
     }
     
-    console.log('Sessão encontrada:', session.user.id);
     const { user } = session;
     return user;
   } catch (error) {
@@ -271,8 +268,6 @@ export async function getRelatedProducts(categoryId, currentProductId) {
  */
 export async function createProduct(productData, imageFiles) {
   try {
-    console.log('Criando produto:', productData);
-    
     // Verificar se há arquivos de imagem válidos
     const validFiles = [];
     
@@ -288,8 +283,6 @@ export async function createProduct(productData, imageFiles) {
         }
       }
     }
-    
-    console.log(`${validFiles.length} arquivos válidos encontrados`);
     
     // Garantir que o bucket existe
     await ensureBucketExists('product-images');
@@ -309,17 +302,13 @@ export async function createProduct(productData, imageFiles) {
       .single();
     
     if (error) throw error;
-    console.log('Produto criado com sucesso:', product);
     
     // Fazer upload das imagens
     if (validFiles.length > 0) {
-      console.log(`Iniciando upload de ${validFiles.length} imagens`);
-      
       const uploadedImages = [];
       
       for (let i = 0; i < validFiles.length; i++) {
         const file = validFiles[i];
-        console.log(`Processando imagem ${i+1}/${validFiles.length}:`, file.name, file.type, file.size);
         
         try {
           // Gerar nome de arquivo único
@@ -327,8 +316,6 @@ export async function createProduct(productData, imageFiles) {
           const timestamp = new Date().getTime();
           const fileName = `${product.id}/${timestamp}-${i}.${fileExt}`;
           const filePath = `products/${fileName}`;
-          
-          console.log('Caminho do arquivo no storage:', filePath);
           
           // Fazer upload do arquivo diretamente
           const { data: uploadData, error: uploadError } = await supabase.storage
@@ -344,15 +331,12 @@ export async function createProduct(productData, imageFiles) {
             continue;
           }
           
-          console.log('Upload concluído com sucesso:', uploadData);
-          
           // Obter URL pública
           const { data: publicURLData } = supabase.storage
             .from('product-images')
             .getPublicUrl(filePath);
           
           const publicUrl = publicURLData?.publicUrl;
-          console.log('URL pública gerada:', publicUrl);
           
           if (!publicUrl) {
             console.error('Falha ao gerar URL pública para a imagem');
@@ -372,7 +356,6 @@ export async function createProduct(productData, imageFiles) {
           if (imageError) {
             console.error('Erro ao salvar referência da imagem:', imageError);
           } else {
-            console.log('Referência da imagem salva com sucesso:', imageData);
             uploadedImages.push({
               url: publicUrl,
               isPrimary: i === 0
@@ -382,10 +365,6 @@ export async function createProduct(productData, imageFiles) {
           console.error('Exceção durante o upload:', uploadErr);
         }
       }
-      
-      console.log(`Upload concluído para ${uploadedImages.length} de ${validFiles.length} imagens`);
-    } else {
-      console.log('Nenhuma imagem válida para upload');
     }
     
     return product;
@@ -403,16 +382,12 @@ export async function createProduct(productData, imageFiles) {
  */
 export async function updateProductStatus(id, status) {
   try {
-    console.log(`Atualizando status do produto ${id} para ${status}`);
-    
     // Verificar se o usuário está autenticado
     const session = await getSession();
     if (!session) {
       console.error('Usuário não autenticado para atualizar status');
       return false;
     }
-    
-    console.log(`Usuário autenticado: ${session.user.id}`);
     
     // Testar permissões com uma consulta simples primeiro
     const { data: testData, error: testError } = await supabase
@@ -429,8 +404,6 @@ export async function updateProductStatus(id, status) {
       return false;
     }
     
-    console.log('Permissão verificada, produto encontrado:', testData);
-    
     // Atualizar o status
     const { data, error } = await supabase
       .from('products')
@@ -443,7 +416,6 @@ export async function updateProductStatus(id, status) {
       return false;
     }
     
-    console.log('Produto atualizado com sucesso:', data);
     return true;
   } catch (error) {
     console.error('Erro ao atualizar status do produto:', error);
@@ -458,8 +430,6 @@ export async function updateProductStatus(id, status) {
  */
 export async function deleteProduct(id) {
   try {
-    console.log(`Excluindo produto ${id}`);
-    
     // Verificar se o usuário está autenticado
     const session = await getSession();
     if (!session) {
@@ -476,8 +446,6 @@ export async function deleteProduct(id) {
     if (fetchError) {
       console.error('Erro ao buscar imagens do produto:', fetchError);
     } else {
-      console.log(`Encontradas ${productImages?.length || 0} imagens para exclusão`);
-      
       // Excluir os arquivos do storage
       if (productImages && productImages.length > 0) {
         try {
@@ -530,8 +498,6 @@ export async function deleteProduct(id) {
       throw imagesError;
     }
     
-    console.log('Referências de imagens excluídas:', imageData);
-    
     // Depois excluir o produto
     const { data, error } = await supabase
       .from('products')
@@ -544,7 +510,6 @@ export async function deleteProduct(id) {
       throw error;
     }
     
-    console.log('Produto excluído:', data);
     return true;
   } catch (error) {
     console.error('Erro ao excluir produto:', error);
@@ -846,26 +811,40 @@ export async function updateCategory(id, name, slug) {
 // ======= Funções de Interessados =======
 
 /**
+ * Função utilitária para converter ID para número
+ * @param {string|number} id - ID a ser convertido
+ * @returns {number|null} - ID convertido ou null se inválido
+ */
+function normalizeId(id) {
+  if (!id) return null;
+  return typeof id === 'string' ? parseInt(id, 10) : id;
+}
+
+/**
  * Registra o interesse de um usuário em um produto
  * @param {object} userData - Dados do usuário interessado
  * @returns {Promise<boolean>} - true se o registro foi bem-sucedido
  */
 export async function registerInterest(userData) {
   try {
-    const { error } = await supabase
+    // Converter para número se for string
+    const numericId = typeof userData.product_id === 'string' ? parseInt(userData.product_id, 10) : userData.product_id;
+    
+    // Inserir o registro de interesse na tabela interests
+    const { error: insertError } = await supabase
       .from('interests')
       .insert([{
         name: userData.name,
         email: userData.email,
         phone: userData.phone,
-        product_id: userData.product_id,
+        product_id: numericId,
         message: userData.message
       }]);
     
-    if (error) throw error;
-    
-    // Incrementar o contador de interesses
-    await incrementProductInterest(userData.product_id);
+    if (insertError) {
+      console.error('Erro ao inserir interesse:', insertError);
+      return false;
+    }
     
     return true;
   } catch (error) {
@@ -875,73 +854,32 @@ export async function registerInterest(userData) {
 }
 
 /**
- * Incrementa o contador de visualizações de um produto
- * @param {string} productId - ID do produto
- * @returns {Promise<void>}
+ * Obtém a contagem de interesses para um produto
+ * @param {string|number} productId - ID do produto
+ * @returns {Promise<number>} - Contagem de interesses
  */
-export async function incrementProductViews(productId) {
+export async function getProductInterestCount(productId) {
   try {
-    // Buscar o produto atual
-    const { data: product, error: fetchError } = await supabase
-      .from('products')
-      .select('views')
-      .eq('id', productId)
-      .single();
+    if (!productId) return 0;
     
-    if (fetchError) throw fetchError;
+    // Converter para número se for string
+    const numericId = typeof productId === 'string' ? parseInt(productId, 10) : productId;
     
-    // Incrementar as visualizações
-    const { error } = await supabase
-      .from('products')
-      .update({ views: (product.views || 0) + 1 })
-      .eq('id', productId);
-    
-    if (error) throw error;
-  } catch (error) {
-    console.error('Erro ao incrementar visualizações:', error);
-  }
-}
-
-/**
- * Incrementa o contador de interesses de um produto
- * @param {string} productId - ID do produto
- * @returns {Promise<boolean>} - true se o incremento foi bem-sucedido
- */
-export async function incrementProductInterest(productId) {
-  try {
-    console.log('Incrementando interesse para produto:', productId);
-    
-    // Buscar o produto atual
-    const { data: product, error: fetchError } = await supabase
-      .from('products')
-      .select('interest_count')
-      .eq('id', productId)
-      .single();
-    
-    if (fetchError) {
-      console.error('Erro ao buscar produto:', fetchError);
-      throw fetchError;
-    }
-    
-    // Incrementar os interesses
-    const currentCount = product.interest_count || 0;
-    console.log('Contador atual:', currentCount);
-    
-    const { error } = await supabase
-      .from('products')
-      .update({ interest_count: currentCount + 1 })
-      .eq('id', productId);
+    // Buscar todos os registros e contar
+    const { data, error } = await supabase
+      .from('interests')
+      .select('id')
+      .eq('product_id', numericId);
     
     if (error) {
-      console.error('Erro ao atualizar contador:', error);
-      throw error;
+      console.error('Erro ao buscar interesses:', error);
+      return 0;
     }
     
-    console.log('Contador incrementado para:', currentCount + 1);
-    return true;
+    return data.length;
   } catch (error) {
-    console.error('Erro ao incrementar interesses:', error);
-    return false;
+    console.error('Erro ao obter contagem de interesses:', error);
+    return 0;
   }
 }
 
@@ -953,14 +891,10 @@ export async function incrementProductInterest(productId) {
  */
 export async function getDashboardStats() {
   try {
-    console.log('Iniciando busca de estatísticas para o dashboard...');
-    
     // Total de produtos
     const { data: products, error: productsError } = await supabase
       .from('products')
       .select('id, status, views, title');
-    
-    console.log('Resposta da consulta de produtos:', { products, error: productsError });
     
     if (productsError) {
       console.error('Erro ao buscar produtos:', productsError);
@@ -968,7 +902,6 @@ export async function getDashboardStats() {
     }
     
     if (!products || products.length === 0) {
-      console.warn('Nenhum produto encontrado na consulta');
       return {
         totalProducts: 0,
         availableProducts: 0,
@@ -988,7 +921,6 @@ export async function getDashboardStats() {
     // Total de visualizações
     const totalViews = products.reduce((sum, product) => {
       const views = product.views || 0;
-      console.log(`Produto ${product.id} (${product.title}) tem ${views} visualizações`);
       return sum + views;
     }, 0);
     
@@ -1007,15 +939,10 @@ export async function getDashboardStats() {
       .from('interests')
       .select('id', { count: 'exact' });
     
-    console.log('Resposta da consulta de interessados:', { interestCount, error: interestError });
-    
     if (interestError) {
       console.error('Erro ao buscar interessados:', interestError);
       throw interestError;
     }
-    
-    console.log('Dashboard stats - Total views:', totalViews);
-    console.log('Dashboard stats - Most viewed products:', mostViewedProducts);
     
     const result = {
       totalProducts: products.length,
@@ -1025,8 +952,6 @@ export async function getDashboardStats() {
       totalViews,
       mostViewedProducts
     };
-    
-    console.log('Resultado final das estatísticas:', result);
     
     return result;
   } catch (error) {
@@ -1061,7 +986,6 @@ export async function ensureBucketExists(bucketName) {
     const bucketExists = buckets.some(bucket => bucket.name === bucketName);
     
     if (bucketExists) {
-      console.log(`Bucket ${bucketName} já existe.`);
       return true;
     }
     
@@ -1079,7 +1003,6 @@ export async function ensureBucketExists(bucketName) {
       return false;
     }
     
-    console.log(`Bucket ${bucketName} criado com sucesso.`);
     return true;
   } catch (error) {
     console.error('Erro ao verificar/criar bucket:', error);
@@ -1126,8 +1049,6 @@ export async function createBucketIfNotExists(bucketName) {
  * @returns {Promise<{success: boolean, error?: any, url?: string}>}
  */
 export async function testImageUpload() {
-  console.log('Iniciando teste de upload de imagem...');
-  
   try {
     // Verificar se o cliente Supabase está disponível
     if (!supabase) {
@@ -1393,12 +1314,10 @@ export async function batchProductAction(productIds, action) {
         break;
         
       case 'markVisible':
-        console.log('Tornando produtos visíveis:', productIds);
         result = await supabase
           .from('products')
           .update({ visible: true, updated_at: new Date().toISOString() })
           .in('id', productIds);
-        console.log('Resultado da operação markVisible:', result);
         break;
         
       case 'delete':
@@ -1459,8 +1378,6 @@ export async function toggleProductVisibility(productId) {
     
     // Alternar a visibilidade
     const newVisibility = !product.visible;
-    
-    console.log(`Alterando visibilidade do produto ${productId} para: ${newVisibility}`);
     
     // Atualizar o produto
     const { error } = await supabase
@@ -1544,8 +1461,6 @@ export async function getSiteSettings() {
  */
 export async function updateSiteSettings(settings) {
   try {
-    console.log('Iniciando atualização de configurações:', settings);
-    
     // Verificar se o usuário está autenticado
     const session = await getSession();
     if (!session) {
@@ -1567,7 +1482,6 @@ export async function updateSiteSettings(settings) {
     let result;
     
     if (existingSettings) {
-      console.log('Atualizando configurações existentes com ID:', existingSettings.id);
       // Atualizar configurações existentes
       const { data, error } = await supabase
         .from('site_settings')
@@ -1584,7 +1498,6 @@ export async function updateSiteSettings(settings) {
       console.log('Configurações atualizadas com sucesso:', data);
       result = { success: true, data };
     } else {
-      console.log('Criando novas configurações');
       // Criar novas configurações
       const { data, error } = await supabase
         .from('site_settings')
