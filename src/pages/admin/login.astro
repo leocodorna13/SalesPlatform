@@ -1,6 +1,13 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import { loginAdmin } from '../../services/supabase';
+import { loginAdmin, getSiteSettings } from '../../services/supabase';
+
+// Buscar configurações do site
+const siteSettingsData = await getSiteSettings();
+const siteSettings = siteSettingsData ? siteSettingsData : {
+  projectName: 'Desapego dos Martins'
+};
+const projectName = siteSettings.projectName || 'Desapego dos Martins';
 
 // Verificar se o formulário foi enviado
 let error = null;
@@ -35,7 +42,7 @@ if (Astro.request.method === 'POST') {
     <div class="w-full max-w-md">
       <div class="bg-white rounded-lg shadow-lg overflow-hidden">
         <div class="bg-primary-600 p-6 text-white text-center">
-          <h1 class="text-2xl font-bold">Desapego dos Martins</h1>
+          <h1 class="text-2xl font-bold">{projectName}</h1>
           <p class="text-primary-100 mt-1">Área Administrativa</p>
         </div>
         

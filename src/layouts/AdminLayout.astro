@@ -1,6 +1,6 @@
 ---
 import '../styles/global.css';
-import { getCurrentUser } from '../services/supabase';
+import { getCurrentUser, getSiteSettings } from '../services/supabase';
 
 interface Props {
   title: string;
@@ -15,6 +15,13 @@ interface User {
 }
 
 const { title, requireAuth = true } = Astro.props;
+
+// Buscar configurações do site
+const siteSettingsData = await getSiteSettings();
+const siteSettings = siteSettingsData ? siteSettingsData : {
+  projectName: 'Desapego dos Martins'
+};
+const projectName = siteSettings.projectName || 'Desapego dos Martins';
 
 // Verificar autenticação
 let user = null;
@@ -50,13 +57,13 @@ if (requireAuth) {
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="robots" content="noindex, nofollow" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
-    <title>{title} | Admin</title>
+    <title>{title} | {projectName}</title>
   </head>
   <body class="bg-gray-100">
     <div class="flex h-screen flex-col md:flex-row">
       <!-- Mobile Header -->
       <header class="bg-primary-800 text-white p-4 flex justify-between items-center md:hidden">
-        <a href="/" class="text-xl font-bold hover:text-primary-200">Desapego dos Martins</a>
+        <a href="/" class="text-xl font-bold hover:text-primary-200">{projectName}</a>
         <button id="mobile-menu-toggle" class="text-white focus:outline-none">
           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
@@ -68,7 +75,7 @@ if (requireAuth) {
       <aside id="sidebar" class="w-full md:w-64 bg-primary-800 text-white md:h-screen md:flex md:flex-col fixed inset-0 z-50 transform -translate-x-full md:relative md:translate-x-0 transition-transform duration-300 ease-in-out">
         <div class="p-4">
           <div class="flex justify-between items-center mb-6">
-            <a href="/" class="text-xl font-bold text-white hover:text-primary-200">Desapego dos Martins</a>
+            <a href="/" class="text-xl font-bold text-white hover:text-primary-200">{projectName}</a>
             <button id="sidebar-close" class="text-white md:hidden">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />

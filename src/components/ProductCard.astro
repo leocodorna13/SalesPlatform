@@ -47,9 +47,9 @@ const formattedPrice = new Intl.NumberFormat('pt-BR', {
   <!-- Badge de categoria (se disponível) -->
   {category && (
     <div class="absolute top-3 right-3 z-10">
-      <span class="badge inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary-100 text-primary-800">
+      <a href={`/categoria/${category.slug}`} class="badge inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary-100 text-primary-800 hover:bg-primary-200 transition-colors">
         {category.name}
-      </span>
+      </a>
     </div>
   )}
   

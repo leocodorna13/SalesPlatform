@@ -4,7 +4,8 @@ import { getSiteSettings, updateSiteSettings, getCurrentUser } from '../../servi
 
 // Definir interface para as configurações do site
 interface SiteSettings {
-  id: string;
+  id?: number;
+  projectName: string;
   heroTitle: string;
   heroDescription: string;
   heroImageUrl: string;
@@ -12,88 +13,65 @@ interface SiteSettings {
   contactWhatsapp: string;
   paymentMethods: string;
   whatsappMessage: string;
-  projectName: string;
 }
 
-// Definir interface para o resultado da operação
-interface OperationResult {
-  success: boolean;
-  message: string;
-  data?: SiteSettings;
-}
-
-// Definir interface para o resultado da operação de atualização
-interface UpdateResult {
-  success: boolean;
-  message?: string;
-  data?: SiteSettings;
-}
-
-// Verificar autenticação
+// Verificar se o usuário está autenticado
 const user = await getCurrentUser();
 if (!user) {
   return Astro.redirect('/admin/login');
 }
 
 // Buscar configurações atuais
-const settings = await getSiteSettings() as SiteSettings;
-
-// Verificar se as configurações foram carregadas
-if (!settings) {
-  return Astro.redirect('/admin/login?error=Não+foi+possível+carregar+as+configurações');
-}
+const settingsData = await getSiteSettings();
+const settings: SiteSettings = settingsData || {
+  projectName: 'Desapego dos Martins',
+  heroTitle: 'Desapego dos Martins',
+  heroDescription: 'Produtos de qualidade a preços acessíveis',
+  heroImageUrl: '',
+  contactPhone: '',
+  contactWhatsapp: '',
+  paymentMethods: '',
+  whatsappMessage: 'Olá! Vi seu produto no site e tenho interesse.'
+};
 
 // Processar formulário
-let result: OperationResult = {
-  success: false,
-  message: ''
-};
+let result = { success: false, message: '' };
 
 if (Astro.request.method === 'POST') {
   try {
     const formData = await Astro.request.formData();
     
-    console.log('Processando formulário de configurações');
-    
     // Extrair dados do formulário
     const updatedSettings: SiteSettings = {
-      id: settings.id,
-      projectName: formData.get('projectName') as string || settings.projectName || 'Desapegos',
-      heroTitle: formData.get('heroTitle') as string || '',
-      heroDescription: formData.get('heroDescription') as string || '',
-      heroImageUrl: formData.get('heroImageUrl') as string || '',
-      contactPhone: formData.get('contactPhone') as string || '',
-      contactWhatsapp: formData.get('contactWhatsapp') as string || '',
-      paymentMethods: formData.get('paymentMethods') as string || '',
-      whatsappMessage: formData.get('whatsappMessage') as string || ''
+      projectName: formData.get('projectName')?.toString() || '',
+      heroTitle: formData.get('heroTitle')?.toString() || '',
+      heroDescription: formData.get('heroDescription')?.toString() || '',
+      heroImageUrl: formData.get('heroImageUrl')?.toString() || settings.heroImageUrl || '',
+      contactPhone: formData.get('contactPhone')?.toString() || '',
+      contactWhatsapp: formData.get('contactWhatsapp')?.toString() || '',
+      paymentMethods: formData.get('paymentMethods')?.toString() || '',
+      whatsappMessage: formData.get('whatsappMessage')?.toString() || ''
     };
     
-    console.log('Dados do formulário:', updatedSettings);
+    // Verificar se há um arquivo de imagem
+    const heroImageFile = formData.get('heroImageFile') as File;
+    const hasImageFile = heroImageFile && heroImageFile.size > 0;
     
     // Atualizar configurações
-    const updateResult = await updateSiteSettings(updatedSettings) as UpdateResult;
-    console.log('Resultado da atualização:', updateResult);
+    result = await updateSiteSettings(updatedSettings, hasImageFile ? heroImageFile : null);
     
-    if (updateResult && updateResult.success) {
-      result = {
-        success: true,
-        message: 'Configurações atualizadas com sucesso!',
-        data: updateResult.data
-      };
-      
-      // Atualizar as configurações na página
-      Object.assign(settings, updateResult.data);
-    } else {
-      result = {
-        success: false,
-        message: updateResult?.message || 'Erro ao atualizar configurações. Tente novamente.'
-      };
+    if (result.success) {
+      // Atualizar as configurações locais após o sucesso
+      const updatedSettingsData = await getSiteSettings();
+      if (updatedSettingsData) {
+        Object.assign(settings, updatedSettingsData);
+      }
     }
   } catch (error) {
     console.error('Erro ao processar formulário:', error);
     result = {
       success: false,
-      message: 'Ocorreu um erro ao processar sua solicitação. Tente novamente.'
+      message: `Erro ao processar formulário: ${error.message}`
     };
   }
 }
@@ -109,7 +87,7 @@ if (Astro.request.method === 'POST') {
       </div>
     )}
     
-    <form method="POST" class="space-y-8">
+    <form method="POST" class="space-y-8" enctype="multipart/form-data">
       <!-- Seção: Informações Gerais -->
       <div class="bg-white shadow rounded-lg p-6">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Informações Gerais</h2>
@@ -127,7 +105,7 @@ if (Astro.request.method === 'POST') {
               type="text"
               id="projectName"
               name="projectName"
-              value={settings.projectName || 'Desapegos'}
+              value={settings.projectName}
               class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
             />
           </div>
@@ -165,21 +143,55 @@ if (Astro.request.method === 'POST') {
             >{settings.heroDescription}</textarea>
           </div>
           
-          <!-- URL da Imagem do Hero -->
+          <!-- Imagem do Hero -->
           <div>
             <label for="heroImageUrl" class="block text-sm font-medium text-gray-700 mb-1">
-              URL da Imagem de Fundo
+              Imagem de Fundo
             </label>
             <div class="text-xs text-gray-500 mb-2">
               Esta imagem será exibida como fundo da seção principal na página inicial.
             </div>
-            <input
-              type="text"
-              id="heroImageUrl"
-              name="heroImageUrl"
-              value={settings.heroImageUrl}
-              class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            />
+            
+            <!-- Preview da imagem atual -->
+            {settings.heroImageUrl && (
+              <div class="mb-3">
+                <img 
+                  src={settings.heroImageUrl} 
+                  alt="Imagem de fundo atual" 
+                  class="w-full max-w-md h-40 object-cover rounded-lg shadow-sm"
+                />
+              </div>
+            )}
+            
+            <!-- Upload de nova imagem -->
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                  Fazer upload de nova imagem
+                </label>
+                <input
+                  type="file"
+                  id="heroImageFile"
+                  name="heroImageFile"
+                  accept="image/*"
+                  class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
+                />
+              </div>
+              
+              <div>
+                <label for="heroImageUrl" class="block text-sm font-medium text-gray-700 mb-1">
+                  Ou use uma URL externa
+                </label>
+                <input
+                  type="text"
+                  id="heroImageUrl"
+                  name="heroImageUrl"
+                  value={settings.heroImageUrl}
+                  placeholder="https://exemplo.com/imagem.jpg"
+                  class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>

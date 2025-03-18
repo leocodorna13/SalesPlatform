@@ -10,10 +10,19 @@ interface Props {
 const { title, description = 'Site de venda de produtos pessoais' } = Astro.props;
 
 // Buscar configurações do site
-const siteSettings = await getSiteSettings();
-const projectName = siteSettings && typeof siteSettings === 'object' && 'projectName' in siteSettings 
-  ? siteSettings.projectName as string 
-  : 'Desapego dos Martins';
+const siteSettingsData = await getSiteSettings();
+const siteSettings = siteSettingsData ? siteSettingsData : {
+  projectName: 'Desapego dos Martins',
+  heroTitle: 'Desapego dos Martins',
+  heroDescription: 'Produtos de qualidade a preços acessíveis',
+  contactPhone: '',
+  contactWhatsapp: '',
+  paymentMethods: '',
+  whatsappMessage: ''
+};
+
+const projectName = siteSettings.projectName || 'Desapego dos Martins';
+
 ---
 
 <!DOCTYPE html>
@@ -37,8 +46,8 @@ const projectName = siteSettings && typeof siteSettings === 'object' && 'project
     <meta name="description" content={description || `${projectName} - Produtos de qualidade a preços acessíveis`} />
   </head>
   <body class="bg-neutral-50 min-h-screen flex flex-col font-sans relative">
-    <!-- Padrão de fundo sutil -->
-    <div class="fixed inset-0 bg-pattern-dots opacity-50 pointer-events-none z-0"></div>
+    <!-- Padrão de fundo sutil com textura beige -->
+    <div class="fixed inset-0 bg-pattern-texture opacity-30 pointer-events-none z-0"></div>
     
     <header class="bg-white shadow-soft sticky top-0 z-40 border-b border-neutral-200">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -80,7 +89,7 @@ const projectName = siteSettings && typeof siteSettings === 'object' && 'project
           <div class="animate-fade-in" style="--animation-delay: 0.1s;">
             <h3 class="text-xl font-bold font-heading mb-4 text-accent-400">{projectName}</h3>
             <p class="text-neutral-300">
-              Produtos de qualidade a preços acessíveis. Todos os itens estão em ótimo estado e prontos para um novo lar.
+              {siteSettings.heroDescription || 'Produtos de qualidade a preços acessíveis. Todos os itens estão em ótimo estado e prontos para um novo lar.'}
             </p>
             <div class="mt-4 flex space-x-4">
               <a href="#" class="text-neutral-400 hover:text-accent-400 transition-colors">
@@ -89,9 +98,11 @@ const projectName = siteSettings && typeof siteSettings === 'object' && 'project
               <a href="#" class="text-neutral-400 hover:text-accent-400 transition-colors">
                 <i class="fab fa-facebook text-xl"></i>
               </a>
-              <a href="#" class="text-neutral-400 hover:text-accent-400 transition-colors">
-                <i class="fab fa-whatsapp text-xl"></i>
-              </a>
+              {siteSettings.contactWhatsapp && (
+                <a href={`https://wa.me/${siteSettings.contactWhatsapp}`} class="text-neutral-400 hover:text-accent-400 transition-colors">
+                  <i class="fab fa-whatsapp text-xl"></i>
+                </a>
+              )}
             </div>
           </div>
           <div class="animate-fade-in" style="--animation-delay: 0.2s;">
@@ -192,6 +203,37 @@ const projectName = siteSettings && typeof siteSettings === 'object' && 'project
     
     --background: var(--neutral-50);
     --text: var(--neutral-900);
+  }
+  
+  /* Textura de fundo beige */
+  .bg-pattern-texture {
+    background-color: #f5f0e5;
+    background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23e0d6c2' fill-opacity='0.3' fill-rule='evenodd'/%3E%3C/svg%3E");
+  }
+  
+  /* Garantir que o site ocupe toda a largura da tela */
+  html, body {
+    width: 100%;
+    max-width: 100%;
+    overflow-x: hidden;
+    margin: 0;
+    padding: 0;
+  }
+  
+  /* Corrigir problemas de layout em dispositivos móveis */
+  @media (max-width: 768px) {
+    .container {
+      width: 100%;
+      padding-left: 1rem;
+      padding-right: 1rem;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    
+    .grid {
+      margin-left: -0.5rem;
+      margin-right: -0.5rem;
+    }
   }
   
   /* Estilos base */

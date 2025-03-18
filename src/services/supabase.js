@@ -1455,69 +1455,110 @@ export async function getSiteSettings() {
 }
 
 /**
+ * Faz upload de uma imagem para o Supabase Storage
+ * @param {File} file - Arquivo de imagem
+ * @param {string} bucketName - Nome do bucket (default: 'site-images')
+ * @param {string} folder - Pasta dentro do bucket (default: 'hero')
+ * @returns {Promise<{success: boolean, url: string|null, error: any}>}
+ */
+export async function uploadImage(file, bucketName = 'site-images', folder = 'hero') {
+  try {
+    // Garantir que o bucket existe
+    const bucketExists = await createBucketIfNotExists(bucketName);
+    if (!bucketExists) {
+      throw new Error('Não foi possível criar o bucket para armazenamento de imagens');
+    }
+
+    // Gerar um nome de arquivo único
+    const fileExt = file.name.split('.').pop();
+    const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+    
+    // Fazer upload do arquivo
+    const { data, error } = await supabase.storage
+      .from(bucketName)
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
+    
+    if (error) throw error;
+    
+    // Obter URL pública da imagem
+    const { data: urlData } = supabase.storage
+      .from(bucketName)
+      .getPublicUrl(fileName);
+    
+    return {
+      success: true,
+      url: urlData.publicUrl,
+      error: null
+    };
+  } catch (error) {
+    console.error('Erro ao fazer upload da imagem:', error);
+    return {
+      success: false,
+      url: null,
+      error: error.message
+    };
+  }
+}
+
+/**
  * Atualiza as configurações do site
  * @param {object} settings - Novas configurações
+ * @param {File} heroImageFile - Arquivo de imagem para o hero (opcional)
  * @returns {Promise<object>} - Resultado da operação
  */
-export async function updateSiteSettings(settings) {
+export async function updateSiteSettings(settings, heroImageFile = null) {
   try {
-    // Verificar se o usuário está autenticado
-    const session = await getSession();
-    if (!session) {
-      console.error('Usuário não autenticado ao tentar atualizar configurações');
-      return { success: false, message: 'Você precisa estar autenticado para atualizar as configurações' };
+    // Se foi enviado um arquivo de imagem, fazer upload
+    if (heroImageFile) {
+      const uploadResult = await uploadImage(heroImageFile);
+      if (uploadResult.success) {
+        settings.heroImageUrl = uploadResult.url;
+      } else {
+        return {
+          success: false,
+          message: `Erro ao fazer upload da imagem: ${uploadResult.error}`
+        };
+      }
     }
-    
-    // Verificar se já existem configurações
-    const { data: existingSettings, error: fetchError } = await supabase
+
+    // Validar campos obrigatórios
+    if (!settings.projectName) {
+      return {
+        success: false,
+        message: 'O nome do projeto é obrigatório'
+      };
+    }
+
+    // Atualizar configurações no banco de dados
+    const { data, error } = await supabase
       .from('site_settings')
-      .select('id')
-      .single();
-    
-    if (fetchError && fetchError.code !== 'PGRST116') {
-      console.error('Erro ao buscar configurações existentes:', fetchError);
-      return { success: false, message: fetchError.message };
-    }
-    
-    let result;
-    
-    if (existingSettings) {
-      // Atualizar configurações existentes
-      const { data, error } = await supabase
-        .from('site_settings')
-        .update(settings)
-        .eq('id', existingSettings.id)
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('Erro ao atualizar configurações:', error);
-        return { success: false, message: error.message };
-      }
-      
-      console.log('Configurações atualizadas com sucesso:', data);
-      result = { success: true, data };
-    } else {
-      // Criar novas configurações
-      const { data, error } = await supabase
-        .from('site_settings')
-        .insert([settings])
-        .select()
-        .single();
-      
-      if (error) {
-        console.error('Erro ao criar configurações:', error);
-        return { success: false, message: error.message };
-      }
-      
-      console.log('Configurações criadas com sucesso:', data);
-      result = { success: true, data };
-    }
-    
-    return result;
+      .update({
+        projectName: settings.projectName,
+        heroTitle: settings.heroTitle,
+        heroDescription: settings.heroDescription,
+        heroImageUrl: settings.heroImageUrl,
+        contactPhone: settings.contactPhone,
+        contactWhatsapp: settings.contactWhatsapp,
+        paymentMethods: settings.paymentMethods,
+        whatsappMessage: settings.whatsappMessage
+      })
+      .eq('id', 1);
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      message: 'Configurações atualizadas com sucesso!'
+    };
   } catch (error) {
-    console.error('Erro ao atualizar configurações do site:', error);
-    return { success: false, message: error.message };
+    console.error('Erro ao atualizar configurações:', error);
+    return {
+      success: false,
+      message: `Erro ao atualizar configurações: ${error.message}`
+    };
   }
 }
 
