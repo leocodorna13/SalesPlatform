@@ -10,7 +10,7 @@ import { getProducts, getCategories, getSiteSettings } from '../services/supabas
 const categories = await getCategories();
 
 // Buscar produtos disponíveis
-const products = await getProducts('available');
+const products = await getProducts('all');
 
 // Produtos em destaque (os 4 mais recentes)
 const featuredProducts = products.slice(0, 4);

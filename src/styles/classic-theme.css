@@ -1,0 +1,281 @@
+/* Tema clássico com cores bege e texturas elegantes */
+:root {
+  --color-primary-50: #f9f6f1;
+  --color-primary-100: #f3ede3;
+  --color-primary-200: #e8dbc7;
+  --color-primary-300: #dcc9ab;
+  --color-primary-400: #cdb78f;
+  --color-primary-500: #bea573;
+  --color-primary-600: #a08456;
+  --color-primary-700: #826a45;
+  --color-primary-800: #645039;
+  --color-primary-900: #463a2d;
+  
+  --color-accent-50: #f6f5f9;
+  --color-accent-100: #edeaf3;
+  --color-accent-200: #dbd5e7;
+  --color-accent-300: #c9c0db;
+  --color-accent-400: #b7aacf;
+  --color-accent-500: #9585b7;
+  --color-accent-600: #7a6a9e;
+  --color-accent-700: #655785;
+  --color-accent-800: #4f446c;
+  --color-accent-900: #3a3353;
+  
+  --color-neutral-50: #f9f8f6;
+  --color-neutral-100: #f3f1ed;
+  --color-neutral-200: #e7e3db;
+  --color-neutral-300: #dbd5c9;
+  --color-neutral-400: #cfc7b7;
+  --color-neutral-500: #b3a99a;
+  --color-neutral-600: #9c917e;
+  --color-neutral-700: #857a68;
+  --color-neutral-800: #6e6454;
+  --color-neutral-900: #574e40;
+  
+  /* Variáveis de fonte */
+  --font-heading: 'Playfair Display', serif;
+  --font-body: 'Raleway', sans-serif;
+}
+
+/* Texturas de fundo */
+.bg-texture-brocade {
+  background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23bea573' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+.bg-texture-damask {
+  background-image: url("data:image/svg+xml,%3Csvg width='52' height='26' viewBox='0 0 52 26' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23bea573' fill-opacity='0.15'%3E%3Cpath d='M10 10c0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6h2c0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4 3.314 0 6 2.686 6 6 0 2.21 1.79 4 4 4v2c-3.314 0-6-2.686-6-6 0-2.21-1.79-4-4-4-3.314 0-6-2.686-6-6zm25.464-1.95l8.486 8.486-1.414 1.414-8.486-8.486 1.414-1.414z' /%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+.bg-texture-subtle {
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M11 18c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm48 25c3.866 0 7-3.134 7-7s-3.134-7-7-7-7 3.134-7 7 3.134 7 7 7zm-43-7c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm63 31c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM34 90c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zm56-76c1.657 0 3-1.343 3-3s-1.343-3-3-3-3 1.343-3 3 1.343 3 3 3zM12 86c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm28-65c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm23-11c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-6 60c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm29 22c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zM32 63c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm57-13c2.76 0 5-2.24 5-5s-2.24-5-5-5-5 2.24-5 5 2.24 5 5 5zm-9-21c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM60 91c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM35 41c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2zM12 60c1.105 0 2-.895 2-2s-.895-2-2-2-2 .895-2 2 .895 2 2 2z' fill='%23bea573' fill-opacity='0.08' fill-rule='evenodd'/%3E%3C/svg%3E");
+}
+
+.bg-texture-paper {
+  background-image: url("data:image/svg+xml,%3Csvg width='100' height='100' viewBox='0 0 100 100' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M77 63a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-8a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm-37-5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-8a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm-39 4a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-8a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm81 5a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-8a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm-37-3a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-8a5 5 0 1 1 0 10 5 5 0 0 1 0-10zm-39 7a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm0-8a5 5 0 1 1 0 10 5 5 0 0 1 0-10z' fill='%23bea573' fill-opacity='0.05' fill-rule='evenodd'/%3E%3C/svg%3E");
+}
+
+/* Estilos para produtos vendidos */
+.sold-badge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: rgba(180, 83, 9, 0.85);
+  color: white;
+  font-weight: bold;
+  padding: 0.25rem 0.75rem;
+  font-size: 0.75rem;
+  transform: rotate(45deg) translate(25%, -50%);
+  transform-origin: top right;
+  z-index: 10;
+  font-family: var(--font-heading);
+  letter-spacing: 0.05em;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.sold-overlay {
+  position: absolute;
+  inset: 0;
+  background-color: rgba(0, 0, 0, 0.25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 5;
+  backdrop-filter: grayscale(50%);
+}
+
+/* Botões e elementos de UI */
+.btn-classic {
+  background-color: var(--color-primary-600);
+  color: var(--color-primary-50);
+  border: 1px solid var(--color-primary-700);
+  transition: all 0.2s ease;
+  font-family: var(--font-body);
+  letter-spacing: 0.03em;
+  position: relative;
+  overflow: hidden;
+}
+
+.btn-classic:hover {
+  background-color: var(--color-primary-700);
+  border-color: var(--color-primary-800);
+  transform: translateY(-2px);
+}
+
+.btn-classic:active {
+  transform: translateY(0);
+}
+
+.btn-classic::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+.btn-classic:hover::after {
+  opacity: 1;
+}
+
+/* Sombras e efeitos */
+.shadow-classic {
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05), 
+              0 1px 3px rgba(0, 0, 0, 0.1), 
+              0 0 0 1px rgba(190, 165, 115, 0.1);
+}
+
+.shadow-classic-hover {
+  transition: all 0.3s ease;
+}
+
+.shadow-classic-hover:hover {
+  box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1),
+              0 4px 6px -2px rgba(0, 0, 0, 0.05),
+              0 0 0 1px rgba(190, 165, 115, 0.2);
+  transform: translateY(-2px);
+}
+
+.card-classic {
+  background-color: var(--color-neutral-50);
+  border: 1px solid var(--color-primary-200);
+  border-radius: 0.375rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.card-classic::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: linear-gradient(to right, var(--color-primary-400), var(--color-primary-600));
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.card-classic:hover::before {
+  opacity: 1;
+}
+
+/* Tipografia clássica */
+.font-heading {
+  font-family: var(--font-heading);
+}
+
+.font-body {
+  font-family: var(--font-body);
+}
+
+/* Decorações clássicas */
+.divider-classic {
+  position: relative;
+  height: 1px;
+  background-color: var(--color-primary-200);
+  margin: 2rem 0;
+}
+
+.divider-classic::before {
+  content: '❦';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background-color: var(--color-neutral-50);
+  padding: 0 1rem;
+  color: var(--color-primary-500);
+  font-size: 1.25rem;
+}
+
+/* Estilo para títulos decorados */
+.title-classic {
+  position: relative;
+  display: inline-block;
+  padding: 0 1rem;
+}
+
+.title-classic::before,
+.title-classic::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  width: 30px;
+  height: 1px;
+  background-color: var(--color-primary-400);
+}
+
+.title-classic::before {
+  left: -40px;
+}
+
+.title-classic::after {
+  right: -40px;
+}
+
+/* Animações refinadas */
+.hover-lift {
+  transition: transform 0.3s ease;
+}
+
+.hover-lift:hover {
+  transform: translateY(-5px);
+}
+
+/* Efeito de borda decorativa */
+.border-classic {
+  border: 1px solid var(--color-primary-200);
+  border-radius: 0.375rem;
+  position: relative;
+}
+
+.border-classic::after {
+  content: '';
+  position: absolute;
+  inset: -5px;
+  border: 1px solid var(--color-primary-300);
+  border-radius: 0.5rem;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.border-classic:hover::after {
+  opacity: 0.5;
+}
+
+/* Efeito de texto com sublinhado decorativo */
+.link-classic {
+  position: relative;
+  color: var(--color-primary-700);
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.link-classic::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 100%;
+  height: 1px;
+  background-color: var(--color-primary-400);
+  transform: scaleX(0);
+  transform-origin: right;
+  transition: transform 0.3s ease;
+}
+
+.link-classic:hover {
+  color: var(--color-primary-800);
+}
+
+.link-classic:hover::after {
+  transform: scaleX(1);
+  transform-origin: left;
+}

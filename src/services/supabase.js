@@ -169,7 +169,7 @@ export async function getProductsByCategorySlug(categorySlug) {
           product_images (*),
           categories (*)
         `)
-        .eq('status', 'available')
+        .neq('status', 'hidden')  // Mostrar produtos disponíveis e vendidos, mas não ocultos
         .eq('visible', true)
         .order('created_at', { ascending: false });
       
@@ -194,7 +194,7 @@ export async function getProductsByCategorySlug(categorySlug) {
         categories (*)
       `)
       .eq('category_id', category.id)
-      .eq('status', 'available') // Mostrar apenas produtos disponíveis
+      .neq('status', 'hidden')  // Mostrar produtos disponíveis e vendidos, mas não ocultos
       .eq('visible', true) // Mostrar apenas produtos visíveis
       .order('created_at', { ascending: false });
     
