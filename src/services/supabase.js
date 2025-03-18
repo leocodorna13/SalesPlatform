@@ -765,16 +765,16 @@ export async function getProductsByCategory(categoryId, status = null) {
 export async function updateCategory(id, name, slug) {
   try {
     // Verificar se o slug já existe em outra categoria
-    const { data: existingCategory, error: checkError } = await supabase
+    const { data: existingCategory, error: searchError } = await supabase
       .from('categories')
       .select('id')
       .eq('slug', slug)
       .neq('id', id)
       .single();
     
-    if (checkError && checkError.code !== 'PGRST116') {
+    if (searchError && searchError.code !== 'PGRST116') {
       // PGRST116 é o código para "não encontrado", que é o que queremos
-      throw checkError;
+      throw searchError;
     }
     
     if (existingCategory) {
@@ -1108,11 +1108,11 @@ export async function testImageUpload() {
     console.log('Arquivo de teste enviado com sucesso:', uploadData);
     
     // Obter URL pública do arquivo
-    const { data: publicUrlData } = supabase.storage
+    const { data: urlData } = supabase.storage
       .from(bucketName)
       .getPublicUrl(filePath);
     
-    const publicUrl = publicUrlData?.publicUrl;
+    const publicUrl = urlData?.publicUrl;
     console.log('URL pública do arquivo de teste:', publicUrl);
     
     return { 

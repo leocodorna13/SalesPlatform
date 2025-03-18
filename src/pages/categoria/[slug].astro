@@ -56,7 +56,7 @@ const projectName = siteSettings && typeof siteSettings === 'object' && 'project
         <!-- Produtos da categoria -->
         <div id="categoryProducts">
           {products.length > 0 ? (
-            <ProductGrid products={products} />
+            <ProductGrid products={products} showSold={true} />
           ) : (
             <div class="text-center py-16 bg-gray-50 rounded-lg">
               <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">

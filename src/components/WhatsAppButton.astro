@@ -26,12 +26,16 @@ const siteSettings = await getSiteSettings();
 const phone = customPhone || (siteSettings?.contactWhatsapp || '').replace(/\D/g, '');
 const formattedPhone = phone.startsWith('55') ? phone : `55${phone}`;
 
+// URL completa do produto para compartilhamento
+const baseUrl = Astro.url.origin;
+const productUrl = productId ? `${baseUrl}/produto/${productId}` : '';
+
 // Mensagem padrão do WhatsApp
 let defaultMessage = siteSettings?.whatsappMessage || 'Olá, gostaria de mais informações sobre seus produtos.';
 
-// Se for um produto específico, personalizar a mensagem
-if (productName) {
-  defaultMessage = `Olá, gostaria de mais informações sobre o produto "${productName}" (ID: ${productId}).`;
+// Se for um produto específico, personalizar a mensagem com link
+if (productName && productId) {
+  defaultMessage = `Olá! Vi seu Desapego e tenho interesse no produto "${productName}"! ${productUrl}`;
 }
 
 // Usar mensagem personalizada se fornecida
