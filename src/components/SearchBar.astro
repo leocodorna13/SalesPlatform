@@ -6,16 +6,18 @@ interface Props {
     name: string;
     slug: string;
   }>;
+  mobileFriendly?: boolean;
 }
 
 const { 
   placeholder = "Buscar produtos...", 
-  categories = [] 
+  categories = [],
+  mobileFriendly = false
 } = Astro.props;
 ---
 
-<div class="search-container bg-white rounded-xl shadow-hover p-1 relative z-50">
-  <div class="flex items-center">
+<div class={`search-container bg-white rounded-xl shadow-hover p-1 relative z-50 ${mobileFriendly ? 'mobile-friendly' : ''}`}>
+  <div class="flex items-center flex-wrap md:flex-nowrap">
     <!-- Ícone de busca -->
     <div class="pl-4 text-primary-500">
       <i class="fas fa-search text-lg"></i>
@@ -81,7 +83,7 @@ const {
       id="searchButton" 
       class="bg-primary-600 hover:bg-primary-700 text-white py-3 px-6 rounded-lg transition-colors ml-2 flex items-center gap-2"
     >
-      <span>Buscar</span>
+      <span class="hidden sm:inline">Buscar</span>
       <i class="fas fa-arrow-right"></i>
     </button>
   </div>
@@ -93,323 +95,11 @@ const {
 </div>
 
 <script>
+  import { SearchBarController } from './SearchBarController.js';
+  
   document.addEventListener('DOMContentLoaded', () => {
-    const searchInput = document.getElementById('searchInput') as HTMLInputElement | null;
-    const searchButton = document.getElementById('searchButton');
-    const categoryDropdownButton = document.getElementById('categoryDropdownButton');
-    const categoryDropdown = document.getElementById('categoryDropdown');
-    const categoryItems = document.querySelectorAll('.category-dropdown-item');
-    const activeFilters = document.getElementById('activeFilters');
-    const productGrid = document.querySelector('.product-grid');
-    
-    let selectedCategory = 'all';
-    let selectedCategoryName = 'Todos';
-    let searchTimeout: ReturnType<typeof setTimeout> | null = null;
-    
-    // Função para normalizar texto (remover acentos e caracteres especiais)
-    const normalizeText = (text: string) => {
-      return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
-    };
-    
-    // Função para realizar a busca em tempo real diretamente na página
-    const performLiveSearch = () => {
-      if (!searchInput) return;
-      
-      const searchTerm = searchInput.value.trim().toLowerCase();
-      const normalizedQuery = normalizeText(searchTerm);
-      
-      // Limpar timeout anterior
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
-      }
-      
-      // Definir timeout para evitar muitas buscas durante digitação
-      searchTimeout = setTimeout(() => {
-        const productCards = document.querySelectorAll('.product-card');
-        let visibleCount = 0;
-        
-        // Filtrar produtos
-        productCards.forEach(card => {
-          const title = normalizeText(card.querySelector('h3')?.textContent || '');
-          const category = normalizeText(card.querySelector('.badge')?.textContent || '');
-          const price = card.querySelector('.text-accent-600')?.textContent || '';
-          
-          // Verificar se o produto corresponde à pesquisa
-          const matchesSearch = !searchTerm || title.includes(normalizedQuery) || category.includes(normalizedQuery) || price.includes(normalizedQuery);
-          
-          // Verificar se o produto corresponde à categoria selecionada
-          const cardCategory = card.getAttribute('data-category');
-          const matchesCategory = selectedCategory === 'all' || cardCategory === selectedCategory;
-          
-          // Mostrar ou esconder o produto
-          if (matchesSearch && matchesCategory) {
-            card.classList.remove('hidden');
-            card.classList.add('animate-fade-in');
-            visibleCount++;
-          } else {
-            card.classList.add('hidden');
-            card.classList.remove('animate-fade-in');
-          }
-        });
-        
-        // Mostrar mensagem se não houver resultados
-        const noResultsElement = document.getElementById('noResults');
-        if (noResultsElement) {
-          if (visibleCount === 0) {
-            noResultsElement.classList.remove('hidden');
-            noResultsElement.textContent = `Nenhum resultado encontrado para "${searchTerm}"`;
-          } else {
-            noResultsElement.classList.add('hidden');
-          }
-        } else if (visibleCount === 0 && productGrid) {
-          // Criar elemento de "nenhum resultado" se não existir
-          const noResults = document.createElement('div');
-          noResults.id = 'noResults';
-          noResults.className = 'w-full py-16 text-center text-neutral-500';
-          noResults.innerHTML = `
-            <div class="flex flex-col items-center">
-              <i class="fas fa-search text-neutral-300 text-4xl mb-4"></i>
-              <p class="text-lg">Nenhum resultado encontrado para "${searchTerm}"</p>
-              <button id="clearSearch" class="mt-4 text-primary-600 hover:text-primary-800 font-medium">
-                <i class="fas fa-times-circle mr-1"></i> Limpar busca
-              </button>
-            </div>
-          `;
-          productGrid.parentNode?.insertBefore(noResults, productGrid.nextSibling);
-          
-          // Adicionar evento para limpar busca
-          document.getElementById('clearSearch')?.addEventListener('click', () => {
-            if (searchInput) {
-              searchInput.value = '';
-              performLiveSearch();
-            }
-          });
-        }
-        
-        // Adicionar contador de resultados
-        const resultsCountElement = document.getElementById('resultsCount');
-        if (resultsCountElement) {
-          resultsCountElement.textContent = `${visibleCount} ${visibleCount === 1 ? 'produto encontrado' : 'produtos encontrados'}`;
-          resultsCountElement.classList.toggle('hidden', visibleCount === 0);
-        } else if (visibleCount > 0 && productGrid) {
-          const resultsCount = document.createElement('div');
-          resultsCount.id = 'resultsCount';
-          resultsCount.className = 'text-sm text-neutral-500 mb-4';
-          resultsCount.textContent = `${visibleCount} ${visibleCount === 1 ? 'produto encontrado' : 'produtos encontrados'}`;
-          productGrid.parentNode?.insertBefore(resultsCount, productGrid);
-        }
-        
-        // Adicionar efeito de animação ao filtrar
-        if (productGrid) {
-          productGrid.classList.add('animate-fade');
-          setTimeout(() => {
-            productGrid.classList.remove('animate-fade');
-          }, 500);
-        }
-      }, 300); // 300ms de delay
-    };
-    
-    // Função para realizar a busca e navegar
-    const performSearch = () => {
-      const searchTerm = searchInput?.value.trim();
-      
-      if (searchTerm || selectedCategory !== 'all') {
-        let url = '/categoria/todos';
-        
-        // Se tiver uma categoria específica, usa a URL da categoria
-        if (selectedCategory !== 'all') {
-          url = `/categoria/${selectedCategory}`;
-        }
-        
-        // Adiciona o termo de busca como parâmetro se existir
-        if (searchTerm) {
-          url += `?q=${encodeURIComponent(searchTerm)}`;
-        }
-        
-        window.location.href = url;
-      }
-    };
-    
-    // Evento de input no campo de busca
-    if (searchInput) {
-      searchInput.addEventListener('input', performLiveSearch);
-      
-      // Focar no input ao clicar na barra de pesquisa
-      document.querySelector('.search-container')?.addEventListener('click', (e) => {
-        if (!categoryDropdownButton?.contains(e.target as Node) && !categoryDropdown?.contains(e.target as Node)) {
-          searchInput.focus();
-        }
-      });
-    }
-    
-    // Evento de clique no botão de busca
-    if (searchButton) {
-      searchButton.addEventListener('click', performSearch);
-    }
-    
-    // Evento de pressionar Enter no campo de busca
-    if (searchInput) {
-      searchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          performSearch();
-        }
-      });
-    }
-    
-    // Toggle do dropdown de categorias
-    if (categoryDropdownButton && categoryDropdown) {
-      categoryDropdownButton.addEventListener('click', (e) => {
-        e.stopPropagation();
-        categoryDropdown.classList.toggle('hidden');
-      });
-      
-      // Fechar dropdown ao clicar fora
-      document.addEventListener('click', () => {
-        if (!categoryDropdown.classList.contains('hidden')) {
-          categoryDropdown.classList.add('hidden');
-        }
-      });
-      
-      // Evitar que o clique dentro do dropdown o feche
-      categoryDropdown.addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
-    }
-    
-    // Selecionar categoria do dropdown
-    categoryItems.forEach(item => {
-      item.addEventListener('click', () => {
-        const category = item.getAttribute('data-category');
-        const categoryName = item.getAttribute('data-name');
-        
-        if (category && categoryName) {
-          selectedCategory = category;
-          selectedCategoryName = categoryName;
-          
-          // Atualizar texto do botão de categorias
-          if (categoryDropdownButton) {
-            const buttonText = categoryDropdownButton.querySelector('span');
-            if (buttonText) {
-              buttonText.textContent = category === 'all' ? 'Categorias' : categoryName;
-            }
-          }
-          
-          // Fechar dropdown
-          if (categoryDropdown) {
-            categoryDropdown.classList.add('hidden');
-          }
-          
-          // Mostrar filtro ativo
-          updateActiveFilters();
-          
-          // Atualizar resultados de pesquisa
-          performLiveSearch();
-        }
-      });
-    });
-    
-    // Atualizar chips de filtros ativos
-    const updateActiveFilters = () => {
-      if (!activeFilters) return;
-      
-      // Limpar filtros atuais
-      activeFilters.innerHTML = '';
-      
-      let hasActiveFilters = false;
-      
-      // Adicionar chip de categoria se não for "Todos"
-      if (selectedCategory !== 'all') {
-        const categoryChip = document.createElement('div');
-        categoryChip.className = 'inline-flex items-center gap-2 bg-primary-100 text-primary-700 px-3 py-1.5 rounded-full text-sm font-medium';
-        categoryChip.innerHTML = `
-          <i class="fas fa-tag text-xs"></i>
-          <span>${selectedCategoryName}</span>
-          <button class="ml-1 text-primary-500 hover:text-primary-700" data-clear="category">
-            <i class="fas fa-times-circle"></i>
-          </button>
-        `;
-        activeFilters.appendChild(categoryChip);
-        hasActiveFilters = true;
-        
-        // Evento para limpar categoria
-        const clearButton = categoryChip.querySelector('[data-clear="category"]');
-        if (clearButton) {
-          clearButton.addEventListener('click', () => {
-            selectedCategory = 'all';
-            selectedCategoryName = 'Todos';
-            
-            // Atualizar texto do botão
-            if (categoryDropdownButton) {
-              const buttonText = categoryDropdownButton.querySelector('span');
-              if (buttonText) {
-                buttonText.textContent = 'Categorias';
-              }
-            }
-            
-            updateActiveFilters();
-            performLiveSearch();
-          });
-        }
-      }
-      
-      // Adicionar chip de termo de busca se existir
-      if (searchInput && searchInput.value.trim()) {
-        const searchChip = document.createElement('div');
-        searchChip.className = 'inline-flex items-center gap-2 bg-accent-100 text-accent-700 px-3 py-1.5 rounded-full text-sm font-medium';
-        searchChip.innerHTML = `
-          <i class="fas fa-search text-xs"></i>
-          <span>${searchInput.value.trim()}</span>
-          <button class="ml-1 text-accent-500 hover:text-accent-700" data-clear="search">
-            <i class="fas fa-times-circle"></i>
-          </button>
-        `;
-        activeFilters.appendChild(searchChip);
-        hasActiveFilters = true;
-        
-        // Evento para limpar termo de busca
-        const clearButton = searchChip.querySelector('[data-clear="search"]');
-        if (clearButton) {
-          clearButton.addEventListener('click', () => {
-            if (searchInput) {
-              searchInput.value = '';
-              updateActiveFilters();
-              performLiveSearch();
-            }
-          });
-        }
-      }
-      
-      // Mostrar ou esconder a seção de filtros ativos
-      if (hasActiveFilters) {
-        activeFilters.classList.remove('hidden');
-      } else {
-        activeFilters.classList.add('hidden');
-      }
-    };
-    
-    // Inicializar filtros ativos
-    updateActiveFilters();
-    
-    // Verificar se há parâmetros na URL para preencher a busca
-    const urlParams = new URLSearchParams(window.location.search);
-    const queryParam = urlParams.get('q');
-    
-    if (queryParam && searchInput) {
-      searchInput.value = queryParam;
-      performLiveSearch();
-    }
-    
-    // Adicionar atributo data-category aos cards de produto
-    document.querySelectorAll('.product-card').forEach(card => {
-      const categoryElement = card.querySelector('.badge');
-      if (categoryElement) {
-        const categoryText = categoryElement.textContent?.trim();
-        const categorySlug = normalizeText(categoryText || '')
-          .replace(/\s+/g, '-')
-          .replace(/[^\w\-]+/g, '');
-        card.setAttribute('data-category', categorySlug);
-      }
-    });
+    // Inicializar o controlador da barra de pesquisa
+    new SearchBarController();
   });
 </script>
 
@@ -464,5 +154,21 @@ const {
   
   .animate-fade-in {
     animation: fadeIn 0.3s ease-out forwards;
+  }
+  
+  /* Estilos específicos para mobile */
+  @media (max-width: 640px) {
+    .mobile-friendly input {
+      font-size: 16px; /* Evita zoom automático em iOS */
+      padding: 0.75rem 0.5rem;
+    }
+    
+    .mobile-friendly #categoryDropdownButton {
+      padding: 0.75rem 0.5rem;
+    }
+    
+    .mobile-friendly #searchButton {
+      padding: 0.75rem 1rem;
+    }
   }
 </style>

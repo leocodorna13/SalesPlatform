@@ -20,7 +20,7 @@ const projectName = siteSettings && typeof siteSettings === 'object' && 'project
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="generator" content={Astro.generator} />
     <title>{title} | {projectName}</title>
@@ -129,6 +129,37 @@ const projectName = siteSettings && typeof siteSettings === 'object' && 'project
         </div>
       </div>
     </footer>
+    
+    <script>
+      // Script para controlar a barra de pesquisa fixa
+      document.addEventListener('DOMContentLoaded', function() {
+        const searchBarContainer = document.getElementById('searchBarContainer');
+        
+        if (searchBarContainer) {
+          let lastScrollTop = 0;
+          
+          window.addEventListener('scroll', function() {
+            const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
+            
+            if (scrollTop > 100) {
+              searchBarContainer.classList.add('shadow-md');
+              
+              // Esconde a barra ao rolar para baixo e mostra ao rolar para cima
+              if (scrollTop > lastScrollTop) {
+                searchBarContainer.style.transform = 'translateY(-100%)';
+              } else {
+                searchBarContainer.style.transform = 'translateY(0)';
+              }
+            } else {
+              searchBarContainer.classList.remove('shadow-md');
+              searchBarContainer.style.transform = 'translateY(0)';
+            }
+            
+            lastScrollTop = scrollTop;
+          });
+        }
+      });
+    </script>
   </body>
 </html>
 

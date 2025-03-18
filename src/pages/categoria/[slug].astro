@@ -30,89 +30,93 @@ const projectName = siteSettings && typeof siteSettings === 'object' && 'project
   : 'Desapego dos Martins';
 ---
 
-<Layout title={`${currentCategory?.name || 'Categoria'} | ${projectName}`}>
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <!-- Cabeçalho da categoria -->
-    <div class="mb-8">
-      <h1 class="text-3xl font-bold text-gray-900 mb-2">
-        {currentCategory?.name || 'Categoria'}
-      </h1>
-      <p class="text-gray-600">
-        Produtos disponíveis nesta categoria
-      </p>
-    </div>
-    
-    <!-- Barra de pesquisa -->
-    <div class="mb-8">
-      <SearchBar categories={categories} />
-    </div>
-    
-    <!-- Filtro de categorias -->
-    <CategoryFilter categories={categories} activeCategory={slug} />
-    
-    <!-- Produtos da categoria -->
-    <div id="categoryProducts">
-      {products.length > 0 ? (
-        <ProductGrid products={products} />
-      ) : (
-        <div class="text-center py-16 bg-gray-50 rounded-lg">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">Nenhum produto disponível</h3>
-          <p class="text-gray-600">
-            No momento não há produtos disponíveis nesta categoria.
-          </p>
-        </div>
-      )}
-      
-      <!-- Mensagem de nenhum produto encontrado (inicialmente oculta) -->
-      <div id="noResults" class="hidden mt-8 text-center py-16 bg-gray-50 rounded-lg">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <h3 class="text-xl font-semibold text-gray-900 mb-2">Nenhum produto encontrado</h3>
-        <p class="text-gray-600">
-          Tente buscar com outras palavras ou explorar outras categorias.
-        </p>
-      </div>
+<Layout title={currentCategory ? currentCategory.name : "Categoria não encontrada"}>
+  <!-- Barra de pesquisa fixa -->
+  <div id="searchBarContainer" class="search-container-wrapper sticky top-0 z-50 bg-white/90 backdrop-blur-md shadow-md py-3 transition-all duration-300">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <SearchBar 
+        placeholder="Buscar nesta categoria..." 
+        categories={categories}
+        mobileFriendly={true}
+      />
     </div>
   </div>
   
-  <!-- WhatsApp flutuante -->
-  <WhatsAppButton 
-    floating={true} 
-    buttonText="Fale conosco" 
-  />
-</Layout>
+  <div class="container mx-auto px-4 py-8">
+    <!-- Cabeçalho da página -->
+    <div class="mb-8">
+      <div class="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-6">
+        <h1 class="text-3xl font-bold text-neutral-800">
+          {currentCategory ? currentCategory.name : "Categoria não encontrada"}
+        </h1>
+        
+        <!-- Filtro de categorias -->
+        <CategoryFilter categories={categories} activeCategory={slug} />
+        
+        <!-- Produtos da categoria -->
+        <div id="categoryProducts">
+          {products.length > 0 ? (
+            <ProductGrid products={products} />
+          ) : (
+            <div class="text-center py-16 bg-gray-50 rounded-lg">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
+              </svg>
+              <h3 class="text-xl font-semibold text-gray-900 mb-2">Nenhum produto disponível</h3>
+              <p class="text-gray-600">
+                No momento não há produtos disponíveis nesta categoria.
+              </p>
+            </div>
+          )}
+          
+          <!-- Mensagem de nenhum produto encontrado (inicialmente oculta) -->
+          <div id="noResults" class="hidden mt-8 text-center py-16 bg-gray-50 rounded-lg">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 class="text-xl font-semibold text-gray-900 mb-2">Nenhum produto encontrado</h3>
+            <p class="text-gray-600">
+              Tente buscar com outras palavras ou explorar outras categorias.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- WhatsApp flutuante -->
+    <WhatsAppButton 
+      floating={true} 
+      buttonText="Fale conosco" 
+    />
+  </Layout>
 
-<script>
-  // Quando a página carregar, pré-selecionar a categoria atual
-  document.addEventListener('DOMContentLoaded', () => {
-    // Prevenir redirecionamento ao clicar nos botões de categoria
-    document.querySelectorAll('.category-btn').forEach(button => {
-      button.addEventListener('click', (e) => {
-        e.preventDefault();
+  <script>
+    // Quando a página carregar, pré-selecionar a categoria atual
+    document.addEventListener('DOMContentLoaded', () => {
+      // Prevenir redirecionamento ao clicar nos botões de categoria
+      document.querySelectorAll('.category-btn').forEach(button => {
+        button.addEventListener('click', (e) => {
+          e.preventDefault();
+        });
+      });
+      
+      // Inicializar a categoria atual
+      const currentSlug = window.location.pathname.split('/').pop();
+      
+      if (!currentSlug) return;
+      
+      // Encontrar o botão da categoria atual e ativá-lo
+      const categoryButtons = document.querySelectorAll('.category-btn');
+      
+      categoryButtons.forEach(button => {
+        const buttonSlug = button.getAttribute('data-slug');
+        
+        if (buttonSlug === currentSlug) {
+          // Simular um clique no botão da categoria atual para inicializar a pesquisa
+          setTimeout(() => {
+            (button as HTMLElement).click();
+          }, 100);
+        }
       });
     });
-    
-    // Inicializar a categoria atual
-    const currentSlug = window.location.pathname.split('/').pop();
-    
-    if (!currentSlug) return;
-    
-    // Encontrar o botão da categoria atual e ativá-lo
-    const categoryButtons = document.querySelectorAll('.category-btn');
-    
-    categoryButtons.forEach(button => {
-      const buttonSlug = button.getAttribute('data-slug');
-      
-      if (buttonSlug === currentSlug) {
-        // Simular um clique no botão da categoria atual para inicializar a pesquisa
-        setTimeout(() => {
-          (button as HTMLElement).click();
-        }, 100);
-      }
-    });
-  });
-</script>
+  </script>
