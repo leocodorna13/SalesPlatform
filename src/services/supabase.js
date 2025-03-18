@@ -1504,61 +1504,144 @@ export async function uploadImage(file, bucketName = 'site-images', folder = 'he
 }
 
 /**
- * Atualiza as configurações do site
- * @param {object} settings - Novas configurações
- * @param {File} heroImageFile - Arquivo de imagem para o hero (opcional)
- * @returns {Promise<object>} - Resultado da operação
+ * Faz upload de múltiplas imagens para o Supabase Storage
+ * @param {File[]} files - Arquivos de imagem
+ * @param {string} bucketName - Nome do bucket (default: 'site-images')
+ * @param {string} folder - Pasta dentro do bucket (default: 'hero')
+ * @returns {Promise<{success: boolean, urls: string[], error: any}>}
  */
-export async function updateSiteSettings(settings, heroImageFile = null) {
+export async function uploadMultipleImages(files, bucketName = 'site-images', folder = 'hero') {
   try {
-    // Se foi enviado um arquivo de imagem, fazer upload
-    if (heroImageFile) {
-      const uploadResult = await uploadImage(heroImageFile);
-      if (uploadResult.success) {
-        settings.heroImageUrl = uploadResult.url;
-      } else {
-        return {
-          success: false,
-          message: `Erro ao fazer upload da imagem: ${uploadResult.error}`
-        };
-      }
+    // Garantir que o bucket existe
+    const bucketExists = await createBucketIfNotExists(bucketName);
+    if (!bucketExists) {
+      throw new Error('Não foi possível criar o bucket para armazenamento de imagens');
     }
 
-    // Validar campos obrigatórios
-    if (!settings.projectName) {
-      return {
-        success: false,
-        message: 'O nome do projeto é obrigatório'
-      };
+    const uploadPromises = [];
+    for (const file of files) {
+      // Gerar um nome de arquivo único
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      
+      // Fazer upload do arquivo
+      const uploadPromise = supabase.storage
+        .from(bucketName)
+        .upload(fileName, file, {
+          cacheControl: '3600',
+          upsert: false
+        })
+        .then(({ data, error }) => {
+          if (error) throw error;
+          
+          // Obter URL pública da imagem
+          const { data: urlData } = supabase.storage
+            .from(bucketName)
+            .getPublicUrl(fileName);
+          
+          return urlData.publicUrl;
+        });
+      
+      uploadPromises.push(uploadPromise);
     }
-
-    // Atualizar configurações no banco de dados
-    const { data, error } = await supabase
-      .from('site_settings')
-      .update({
-        projectName: settings.projectName,
-        heroTitle: settings.heroTitle,
-        heroDescription: settings.heroDescription,
-        heroImageUrl: settings.heroImageUrl,
-        contactPhone: settings.contactPhone,
-        contactWhatsapp: settings.contactWhatsapp,
-        paymentMethods: settings.paymentMethods,
-        whatsappMessage: settings.whatsappMessage
-      })
-      .eq('id', 1);
-
-    if (error) throw error;
-
+    
+    // Esperar todos os uploads terminarem
+    const urls = await Promise.all(uploadPromises);
+    
     return {
       success: true,
-      message: 'Configurações atualizadas com sucesso!'
+      urls,
+      error: null
     };
   } catch (error) {
-    console.error('Erro ao atualizar configurações:', error);
+    console.error('Erro ao fazer upload das imagens:', error);
     return {
       success: false,
-      message: `Erro ao atualizar configurações: ${error.message}`
+      urls: [],
+      error: error.message
     };
+  }
+}
+
+/**
+ * Atualiza as configurações do site
+ * @param {object} settings - Novas configurações
+ * @param {File|null} heroImageFile - Arquivo de imagem para o hero (opcional)
+ * @param {File[]|null} heroCarouselFiles - Arquivos de imagem para o carrossel (opcional)
+ * @returns {Promise<object>} - Resultado da operação
+ */
+export async function updateSiteSettings(settings, heroImageFile = null, heroCarouselFiles = null) {
+  try {
+    const supabase = createClient();
+    let updatedSettings = { ...settings };
+    
+    // Upload hero image if provided
+    if (heroImageFile) {
+      const heroImageUrl = await uploadImage(heroImageFile);
+      if (heroImageUrl) {
+        updatedSettings.heroImageUrl = heroImageUrl;
+      }
+    }
+    
+    // Upload carousel images if provided
+    if (heroCarouselFiles && heroCarouselFiles.length > 0) {
+      const newCarouselUrls = await uploadMultipleImages(heroCarouselFiles);
+      
+      // Combine with existing carousel images
+      let existingUrls = [];
+      try {
+        existingUrls = JSON.parse(settings.heroCarouselUrls || '[]');
+      } catch (e) {
+        console.error('Erro ao analisar URLs do carrossel:', e);
+        existingUrls = [];
+      }
+      
+      // Merge existing and new URLs
+      const combinedUrls = [...existingUrls, ...newCarouselUrls];
+      
+      // Update the settings with the combined URLs
+      updatedSettings.heroCarouselUrls = JSON.stringify(combinedUrls);
+    }
+    
+    // Check if settings already exist
+    const { data: existingSettings } = await supabase
+      .from('site_settings')
+      .select('id')
+      .limit(1);
+    
+    let result;
+    
+    if (existingSettings && existingSettings.length > 0) {
+      // Update existing settings
+      const { data, error } = await supabase
+        .from('site_settings')
+        .update(updatedSettings)
+        .eq('id', existingSettings[0].id);
+      
+      if (error) {
+        console.error('Erro ao atualizar configurações:', error);
+        return { success: false, message: `Erro ao atualizar configurações: ${error.message}` };
+      }
+      
+      result = { success: true, message: 'Configurações atualizadas com sucesso!' };
+    } else {
+      // Insert new settings
+      const { data, error } = await supabase
+        .from('site_settings')
+        .insert([updatedSettings]);
+      
+      if (error) {
+        console.error('Erro ao inserir configurações:', error);
+        return { success: false, message: `Erro ao inserir configurações: ${error.message}` };
+      }
+      
+      result = { success: true, message: 'Configurações criadas com sucesso!' };
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Erro ao atualizar configurações:', error);
+    return { success: false, message: `Erro ao processar configurações: ${error.message}` };
   }
 }
 
@@ -1611,3 +1694,232 @@ export async function searchProducts(query, categoryId) {
     return [];
   }
 }
+
+/**
+ * Upload multiple images to Supabase Storage
+ * @param {File[]} files - Array of files to upload
+ * @param {string} bucketName - Name of the bucket to upload to
+ * @param {string} folder - Folder within the bucket to upload to
+ * @returns {Promise<string[]>} - Array of URLs of the uploaded images
+ */
+async function uploadMultipleImages(files, bucketName = 'site-images', folder = 'hero') {
+  try {
+    if (!files || files.length === 0) {
+      return [];
+    }
+    
+    const supabase = createClient();
+    const urls = [];
+    
+    // Upload each file and collect the URLs
+    for (const file of files) {
+      if (!file || file.size === 0) continue;
+      
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+      const filePath = `${folder}/${fileName}`;
+      
+      const { data, error } = await supabase.storage
+        .from(bucketName)
+        .upload(filePath, file, {
+          cacheControl: '3600',
+          upsert: false
+        });
+      
+      if (error) {
+        console.error('Erro ao fazer upload da imagem:', error);
+        continue;
+      }
+      
+      // Get the public URL
+      const { data: { publicUrl } } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(filePath);
+      
+      urls.push(publicUrl);
+    }
+    
+    return urls;
+  } catch (error) {
+    console.error('Erro ao fazer upload das imagens:', error);
+    return [];
+  }
+}
+
+/**
+ * Update site settings
+ * @param {Object} settings - Site settings to update
+ * @param {File} heroImageFile - Hero image file to upload (optional)
+ * @param {File[]} heroCarouselFiles - Hero carousel image files to upload (optional)
+ * @returns {Promise<Object>} - Result of the update operation
+ */
+async function updateSiteSettings(settings, heroImageFile = null, heroCarouselFiles = null) {
+  try {
+    const supabase = createClient();
+    let updatedSettings = { ...settings };
+    
+    // Upload hero image if provided
+    if (heroImageFile) {
+      const heroImageUrl = await uploadImage(heroImageFile);
+      if (heroImageUrl) {
+        updatedSettings.heroImageUrl = heroImageUrl;
+      }
+    }
+    
+    // Upload carousel images if provided
+    if (heroCarouselFiles && heroCarouselFiles.length > 0) {
+      const newCarouselUrls = await uploadMultipleImages(heroCarouselFiles);
+      
+      // Combine with existing carousel images
+      let existingUrls = [];
+      try {
+        existingUrls = JSON.parse(settings.heroCarouselUrls || '[]');
+      } catch (e) {
+        console.error('Erro ao analisar URLs do carrossel:', e);
+        existingUrls = [];
+      }
+      
+      // Merge existing and new URLs
+      const combinedUrls = [...existingUrls, ...newCarouselUrls];
+      
+      // Update the settings with the combined URLs
+      updatedSettings.heroCarouselUrls = JSON.stringify(combinedUrls);
+    }
+    
+    // Check if settings already exist
+    const { data: existingSettings } = await supabase
+      .from('site_settings')
+      .select('id')
+      .limit(1);
+    
+    let result;
+    
+    if (existingSettings && existingSettings.length > 0) {
+      // Update existing settings
+      const { data, error } = await supabase
+        .from('site_settings')
+        .update(updatedSettings)
+        .eq('id', existingSettings[0].id);
+      
+      if (error) {
+        console.error('Erro ao atualizar configurações:', error);
+        return { success: false, message: `Erro ao atualizar configurações: ${error.message}` };
+      }
+      
+      result = { success: true, message: 'Configurações atualizadas com sucesso!' };
+    } else {
+      // Insert new settings
+      const { data, error } = await supabase
+        .from('site_settings')
+        .insert([updatedSettings]);
+      
+      if (error) {
+        console.error('Erro ao inserir configurações:', error);
+        return { success: false, message: `Erro ao inserir configurações: ${error.message}` };
+      }
+      
+      result = { success: true, message: 'Configurações criadas com sucesso!' };
+    }
+    
+    return result;
+  } catch (error) {
+    console.error('Erro ao atualizar configurações:', error);
+    return { success: false, message: `Erro ao processar configurações: ${error.message}` };
+  }
+}
+
+/**
+ * Remove an image from the carousel
+ * @param {string} imageUrl - URL of the image to remove
+ * @returns {Promise<Object>} - Result of the operation
+ */
+async function removeCarouselImage(imageUrl) {
+  try {
+    const supabase = createClient();
+    
+    // Get current settings
+    const { data: settings } = await supabase
+      .from('site_settings')
+      .select('*')
+      .limit(1)
+      .single();
+    
+    if (!settings) {
+      return { success: false, message: 'Configurações não encontradas' };
+    }
+    
+    // Parse current carousel URLs
+    let carouselUrls = [];
+    try {
+      carouselUrls = JSON.parse(settings.heroCarouselUrls || '[]');
+    } catch (e) {
+      console.error('Erro ao analisar URLs do carrossel:', e);
+      return { success: false, message: 'Erro ao processar URLs do carrossel' };
+    }
+    
+    // Remove the specified URL
+    const updatedUrls = carouselUrls.filter(url => url !== imageUrl);
+    
+    // Update settings with new URLs
+    const { data, error } = await supabase
+      .from('site_settings')
+      .update({ heroCarouselUrls: JSON.stringify(updatedUrls) })
+      .eq('id', settings.id);
+    
+    if (error) {
+      console.error('Erro ao atualizar configurações:', error);
+      return { success: false, message: `Erro ao remover imagem: ${error.message}` };
+    }
+    
+    // Try to delete the file from storage if it's in our bucket
+    try {
+      if (imageUrl.includes('supabase.co')) {
+        const urlParts = new URL(imageUrl);
+        const pathParts = urlParts.pathname.split('/');
+        const bucketName = pathParts[1]; // Assuming URL format /storage/v1/object/public/bucket-name/path
+        const filePath = pathParts.slice(4).join('/'); // Get everything after the bucket name
+        
+        if (bucketName && filePath) {
+          await supabase.storage
+            .from(bucketName)
+            .remove([filePath]);
+        }
+      }
+    } catch (e) {
+      console.warn('Não foi possível excluir o arquivo de armazenamento:', e);
+      // Continue anyway, as we've already updated the database
+    }
+    
+    return { success: true, message: 'Imagem removida com sucesso!' };
+  } catch (error) {
+    console.error('Erro ao remover imagem do carrossel:', error);
+    return { success: false, message: `Erro ao processar a remoção: ${error.message}` };
+  }
+}
+
+export {
+  getProducts,
+  getProductById,
+  getProductsByCategory,
+  getCategories,
+  getCategoryBySlug,
+  createProduct,
+  updateProduct,
+  deleteProduct,
+  createCategory,
+  updateCategory,
+  deleteCategory,
+  uploadImage,
+  uploadMultipleImages,
+  registerInterest,
+  getInterests,
+  getInterestsByProduct,
+  deleteInterest,
+  getSiteSettings,
+  updateSiteSettings,
+  removeCarouselImage,
+  getCurrentUser,
+  signIn,
+  signOut,
+  createClient
+};

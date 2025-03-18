@@ -20,6 +20,7 @@ interface SiteSettings {
   heroTitle: string;
   heroDescription: string;
   heroImageUrl: string;
+  heroCarouselUrls?: string;
   contactWhatsapp: string;
   projectName: string;
   [key: string]: any;
@@ -31,23 +32,46 @@ const siteSettings: SiteSettings = siteSettingsData ? siteSettingsData as SiteSe
   heroTitle: "Desapego dos Martins",
   heroDescription: "Encontre produtos de qualidade a preços acessíveis. Todos os itens estão em ótimo estado e prontos para um novo lar.",
   heroImageUrl: "/images/hero-background.jpg",
+  heroCarouselUrls: "[]",
   contactWhatsapp: "",
   projectName: "Desapego dos Martins"
 };
+
+// Processar imagens do carrossel
+const carouselImages = siteSettings.heroCarouselUrls 
+  ? JSON.parse(siteSettings.heroCarouselUrls) 
+  : [];
+
+// Se não houver imagens no carrossel, usar a imagem principal
+if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
+  carouselImages.push(siteSettings.heroImageUrl);
+}
 ---
 
 <Layout title={siteSettings.projectName || "Desapego dos Martins"}>
-  <!-- Hero Section com efeito parallax -->
+  <!-- Hero Section com carrossel -->
   <section class="relative min-h-[80vh] flex items-center overflow-hidden">
-    <!-- Substituindo o overlay escuro por um mais sutil sem blur na imagem principal -->
+    <!-- Overlay para melhorar legibilidade do texto -->
     <div class="absolute inset-0 bg-black/40 z-10"></div>
+    
+    <!-- Carrossel de imagens -->
     <div class="absolute inset-0 overflow-hidden">
-      <img 
-        src={siteSettings.heroImageUrl || "/images/hero-background.jpg"} 
-        alt="Hero Background" 
-        class="w-full h-full object-cover transform scale-110 hero-parallax"
-        loading="eager"
-      />
+      {carouselImages.length > 0 ? (
+        <div class="carousel-container w-full h-full">
+          {carouselImages.map((imageUrl: string, index: number) => (
+            <div class={`carousel-slide absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === 0 ? 'opacity-100' : 'opacity-0'}`} data-index={index}>
+              <img 
+                src={imageUrl} 
+                alt={`Slide ${index + 1}`} 
+                class="w-full h-full object-cover transform scale-110 hero-parallax"
+                loading={index === 0 ? "eager" : "lazy"}
+              />
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div class="w-full h-full bg-gradient-to-r from-primary-700 to-primary-900"></div>
+      )}
     </div>
     <div class="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-white">
       <div class="max-w-3xl backdrop-blur-sm bg-black/20 p-8 rounded-lg shadow-lg">
@@ -228,74 +252,22 @@ const siteSettings: SiteSettings = siteSettingsData ? siteSettingsData as SiteSe
   />
 </Layout>
 
-<script>
-  document.addEventListener('DOMContentLoaded', () => {
-    // Animação para os cards de categoria
-    const categoryCards = document.querySelectorAll('.category-card');
-    categoryCards.forEach(card => {
-      card.addEventListener('mouseenter', () => {
-        card.classList.add('hover');
-      });
-      card.addEventListener('mouseleave', () => {
-        card.classList.remove('hover');
-      });
-    });
-    
-    // Efeito parallax para o hero
-    const heroImage = document.querySelector('.hero-parallax');
-    if (heroImage) {
-      window.addEventListener('scroll', () => {
-        const scrolled = window.scrollY;
-        if (scrolled < 600) { // Limitar o efeito para melhor performance
-          heroImage.style.transform = `scale(1.1) translateY(${scrolled * 0.2}px)`;
-        }
-      });
-    }
-    
-    // Animação de fade-in para elementos
-    const animateOnScroll = () => {
-      const elements = document.querySelectorAll('.animate-fade-in');
-      elements.forEach(element => {
-        const elementTop = element.getBoundingClientRect().top;
-        const elementBottom = element.getBoundingClientRect().bottom;
-        const isVisible = (elementTop < window.innerHeight - 100) && (elementBottom > 0);
-        
-        if (isVisible) {
-          const delay = element.style.getPropertyValue('--animation-delay') || '0s';
-          element.style.transitionDelay = delay;
-          element.classList.add('visible');
-        }
-      });
-    };
-    
-    // Iniciar animação
-    animateOnScroll();
-    
-    // Adicionar listener para scroll
-    window.addEventListener('scroll', animateOnScroll);
-    
-    // Barra de pesquisa flutuante
-    const searchContainer = document.getElementById('searchBarContainer');
-    const heroSection = document.querySelector('section'); // Primeira seção (hero)
-    
-    if (searchContainer && heroSection) {
-      const handleScroll = () => {
-        const scrollPosition = window.scrollY;
-        const heroBottom = heroSection.getBoundingClientRect().bottom;
-        
-        if (scrollPosition > 300 || heroBottom <= 0) {
-          searchContainer.classList.add('fixed');
-        } else {
-          searchContainer.classList.remove('fixed');
-        }
-      };
-      
-      window.addEventListener('scroll', handleScroll);
-    }
-  });
-</script>
-
 <style>
+  /* Animações para o carrossel */
+  .carousel-slide {
+    transition: opacity 1.5s ease-in-out;
+  }
+  
+  /* Decorações de fundo */
+  .bg-pattern-texture {
+    background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23f0e6d2' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+  }
+  
+  /* Animação para o parallax */
+  .hero-parallax {
+    transition: transform 0.5s ease-out;
+  }
+  
   /* Animação para os cards de categoria */
   .category-card {
     opacity: 0;
@@ -361,3 +333,90 @@ const siteSettings: SiteSettings = siteSettingsData ? siteSettingsData as SiteSe
     }
   }
 </style>
+
+<script>
+  document.addEventListener('DOMContentLoaded', () => {
+    // Configuração do carrossel
+    const slides = document.querySelectorAll('.carousel-slide');
+    if (slides.length > 1) {
+      let currentSlide = 0;
+      
+      // Função para trocar os slides
+      const nextSlide = () => {
+        slides[currentSlide].classList.remove('opacity-100');
+        slides[currentSlide].classList.add('opacity-0');
+        
+        currentSlide = (currentSlide + 1) % slides.length;
+        
+        slides[currentSlide].classList.remove('opacity-0');
+        slides[currentSlide].classList.add('opacity-100');
+      };
+      
+      // Iniciar o carrossel
+      setInterval(nextSlide, 5000);
+    }
+    
+    // Animação para os cards de categoria
+    const categoryCards = document.querySelectorAll('.category-card');
+    categoryCards.forEach(card => {
+      card.addEventListener('mouseenter', () => {
+        card.classList.add('hover');
+      });
+      card.addEventListener('mouseleave', () => {
+        card.classList.remove('hover');
+      });
+    });
+    
+    // Efeito parallax para o hero
+    const heroImage = document.querySelector('.hero-parallax');
+    if (heroImage) {
+      window.addEventListener('scroll', () => {
+        const scrolled = window.scrollY;
+        if (scrolled < 600) { // Limitar o efeito para melhor performance
+          heroImage.style.transform = `scale(1.1) translateY(${scrolled * 0.2}px)`;
+        }
+      });
+    }
+    
+    // Animação de fade-in para elementos
+    const animateOnScroll = () => {
+      const elements = document.querySelectorAll('.animate-fade-in');
+      elements.forEach(element => {
+        const elementTop = element.getBoundingClientRect().top;
+        const elementBottom = element.getBoundingClientRect().bottom;
+        const isVisible = (elementTop < window.innerHeight - 100) && (elementBottom > 0);
+        
+        if (isVisible) {
+          const delay = element.style.getPropertyValue('--animation-delay') || '0s';
+          element.style.transitionDelay = delay;
+          element.classList.add('visible');
+        }
+      });
+    };
+    
+    // Iniciar animação
+    animateOnScroll();
+    
+    // Adicionar listener para scroll
+    window.addEventListener('scroll', animateOnScroll);
+    
+    // Barra de pesquisa flutuante
+    const searchContainer = document.getElementById('searchBarContainer');
+    const heroSection = document.querySelector('section'); // Primeira seção (hero)
+    
+    if (searchContainer && heroSection) {
+      const handleScroll = () => {
+        const scrollPosition = window.scrollY;
+        const heroBottom = heroSection.getBoundingClientRect().bottom;
+        
+        if (scrollPosition > 300 || heroBottom <= 0) {
+          searchContainer.classList.add('fixed');
+        } else {
+          searchContainer.classList.remove('fixed');
+        }
+      };
+      
+      window.addEventListener('scroll', handleScroll);
+    }
+  });
+</script>

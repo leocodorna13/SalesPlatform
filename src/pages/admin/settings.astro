@@ -3,16 +3,19 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
 import { getSiteSettings, updateSiteSettings, getCurrentUser } from '../../services/supabase';
 
 // Definir interface para as configurações do site
+// Garantir que esta interface seja compatível com a definida em supabase.js
 interface SiteSettings {
-  id?: number;
+  id?: number | null;
   projectName: string;
   heroTitle: string;
   heroDescription: string;
   heroImageUrl: string;
+  heroCarouselUrls?: string; // JSON string de URLs
   contactPhone: string;
   contactWhatsapp: string;
   paymentMethods: string;
   whatsappMessage: string;
+  [key: string]: any; // Para permitir propriedades adicionais
 }
 
 // Verificar se o usuário está autenticado
@@ -28,6 +31,7 @@ const settings: SiteSettings = settingsData || {
   heroTitle: 'Desapego dos Martins',
   heroDescription: 'Produtos de qualidade a preços acessíveis',
   heroImageUrl: '',
+  heroCarouselUrls: '[]',
   contactPhone: '',
   contactWhatsapp: '',
   paymentMethods: '',
@@ -35,7 +39,7 @@ const settings: SiteSettings = settingsData || {
 };
 
 // Processar formulário
-let result = { success: false, message: '' };
+let result: { success: boolean; message: string } = { success: false, message: '' };
 
 if (Astro.request.method === 'POST') {
   try {
@@ -47,18 +51,28 @@ if (Astro.request.method === 'POST') {
       heroTitle: formData.get('heroTitle')?.toString() || '',
       heroDescription: formData.get('heroDescription')?.toString() || '',
       heroImageUrl: formData.get('heroImageUrl')?.toString() || settings.heroImageUrl || '',
+      heroCarouselUrls: settings.heroCarouselUrls || '[]',
       contactPhone: formData.get('contactPhone')?.toString() || '',
       contactWhatsapp: formData.get('contactWhatsapp')?.toString() || '',
       paymentMethods: formData.get('paymentMethods')?.toString() || '',
       whatsappMessage: formData.get('whatsappMessage')?.toString() || ''
     };
     
-    // Verificar se há um arquivo de imagem
+    // Verificar se há um arquivo de imagem principal
     const heroImageFile = formData.get('heroImageFile') as File;
     const hasImageFile = heroImageFile && heroImageFile.size > 0;
     
+    // Verificar se há arquivos para o carrossel
+    const heroCarouselFiles = formData.getAll('heroCarouselFiles') as File[];
+    const hasCarouselFiles = heroCarouselFiles.length > 0 && heroCarouselFiles.some(file => file.size > 0);
+    const validCarouselFiles = heroCarouselFiles.filter(file => file.size > 0);
+    
     // Atualizar configurações
-    result = await updateSiteSettings(updatedSettings, hasImageFile ? heroImageFile : null);
+    result = await updateSiteSettings(
+      updatedSettings, 
+      hasImageFile ? heroImageFile : undefined, 
+      hasCarouselFiles ? validCarouselFiles : undefined
+    );
     
     if (result.success) {
       // Atualizar as configurações locais após o sucesso
@@ -67,7 +81,7 @@ if (Astro.request.method === 'POST') {
         Object.assign(settings, updatedSettingsData);
       }
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error('Erro ao processar formulário:', error);
     result = {
       success: false,
@@ -75,6 +89,10 @@ if (Astro.request.method === 'POST') {
     };
   }
 }
+
+// Converter heroCarouselUrls de string JSON para array
+const carouselImages = settings.heroCarouselUrls ? JSON.parse(settings.heroCarouselUrls as string) : [];
+
 ---
 
 <AdminLayout title="Configurações do Site">
@@ -143,13 +161,13 @@ if (Astro.request.method === 'POST') {
             >{settings.heroDescription}</textarea>
           </div>
           
-          <!-- Imagem do Hero -->
-          <div>
-            <label for="heroImageUrl" class="block text-sm font-medium text-gray-700 mb-1">
-              Imagem de Fundo
+          <!-- Imagem principal (para compatibilidade) -->
+          <div class="mt-6">
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Imagem Principal (Legado)
             </label>
             <div class="text-xs text-gray-500 mb-2">
-              Esta imagem será exibida como fundo da seção principal na página inicial.
+              Esta opção é mantida para compatibilidade. Recomendamos usar o carrossel acima.
             </div>
             
             <!-- Preview da imagem atual -->
@@ -192,6 +210,78 @@ if (Astro.request.method === 'POST') {
                 />
               </div>
             </div>
+          </div>
+          
+          <!-- Imagens do Carrossel -->
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-1">
+              Imagens para o Carrossel
+            </label>
+            <div class="text-xs text-gray-500 mb-2">
+              Estas imagens serão exibidas em um carrossel na seção principal da página inicial.
+            </div>
+            
+            <!-- Área de upload com drag and drop -->
+            <div class="mt-3">
+              <div 
+                id="carouselDropzone" 
+                class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition-colors cursor-pointer"
+              >
+                <div class="space-y-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                  </svg>
+                  <div class="text-sm text-gray-600">
+                    <label for="carousel-file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none">
+                      <span>Arraste imagens aqui</span>
+                      <span class="block mt-1">ou clique para selecionar</span>
+                      <input 
+                        id="carousel-file-upload" 
+                        name="heroCarouselFiles" 
+                        type="file" 
+                        multiple 
+                        accept="image/*"
+                        class="sr-only" 
+                      />
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <!-- Preview das imagens selecionadas para upload -->
+            <div id="carousel-preview" class="mt-4 hidden">
+              <h4 class="text-sm font-medium text-gray-700 mb-2">Imagens selecionadas:</h4>
+              <div id="carousel-preview-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"></div>
+            </div>
+            
+            <!-- Preview das imagens atuais do carrossel -->
+            {carouselImages.length > 0 && (
+              <div class="mt-6">
+                <h4 class="text-sm font-medium text-gray-700 mb-2">Imagens atuais do carrossel:</h4>
+                <div id="carousel-current-images" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+                  {carouselImages.map((imageUrl: string, index: number) => (
+                    <div class="relative group">
+                      <img 
+                        src={imageUrl} 
+                        alt={`Imagem do carrossel ${index + 1}`} 
+                        class="w-full h-24 object-cover rounded-lg shadow-sm"
+                      />
+                      <button 
+                        type="button"
+                        data-image-url={imageUrl}
+                        class="remove-carousel-image absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        aria-label="Remover imagem"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -288,3 +378,162 @@ if (Astro.request.method === 'POST') {
     </form>
   </div>
 </AdminLayout>
+
+<script>
+  // Script para remover imagens do carrossel
+  document.addEventListener('DOMContentLoaded', () => {
+    // Configuração do dropzone para upload de imagens
+    const dropzone = document.getElementById('carouselDropzone');
+    const fileInput = document.getElementById('carousel-file-upload');
+    const previewContainer = document.getElementById('carousel-preview');
+    const previewGrid = document.getElementById('carousel-preview-container');
+    const removeButtons = document.querySelectorAll('.remove-carousel-image');
+    
+    // Função para mostrar preview das imagens selecionadas
+    const handleFiles = (files) => {
+      if (files.length === 0) return;
+      
+      previewContainer.classList.remove('hidden');
+      previewGrid.innerHTML = '';
+      
+      Array.from(files).forEach((file, index) => {
+        // Criar elemento de preview
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const preview = document.createElement('div');
+          preview.className = 'relative group';
+          preview.innerHTML = `
+            <img 
+              src="${e.target.result}" 
+              alt="Preview ${index + 1}" 
+              class="w-full h-24 object-cover rounded-lg shadow-sm"
+              data-file-index="${index}"
+            />
+            <button 
+              type="button"
+              class="preview-remove-btn absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              aria-label="Remover imagem"
+              data-index="${index}"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          `;
+          
+          previewGrid.appendChild(preview);
+          
+          // Adicionar evento para remover preview
+          const removeBtn = preview.querySelector('.preview-remove-btn');
+          removeBtn.addEventListener('click', () => {
+            preview.remove();
+            
+            // Se não houver mais previews, esconder o container
+            if (previewGrid.children.length === 0) {
+              previewContainer.classList.add('hidden');
+            }
+          });
+        };
+        
+        reader.readAsDataURL(file);
+      });
+    };
+    
+    // Eventos do dropzone
+    if (dropzone && fileInput) {
+      // Evento de clique
+      dropzone.addEventListener('click', () => {
+        fileInput.click();
+      });
+      
+      // Evento de mudança no input de arquivo
+      fileInput.addEventListener('change', (e) => {
+        handleFiles(e.target.files);
+      });
+      
+      // Eventos de drag and drop
+      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+        }, false);
+      });
+      
+      // Adicionar classe de highlight durante o drag
+      ['dragenter', 'dragover'].forEach(eventName => {
+        dropzone.addEventListener(eventName, () => {
+          dropzone.classList.add('border-primary-500', 'bg-primary-50');
+        }, false);
+      });
+      
+      // Remover classe de highlight quando o drag terminar
+      ['dragleave', 'drop'].forEach(eventName => {
+        dropzone.addEventListener(eventName, () => {
+          dropzone.classList.remove('border-primary-500', 'bg-primary-50');
+        }, false);
+      });
+      
+      // Processar arquivos quando forem soltos
+      dropzone.addEventListener('drop', (e) => {
+        const dt = e.dataTransfer;
+        const files = dt.files;
+        handleFiles(files);
+        
+        // Atualizar o input de arquivo com os arquivos soltos
+        if (files.length > 0) {
+          fileInput.files = files;
+        }
+      }, false);
+    }
+    
+    // Eventos para remover imagens existentes
+    removeButtons.forEach(button => {
+      button.addEventListener('click', async (e) => {
+        e.preventDefault();
+        const target = e.currentTarget as HTMLButtonElement;
+        const imageUrl = target.dataset.imageUrl;
+        
+        if (!imageUrl) return;
+        
+        // Confirmar a remoção
+        if (!confirm('Tem certeza que deseja remover esta imagem do carrossel?')) {
+          return;
+        }
+        
+        // Desabilitar o botão durante o processamento
+        target.disabled = true;
+        
+        try {
+          // Fazer requisição para remover a imagem
+          const response = await fetch('/api/remove-carousel-image', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ imageUrl })
+          });
+          
+          const result = await response.json();
+          
+          if (result.success) {
+            // Remover o elemento da UI
+            const imageContainer = target.closest('.relative');
+            if (imageContainer) {
+              imageContainer.remove();
+            }
+            
+            // Mostrar mensagem de sucesso
+            alert('Imagem removida com sucesso!');
+          } else {
+            alert(`Erro ao remover imagem: ${result.message}`);
+            target.disabled = false;
+          }
+        } catch (error) {
+          console.error('Erro ao processar remoção:', error);
+          alert('Ocorreu um erro ao tentar remover a imagem.');
+          target.disabled = false;
+        }
+      });
+    });
+  });
+</script>
