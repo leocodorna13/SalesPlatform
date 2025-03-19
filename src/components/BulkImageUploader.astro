@@ -95,21 +95,37 @@
           
           listItem.innerHTML = `
             <div class="flex flex-col md:flex-row">
-              <!-- Imagem do produto -->
-              <div class="md:w-1/4 p-4 flex items-center justify-center bg-gray-50">
-                <div class="relative">
-                  <img src="${e.target.result}" alt="Produto ${index + 1}" class="w-full h-48 object-contain rounded-lg" />
-                  <button type="button" class="absolute top-1 right-1 bg-white rounded-full p-1 delete-bulk-item" data-index="${index}">
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
+              <!-- Container de imagens -->
+              <div class="md:w-1/4 p-4 bg-gray-50">
+                <div class="flex flex-col gap-2 product-images" data-product-index="${index}">
+                  <div class="relative group">
+                    <img src="${e.target.result}" alt="Produto ${index + 1}" class="w-full h-32 object-contain rounded-lg" />
+                    <button type="button" class="absolute top-1 right-1 bg-white rounded-full p-1 delete-image">
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                      </svg>
+                    </button>
+                  </div>
                 </div>
+                <button type="button" class="mt-2 w-full flex items-center justify-center gap-1 py-1 px-2 bg-white rounded text-sm text-primary-500 hover:bg-gray-100 add-image" data-product-index="${index}">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
+                  </svg>
+                  Adicionar imagem
+                </button>
               </div>
               
               <!-- Formulário do produto -->
               <div class="md:w-3/4 p-4 space-y-4">
-                <div class="text-sm text-gray-500 mb-2">Produto ${index + 1}</div>
+                <div class="relative">
+                  <!-- Botão de excluir produto -->
+                  <button type="button" class="absolute -top-2 right-0 bg-red-100 rounded-full p-1.5 hover:bg-red-200 delete-bulk-item" data-index="${index}">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                  <div class="text-sm text-gray-500 mb-2">Produto ${index + 1}</div>
+                </div>
                 
                 <input type="hidden" name="bulk-file-${index}" value="${file.name}" />
                 
@@ -150,6 +166,31 @@
       });
     }
     
+    // Adicionar uma nova imagem a um produto
+    function addImageToProduct(productElement, imageDataURL) {
+      const imagesContainer = productElement.querySelector('.product-images');
+      if (!imagesContainer) return;
+      
+      const imageElement = document.createElement('div');
+      imageElement.className = 'relative group inline-block mr-2 mb-2';
+      imageElement.innerHTML = `
+        <img src="${imageDataURL}" class="w-20 h-20 object-cover rounded-lg" />
+        <button type="button" class="remove-image absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
+          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+          </svg>
+        </button>
+      `;
+      
+      // Adicionar botão de remover
+      const removeButton = imageElement.querySelector('.remove-image');
+      removeButton.addEventListener('click', () => {
+        imageElement.remove();
+      });
+      
+      imagesContainer.appendChild(imageElement);
+    }
+    
     // Evento para seleção de arquivos
     fileInput.addEventListener('change', (e) => {
       showBulkList(e.target.files);
@@ -181,12 +222,13 @@
     
     // Remover item da lista
     imageList.addEventListener('click', (e) => {
-      const deleteButton = e.target.closest('.delete-bulk-item');
-      if (deleteButton) {
-        const index = parseInt(deleteButton.getAttribute('data-index'));
-        const listItem = deleteButton.closest('.bg-white');
+      // Handler para remover produto
+      if (e.target.closest('.delete-bulk-item')) {
+        const button = e.target.closest('.delete-bulk-item');
+        const index = parseInt(button.dataset.index);
+        const listItem = button.closest('.bg-white');
         
-        // Criar uma nova FileList sem o arquivo removido
+        // Remover o produto
         const dt = new DataTransfer();
         const files = fileInput.files;
         
@@ -199,11 +241,41 @@
         fileInput.files = dt.files;
         listItem.remove();
         
-        // Reindexar os elementos restantes
-        const listItems = imageList.querySelectorAll('.bg-white');
-        if (listItems.length === 0) {
+        if (imageList.querySelectorAll('.bg-white').length === 0) {
           bulkActions.style.display = 'none';
         }
+      }
+      
+      // Handler para remover imagem
+      if (e.target.closest('.delete-image')) {
+        const button = e.target.closest('.delete-image');
+        const img = button.closest('.relative').querySelector('img');
+        img.src = '';
+        img.style.display = 'none';
+      }
+      
+      // Handler para adicionar imagem
+      if (e.target.closest('.add-image')) {
+        const button = e.target.closest('.add-image');
+        const productIndex = button.dataset.productIndex;
+        const container = document.querySelector(`.product-images[data-product-index="${productIndex}"]`);
+        
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = 'image/*';
+        input.multiple = true;
+        
+        input.onchange = (e) => {
+          Array.from(e.target.files).forEach(file => {
+            const reader = new FileReader();
+            
+            reader.onload = (e) => {
+              addImageToProduct(button.closest('.bg-white'), e.target.result);
+            };
+            reader.readAsDataURL(file);
+          });
+        };
+        input.click();
       }
     });
     
@@ -216,26 +288,24 @@
     
     // Submeter todos os produtos
     bulkSubmit.addEventListener('click', async () => {
-      const files = fileInput.files;
-      if (files.length === 0) return;
-      
-      // Desabilitar botão para evitar múltiplos envios
-      bulkSubmit.disabled = true;
-      bulkSubmit.textContent = 'Publicando...';
+      const formData = new FormData(productForm);
+      formData.append('bulk_upload', 'true');
       
       // Coletar dados de todos os produtos
       const products = [];
       let hasErrors = false;
       
-      for (let i = 0; i < files.length; i++) {
-        const titleInput = document.querySelector(`.bulk-title[data-index="${i}"]`);
-        const priceInput = document.querySelector(`.bulk-price[data-index="${i}"]`);
-        const categoryInput = document.querySelector(`.bulk-category[data-index="${i}"]`);
-        const descriptionInput = document.querySelector(`.bulk-description[data-index="${i}"]`);
+      document.querySelectorAll('.bg-white').forEach((item, productIndex) => {
+        const titleInput = item.querySelector('.bulk-title');
+        const priceInput = item.querySelector('.bulk-price');
+        const categoryInput = item.querySelector('.bulk-category');
+        const descriptionInput = item.querySelector('.bulk-description');
+        const images = item.querySelectorAll('.product-images img');
         
-        if (!titleInput || !priceInput || !categoryInput) {
-          console.error(`Campos não encontrados para o produto ${i}`);
-          continue;
+        if (!titleInput || !priceInput || !categoryInput || images.length === 0) {
+          console.error(`Campos não encontrados para o produto ${productIndex}`);
+          hasErrors = true;
+          return;
         }
         
         // Validar campos obrigatórios
@@ -244,13 +314,12 @@
           priceInput.classList.add('border-red-500');
           categoryInput.classList.add('border-red-500');
           hasErrors = true;
-          continue;
+          return;
         }
         
-        // Encontrar ID da categoria ou null para nova categoria
+        // Encontrar ID da categoria
         const categories = getCategories();
         let categoryId = null;
-        
         for (const category of categories) {
           if (category.name.toLowerCase() === categoryInput.value.toLowerCase()) {
             categoryId = category.id;
@@ -258,63 +327,106 @@
           }
         }
         
-        products.push({
-          file: files[i],
-          data: {
-            title: titleInput.value,
-            price: parseFloat(priceInput.value),
-            category: categoryInput.value,
-            category_id: categoryId,
-            description: descriptionInput ? descriptionInput.value : ''
-          }
+        // Adicionar dados do produto
+        formData.append(`title_${productIndex}`, titleInput.value);
+        formData.append(`price_${productIndex}`, priceInput.value);
+        formData.append(`category_${productIndex}`, categoryInput.value);
+        formData.append(`category_id_${productIndex}`, categoryId || '');
+        formData.append(`description_${productIndex}`, descriptionInput?.value || '');
+        
+        // Adicionar cada imagem
+        const imagePromises = [];
+        images.forEach((img, imgIndex) => {
+          const imagePromise = fetch(img.src)
+            .then(res => res.blob())
+            .then(blob => {
+              const file = new File([blob], `product_${productIndex}_${imgIndex}.jpg`, { type: 'image/jpeg' });
+              formData.append(`image_${productIndex}_${imgIndex}`, file);
+            });
+          imagePromises.push(imagePromise);
         });
-      }
+        
+        // Registrar o número de imagens para este produto
+        formData.append(`image_count_${productIndex}`, images.length.toString());
+        
+        products.push({
+          title: titleInput.value,
+          images: images.length,
+          promises: imagePromises
+        });
+      });
+      
+      formData.append('product_count', products.length.toString());
       
       if (hasErrors) {
         alert('Por favor, preencha todos os campos obrigatórios para cada produto.');
-        bulkSubmit.disabled = false;
-        bulkSubmit.textContent = 'Publicar todos os produtos';
         return;
       }
       
-      // Criar formulário para envio
-      const formData = new FormData();
-      formData.append('bulk_upload', 'true');
-      formData.append('product_count', products.length.toString());
-      
-      // Adicionar dados de cada produto
-      products.forEach((product, index) => {
-        formData.append(`image_${index}`, product.file);
-        formData.append(`title_${index}`, product.data.title);
-        formData.append(`price_${index}`, product.data.price.toString());
-        formData.append(`category_${index}`, product.data.category);
-        if (product.data.category_id) {
-          formData.append(`category_id_${index}`, product.data.category_id);
-        }
-        formData.append(`description_${index}`, product.data.description);
-      });
+      // Aguardar todas as promessas de imagens
+      const allImagePromises = products.flatMap(p => p.promises);
       
       try {
-        // Enviar para o servidor
-        const response = await fetch('/admin/produtos/novo', {
-          method: 'POST',
-          body: formData
-        });
+        bulkSubmit.disabled = true;
+        bulkSubmit.textContent = 'Preparando imagens...';
         
-        if (response.ok) {
-          // Redirecionar para a página de sucesso
-          window.location.href = '/admin/produtos?bulk_success=true';
-        } else {
-          throw new Error('Erro ao criar produtos');
+        // Aguardar todas as conversões de imagens
+        await Promise.all(allImagePromises);
+        
+        bulkSubmit.textContent = 'Publicando...';
+        
+        // Criar um novo formulário e adicionar os campos
+        const tempForm = document.createElement('form');
+        tempForm.method = 'POST';
+        tempForm.action = '/admin/produtos/novo';
+        tempForm.enctype = 'multipart/form-data';
+        
+        for (const [key, value] of formData.entries()) {
+          if (value instanceof Blob) {
+            // Para arquivos, criar um input de arquivo
+            const fileInput = document.createElement('input');
+            fileInput.type = 'file';
+            fileInput.name = key;
+            fileInput.style.display = 'none';
+            
+            // Criar um objeto de transferência de dados
+            const dt = new DataTransfer();
+            dt.items.add(new File([value], value.name, { type: value.type }));
+            fileInput.files = dt.files;
+            
+            tempForm.appendChild(fileInput);
+          } else {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = value;
+            tempForm.appendChild(input);
+          }
         }
+        
+        // Adicionar ao documento e enviar
+        document.body.appendChild(tempForm);
+        tempForm.submit();
       } catch (error) {
-        console.error('Erro ao criar produtos:', error);
-        alert('Ocorreu um erro ao criar os produtos. Por favor, tente novamente.');
+        console.error('Erro ao processar imagens:', error);
+        alert('Ocorreu um erro ao processar as imagens. Por favor, tente novamente.');
         bulkSubmit.disabled = false;
         bulkSubmit.textContent = 'Publicar todos os produtos';
       }
     });
+    
+    // Função para converter dataURL para Blob
+    function dataURLtoBlob(dataURL) {
+      const arr = dataURL.split(',');
+      const mime = arr[0].match(/:(.*?);/)[1];
+      const bstr = atob(arr[1]);
+      let n = bstr.length;
+      const u8arr = new Uint8Array(n);
+      while(n--) {
+        u8arr[n] = bstr.charCodeAt(n);
+      }
+      return new Blob([u8arr], {type: mime});
+    }
   });
   
 </script>
-

@@ -621,7 +621,7 @@ export async function getCategories() {
         // Buscar a contagem de produtos disponíveis nesta categoria
         const { count, error: countError } = await supabase
           .from('products')
-          .select('id', { count: 'exact', head: true })
+          .select('id', { count: 'exact' })
           .eq('category_id', category.id)
           .eq('status', 'available');
         
@@ -1275,9 +1275,9 @@ export async function createBulkProducts(productsData) {
     
     // Processar cada produto
     for (const productData of productsData) {
-      const { title, price, description, category_id, image } = productData;
+      const { title, price, description, category_id, image, images } = productData;
       
-      if (!title || !price || !category_id || !image) {
+      if (!title || !price || !category_id || (!image && (!images || images.length === 0))) {
         console.error('Dados de produto incompletos:', productData);
         continue;
       }
@@ -1287,8 +1287,8 @@ export async function createBulkProducts(productsData) {
         .from('products')
         .insert([{
           title,
-          price,
           description,
+          price,
           category_id,
           status: 'available',
           created_at: new Date().toISOString()
@@ -1301,55 +1301,67 @@ export async function createBulkProducts(productsData) {
         continue;
       }
       
-      // Fazer upload da imagem
-      if (image && product) {
-        try {
-          const fileExt = image.name.split('.').pop();
-          const timestamp = new Date().getTime();
-          const fileName = `${product.id}/${timestamp}.${fileExt}`;
-          const filePath = `products/${fileName}`;
-          
-          // Fazer upload do arquivo
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('product-images')
-            .upload(filePath, image, {
-              cacheControl: '3600',
-              upsert: true,
-              contentType: image.type
-            });
-          
-          if (uploadError) {
-            console.error('Erro ao fazer upload da imagem:', uploadError);
-            continue;
+      // Preparar array de imagens
+      const imagesToUpload = [];
+      if (image) {
+        imagesToUpload.push(image);
+      }
+      if (images && images.length > 0) {
+        imagesToUpload.push(...images);
+      }
+      
+      // Fazer upload das imagens
+      if (imagesToUpload.length > 0 && product) {
+        for (let i = 0; i < imagesToUpload.length; i++) {
+          const currentImage = imagesToUpload[i];
+          try {
+            const fileExt = currentImage.name.split('.').pop();
+            const timestamp = new Date().getTime();
+            const fileName = `${product.id}/${timestamp}-${i}.${fileExt}`;
+            const filePath = `products/${fileName}`;
+            
+            // Fazer upload do arquivo
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('product-images')
+              .upload(filePath, currentImage, {
+                cacheControl: '3600',
+                upsert: true,
+                contentType: currentImage.type
+              });
+            
+            if (uploadError) {
+              console.error('Erro ao fazer upload da imagem:', uploadError);
+              continue;
+            }
+            
+            // Obter URL pública da imagem
+            const { data: publicURLData } = supabase.storage
+              .from('product-images')
+              .getPublicUrl(filePath);
+            
+            if (!publicURLData || !publicURLData.publicUrl) {
+              console.error('Falha ao gerar URL pública para a imagem');
+              continue;
+            }
+            
+            // Salvar referência da imagem no banco
+            const { data: imageData, error: imageError } = await supabase
+              .from('product_images')
+              .insert([{
+                product_id: product.id,
+                image_url: publicURLData.publicUrl,
+                is_primary: i === 0
+              }])
+              .select();
+            
+            if (imageError) {
+              console.error('Erro ao salvar referência da imagem:', imageError);
+            } else {
+              console.log('Imagem salva com sucesso para o produto:', product.id);
+            }
+          } catch (uploadErr) {
+            console.error('Exceção durante o upload da imagem:', uploadErr);
           }
-          
-          // Obter URL pública da imagem
-          const { data: publicURLData } = supabase.storage
-            .from('product-images')
-            .getPublicUrl(filePath);
-          
-          if (!publicURLData || !publicURLData.publicUrl) {
-            console.error('Falha ao gerar URL pública para a imagem');
-            continue;
-          }
-          
-          // Salvar referência da imagem no banco
-          const { data: imageData, error: imageError } = await supabase
-            .from('product_images')
-            .insert([{
-              product_id: product.id,
-              image_url: publicURLData.publicUrl,
-              is_primary: true
-            }])
-            .select();
-          
-          if (imageError) {
-            console.error('Erro ao salvar referência da imagem:', imageError);
-          } else {
-            console.log('Imagem salva com sucesso para o produto:', product.id);
-          }
-        } catch (uploadErr) {
-          console.error('Exceção durante o upload da imagem:', uploadErr);
         }
       }
       

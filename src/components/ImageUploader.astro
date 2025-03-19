@@ -36,6 +36,7 @@ const {
   <div id="preview-container" class="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
     <!-- Preview das imagens aqui -->
   </div>
+  <input type="hidden" id="removed-images" />
 </div>
 
 <script>
@@ -45,9 +46,19 @@ const {
     
     if (!input || !previewContainer) return;
     
+    // Verificar se já existem imagens no preview
+    if (previewContainer.children.length > 0) {
+      // Adicionar botões de remoção para imagens existentes
+      Array.from(previewContainer.children).forEach(preview => {
+        const removeButton = preview.querySelector('.remove-image');
+        if (removeButton) {
+          removeButton.onclick = () => preview.remove();
+        }
+      });
+    }
+    
     function handleFiles(files) {
-      // Limpar preview
-      previewContainer.innerHTML = '';
+      // Não limpar o preview para manter imagens existentes
       
       // Processar cada arquivo
       Array.from(files).forEach((file) => {
@@ -75,6 +86,17 @@ const {
         };
         reader.readAsDataURL(file);
       });
+    }
+    
+    // Função para atualizar o input de arquivo com base nas imagens mostradas
+    function updateFileInput() {
+      // Esta função é um placeholder - não podemos realmente modificar o input file por segurança
+      // Mas podemos usar um campo hidden para rastrear quais imagens foram removidas
+      const removedImages = document.getElementById('removed-images');
+      if (removedImages) {
+        const currentImages = previewContainer.querySelectorAll('img');
+        removedImages.value = currentImages.length.toString();
+      }
     }
     
     // Event Listeners

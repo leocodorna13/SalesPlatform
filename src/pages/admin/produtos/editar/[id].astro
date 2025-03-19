@@ -3,11 +3,25 @@ import AdminLayout from '../../../../layouts/AdminLayout.astro';
 import ImageUploader from '../../../../components/ImageUploader.astro';
 import { getProductById, getCategories, supabase } from '../../../../services/supabase';
 
+interface Product {
+  id: string;
+  title: string;
+  description: string;
+  price: number;
+  category_id: string;
+  status: string;
+  product_images?: Array<{
+    image_url: string;
+    is_primary: boolean;
+  }>;
+}
+
 // Obter o ID do produto da URL
 const { id } = Astro.params;
+if (!id) throw new Error('ID não fornecido');
 
 // Buscar detalhes do produto e categorias
-const product = await getProductById(id);
+const product = (await getProductById(id)) as Product;
 const categories = await getCategories();
 
 // Verificar se o produto existe
@@ -24,10 +38,10 @@ if (Astro.request.method === 'POST') {
     const formData = await Astro.request.formData();
     
     // Extrair dados do produto
-    const title = formData.get('title');
-    const description = formData.get('description');
-    const price = parseFloat(formData.get('price'));
-    const category_id = formData.get('category_id');
+    const title = formData.get('title') as string;
+    const description = formData.get('description') as string;
+    const price = parseFloat(formData.get('price') as string);
+    const category_id = formData.get('category_id') as string;
     
     // Atualizar produto
     const { error: updateError } = await supabase
@@ -45,7 +59,7 @@ if (Astro.request.method === 'POST') {
     }
     
     // Extrair arquivos de imagem
-    const imageFiles = formData.getAll('images');
+    const imageFiles = formData.getAll('images') as File[];
     
     // Se houver novas imagens, fazer upload
     if (imageFiles.length > 0 && imageFiles[0].size > 0) {
@@ -274,7 +288,7 @@ const formattedPrice = product.price.toString();
         formData.delete('images');
         
         // Adicionar cada arquivo ao FormData
-        files.forEach(file => {
+        files.forEach((file: File) => {
           formData.append('images', file);
         });
       }

@@ -38,9 +38,21 @@ if (Astro.request.method === 'POST') {
         const productDescription = formData.get(`description_${i}`)?.toString() || '';
         let productCategoryId = formData.get(`category_id_${i}`)?.toString() || '';
         const productCategoryName = formData.get(`category_${i}`)?.toString() || '';
-        const productImage = formData.get(`image_${i}`);
         
-        if (!productImage || !(productImage instanceof File)) {
+        // Obter o número de imagens para este produto
+        const imageCount = parseInt(formData.get(`image_count_${i}`)?.toString() || '0');
+        
+        // Coletar todas as imagens para este produto
+        const productImages = [];
+        for (let j = 0; j < imageCount; j++) {
+          const productImage = formData.get(`image_${i}_${j}`);
+          if (productImage && productImage instanceof File) {
+            productImages.push(productImage);
+          }
+        }
+        
+        // Verificar se tem pelo menos uma imagem
+        if (productImages.length === 0) {
           continue;
         }
         
@@ -54,7 +66,7 @@ if (Astro.request.method === 'POST') {
                   price: productPrice,
                   description: productDescription,
                   category_id: String(newCategory.id),
-                  image: productImage
+                  images: productImages
                 });
               }
             })
@@ -65,7 +77,7 @@ if (Astro.request.method === 'POST') {
             price: productPrice,
             description: productDescription,
             category_id: productCategoryId,
-            image: productImage
+            images: productImages
           });
         }
       }
@@ -77,6 +89,7 @@ if (Astro.request.method === 'POST') {
       if (productsData.length > 0) {
         await createBulkProducts(productsData);
         bulkSuccess = true;
+        return Astro.redirect('/admin/produtos?bulk_success=true');
       }
     } else {
       // Upload de produto único
@@ -106,10 +119,10 @@ if (Astro.request.method === 'POST') {
       // Não redirecionar para a página do produto, apenas marcar como sucesso
     }
     
-    // Não redirecionar, deixar mostrar a página de sucesso
-    // if (success || bulkSuccess) {
-    //   return Astro.redirect(redirectUrl || '/admin/produtos');
-    // }
+    // Redirecionar para a página de produtos
+    if (success || bulkSuccess) {
+      return Astro.redirect(redirectUrl || '/admin/produtos');
+    }
     
   } catch (error) {
     console.error('Erro ao criar produto:', error);
@@ -346,5 +359,13 @@ if (Astro.request.method === 'POST') {
         }
       });
     }
+    
+    document.querySelectorAll('.bg-white').forEach((item, productIndex) => {
+      const titleInput = item.querySelector(`.bulk-title[data-index="${productIndex}"]`);
+      const priceInput = item.querySelector(`.bulk-price[data-index="${productIndex}"]`);
+      const categoryInput = item.querySelector(`.bulk-category[data-index="${productIndex}"]`);
+      const descriptionInput = item.querySelector(`.bulk-description[data-index="${productIndex}"]`);
+      const images = item.querySelectorAll('.product-images[data-product-index="' + productIndex + '"] img');
+    });
   });
 </script>
