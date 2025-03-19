@@ -331,7 +331,9 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
   <!-- WhatsApp flutuante -->
   <WhatsAppButton 
     floating={true} 
-    buttonText="Fale conosco" 
+    productName={product.title}
+    productId={product.id}
+    buttonText="Tenho interesse neste produto"
   />
 </Layout>
 
