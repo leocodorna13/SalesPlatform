@@ -37,10 +37,14 @@ const formattedPrice = new Intl.NumberFormat('pt-BR', {
       <div class="absolute top-3 right-3 z-10">
         <a 
           href={`/categoria/${category.slug}`} 
-          class="badge inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary-100 text-primary-800 hover:bg-primary-200 transition-colors"
+          class="badge inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold 
+          bg-white/90 backdrop-blur-sm text-primary-700 hover:bg-white 
+          transition-all duration-300 shadow-lg hover:shadow-xl
+          border border-primary-200 hover:border-primary-300"
           data-category={category.slug}
           data-name={category.name}
         >
+          <i class="fas fa-tag mr-1.5 text-primary-500"></i>
           {category.name}
         </a>
       </div>
@@ -48,19 +52,11 @@ const formattedPrice = new Intl.NumberFormat('pt-BR', {
     
     <!-- Badge de status (se disponível) na diagonal -->
     {product.status && (
-      <div class="absolute top-0 left-0 z-10">
-        <div class={`status-badge py-1 px-4 text-xs font-medium transform rotate-45 origin-left translate-y-3 -translate-x-2 ${
-          product.status === 'available' 
-            ? 'bg-green-500 text-white' 
-            : product.status === 'sold' 
-              ? 'bg-red-500 text-white'
-              : 'bg-yellow-500 text-white'
-        }`}>
-          {product.status === 'available' 
-            ? 'Disponível' 
-            : product.status === 'sold' 
-              ? 'Vendido'
-              : 'Reservado'}
+      <div class="absolute top-0 left-0 z-10 w-32 h-32 overflow-hidden">
+        <div class={`absolute top-[26px] left-[-35px] w-[170px] text-center py-1.5 transform -rotate-45 
+          ${product.status === 'sold' ? 'bg-red-500' : 'bg-green-500'} 
+          text-white font-medium tracking-wider text-sm shadow-lg`}>
+          {product.status === 'sold' ? 'VENDIDO' : 'DISPONÍVEL'}
         </div>
       </div>
     )}
