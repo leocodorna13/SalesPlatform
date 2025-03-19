@@ -26,7 +26,7 @@ const formattedPrice = new Intl.NumberFormat('pt-BR', {
 ---
 
 {product ? (
-  <div class="product-card bg-white rounded-xl shadow-soft overflow-hidden h-full w-full relative">
+  <div class="product-card bg-white rounded-xl shadow-soft overflow-hidden h-full w-full relative flex flex-col">
     <!-- Badge de status (se disponível) na diagonal -->
     {product.status && (
       <div class="absolute top-0 left-0 z-10">

@@ -36,7 +36,7 @@ const products = (productsData || []).map(product => {
   // Se o produto tem imagens, usar a primeira imagem como image_url
   if (product.images && product.images.length > 0) {
     // Tentar encontrar a imagem primária primeiro
-    const primaryImage = product.images.find(img => img.is_primary);
+    const primaryImage = product.images.find((img: { is_primary: boolean, image_url: string }) => img.is_primary);
     product.image_url = primaryImage ? primaryImage.image_url : product.images[0].image_url;
   }
   return product;

@@ -346,13 +346,13 @@ if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
       
       // Função para trocar os slides
       const nextSlide = () => {
-        slides[currentSlide].classList.remove('opacity-100');
-        slides[currentSlide].classList.add('opacity-0');
+        (slides[currentSlide] as HTMLElement).classList.remove('opacity-100');
+        (slides[currentSlide] as HTMLElement).classList.add('opacity-0');
         
         currentSlide = (currentSlide + 1) % slides.length;
         
-        slides[currentSlide].classList.remove('opacity-0');
-        slides[currentSlide].classList.add('opacity-100');
+        (slides[currentSlide] as HTMLElement).classList.remove('opacity-0');
+        (slides[currentSlide] as HTMLElement).classList.add('opacity-100');
       };
       
       // Iniciar o carrossel
@@ -376,7 +376,7 @@ if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
       window.addEventListener('scroll', () => {
         const scrolled = window.scrollY;
         if (scrolled < 600) { // Limitar o efeito para melhor performance
-          heroImage.style.transform = `scale(1.1) translateY(${scrolled * 0.2}px)`;
+          (heroImage as HTMLElement).style.transform = `scale(1.1) translateY(${scrolled * 0.2}px)`;
         }
       });
     }
@@ -390,8 +390,8 @@ if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
         const isVisible = (elementTop < window.innerHeight - 100) && (elementBottom > 0);
         
         if (isVisible) {
-          const delay = element.style.getPropertyValue('--animation-delay') || '0s';
-          element.style.transitionDelay = delay;
+          const delay = (element as HTMLElement).style.getPropertyValue('--animation-delay') || '0s';
+          (element as HTMLElement).style.transitionDelay = delay;
           element.classList.add('visible');
         }
       });
@@ -413,13 +413,24 @@ if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
         const heroBottom = heroSection.getBoundingClientRect().bottom;
         
         if (scrollPosition > 300 || heroBottom <= 0) {
-          searchContainer.classList.add('sticky');
+          (searchContainer as HTMLElement).classList.add('sticky');
         } else {
-          searchContainer.classList.remove('sticky');
+          (searchContainer as HTMLElement).classList.remove('sticky');
         }
       };
       
       window.addEventListener('scroll', handleScroll);
     }
+    
+    // Adicionar animação de fade para produtos
+    const products = document.querySelectorAll('.product');
+    products.forEach(product => {
+      // Adicionar animação de fade
+      (product as HTMLElement).style.opacity = '0';
+      requestAnimationFrame(() => {
+        (product as HTMLElement).style.transition = 'opacity 0.3s ease-in-out';
+        (product as HTMLElement).style.opacity = '1';
+      });
+    });
   });
 </script>
