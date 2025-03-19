@@ -64,6 +64,18 @@ const defaultSettings: SiteSettings = {
 
 const siteSettings: SiteSettings = siteSettingsData?.data ? { ...defaultSettings, ...siteSettingsData.data } : defaultSettings;
 
+// Buscar imagens do hero
+const { data } = await supabase.storage.from('siteimages').list('hero');
+const heroImagesData = data || [];
+
+// Processar imagens do hero
+const heroImages = heroImagesData.length > 0 ? heroImagesData : [{ name: 'default-hero-bg.jpg' }];
+
+// Se não houver imagens no carrossel, usar uma imagem padrão
+if (!siteSettings.heroCarouselUrls) {
+  siteSettings.heroCarouselUrls = '["/images/default-hero-bg.jpg"]';
+}
+
 // Processar imagens do carrossel
 const carouselImages = siteSettings.heroCarouselUrls 
   ? JSON.parse(siteSettings.heroCarouselUrls) 
@@ -92,42 +104,42 @@ if (carouselImages.length === 0) {
 ---
 
 <Layout title={siteSettings.projectName || "Desapego dos Martins"}>
-  <!-- Hero Section com carrossel -->
+  <!-- Hero Section -->
   <section class="relative min-h-[80vh] flex items-center overflow-hidden">
     <!-- Overlay para melhorar legibilidade do texto -->
     <div class="absolute inset-0 bg-black/40 z-10"></div>
     
-    <!-- Carrossel de imagens -->
+    <!-- Imagens do hero -->
     <div class="absolute inset-0 overflow-hidden">
-      {carouselImages.length > 0 ? (
-        <div class="carousel-container w-full h-full">
-          {carouselImages.map((imageUrl: string, index: number) => (
-            <div class={`carousel-slide absolute inset-0 transition-opacity duration-1000 ease-in-out ${index === 0 ? 'opacity-100' : 'opacity-0'}`} data-index={index}>
-              <img 
-                src={imageUrl} 
-                alt={`Slide ${index + 1}`} 
-                class="w-full h-full object-cover transform scale-110 hero-parallax"
-                loading={index === 0 ? "eager" : "lazy"}
-              />
-            </div>
+      {heroImages && heroImages.length > 0 ? (
+        <div class="w-full h-full">
+          {heroImages.map((image, index) => (
+            <img 
+              src={supabase.storage.from('siteimages').getPublicUrl(`hero/${image.name}`).data.publicUrl}
+              alt={`Hero image ${index + 1}`}
+              class={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${index === 0 ? 'opacity-100' : 'opacity-0'}`}
+              loading={index === 0 ? "eager" : "lazy"}
+            />
           ))}
         </div>
       ) : (
         <div class="w-full h-full bg-gradient-to-r from-primary-700 to-primary-900"></div>
       )}
     </div>
+
+    <!-- Conteúdo -->
     <div class="relative z-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-16 text-white">
       <div class="max-w-3xl backdrop-blur-sm bg-black/20 p-8 rounded-lg shadow-lg">
-        <span class="inline-block px-3 py-1 bg-accent-500 text-white text-sm font-medium rounded-full mb-4 animate-slide-up" data-delay="0.1s">
+        <span class="inline-block px-3 py-1 bg-accent-500 text-white text-sm font-medium rounded-full mb-4">
           <i class="fas fa-sparkles mr-1"></i> Produtos de qualidade
         </span>
-        <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 font-heading animate-slide-up text-shadow" data-delay="0.2s">
+        <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 font-heading">
           {siteSettings.heroTitle}
         </h1>
-        <p class="text-xl md:text-2xl mb-8 opacity-90 max-w-2xl animate-slide-up text-shadow" data-delay="0.3s">
+        <p class="text-xl md:text-2xl mb-8 opacity-90 max-w-2xl">
           {siteSettings.heroDescription}
         </p>
-        <div class="flex flex-col sm:flex-row gap-4 animate-slide-up" data-delay="0.4s">
+        <div class="flex flex-col sm:flex-row gap-4">
           <a href="#produtos" class="btn btn-accent text-lg px-8 py-4 rounded-lg shadow-md hover:shadow-lg transition-all">
             <i class="fas fa-shopping-basket mr-2"></i> Ver produtos
           </a>
@@ -138,7 +150,7 @@ if (carouselImages.length === 0) {
       </div>
     </div>
     
-    <!-- Decoração de ondas na parte inferior -->
+    <!-- Decoração de ondas -->
     <div class="absolute bottom-0 left-0 right-0 z-10 text-white overflow-hidden leading-none w-full">
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120" preserveAspectRatio="none" class="w-full h-16 text-neutral-50">
         <path d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V0Z" fill="currentColor"></path>

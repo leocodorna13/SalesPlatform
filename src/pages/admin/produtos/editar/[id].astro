@@ -309,14 +309,15 @@ const formattedPrice = product.price.toString();
     
     // Adicionar handlers para botões de remoção de imagem
     document.querySelectorAll('.remove-image').forEach((button) => {
-      button.addEventListener('click', function() {
-        const imageUrl = (this as HTMLElement).getAttribute('data-image-url');
+      button.addEventListener('click', (e) => {
+        const target = e.currentTarget as HTMLElement;
+        const imageUrl = target.getAttribute('data-image-url');
         if (imageUrl) {
           // Adicionar URL à lista de imagens a remover
           imagesToRemove.push(imageUrl);
           
           // Remover visualmente o elemento pai (container da imagem)
-          const imageContainer = (this as HTMLElement).closest('.relative');
+          const imageContainer = target.closest('.relative');
           if (imageContainer) {
             imageContainer.remove();
           }
@@ -325,10 +326,10 @@ const formattedPrice = product.price.toString();
     });
     
     // Handler de submissão do formulário
-    form.addEventListener('submit', function(this: HTMLFormElement, e: Event) {
+    form.addEventListener('submit', (e: Event) => {
       e.preventDefault();
       
-      const formData = new FormData(this);
+      const formData = new FormData(form);
       
       // Adicionar lista de imagens a remover
       if (imagesToRemove.length > 0) {
@@ -355,5 +356,24 @@ const formattedPrice = product.price.toString();
         window.location.reload();
       });
     });
+  });
+
+  // Inicializar Dropzone
+  document.addEventListener('DOMContentLoaded', function() {
+    const dropzone = document.getElementById('dropzone');
+    const fileInput = document.getElementById('file-upload') as HTMLInputElement;
+    const previewContainer = document.getElementById('preview-container');
+    const uploadedFiles = new Set();
+
+    if (dropzone && fileInput && previewContainer) {
+      dropzone.addEventListener('dragover', function(this: HTMLElement, e) {
+        e.preventDefault();
+        this.classList.add('border-primary-500');
+      });
+
+      dropzone.addEventListener('dragleave', function(this: HTMLElement) {
+        this.classList.remove('border-primary-500');
+      });
+    }
   });
 </script>

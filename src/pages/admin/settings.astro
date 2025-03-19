@@ -4,7 +4,7 @@ import { getSiteSettings, getCurrentUser, supabase } from '../../services/supaba
 
 // Definir interface para as configurações do site
 interface SiteSettings {
-  id?: number | null;
+  id?: string | number | null;
   projectName: string;
   heroTitle: string;
   heroDescription: string;
@@ -328,6 +328,62 @@ if (Astro.request.method === 'POST') {
       if (!response.ok) throw new Error('Erro ao enviar formulário');
       
       // Recarregar a página para mostrar as atualizações
+      window.location.reload();
+    } catch (error) {
+      console.error('Erro:', error);
+    }
+  });
+</script>
+
+<script>
+  import { supabase } from '../../services/supabase';
+
+  // Upload de imagens
+  const fileInput = document.getElementById('heroImages') as HTMLInputElement;
+  const uploadButton = document.getElementById('uploadButton');
+
+  // Botões de exclusão
+  document.querySelectorAll('[data-filename]').forEach(button => {
+    button.addEventListener('click', async () => {
+      const filename = button.getAttribute('data-filename');
+      if (!filename) return;
+
+      try {
+        const { error } = await supabase.storage
+          .from('siteimages')
+          .remove([`hero/${filename}`]);
+
+        if (error) throw error;
+        
+        // Remover o elemento da imagem
+        button.closest('.relative')?.remove();
+      } catch (error) {
+        console.error('Erro ao excluir:', error);
+      }
+    });
+  });
+
+  // Upload de novas imagens
+  uploadButton?.addEventListener('click', async () => {
+    const files = fileInput.files;
+    if (!files?.length) return;
+
+    try {
+      for (const file of files) {
+        const filename = `hero/${Date.now()}-${file.name}`;
+        console.log('Fazendo upload:', filename);
+        
+        const { error } = await supabase.storage
+          .from('siteimages')
+          .upload(filename, file);
+
+        if (error) {
+          console.error('Erro no upload:', error);
+          throw error;
+        }
+      }
+      
+      // Recarregar a página
       window.location.reload();
     } catch (error) {
       console.error('Erro:', error);
