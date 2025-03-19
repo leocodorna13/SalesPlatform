@@ -4,16 +4,40 @@ import ProductGrid from '../components/ProductGrid.astro';
 import CategoryFilter from '../components/CategoryFilter.astro';
 import SearchBar from '../components/SearchBar.astro';
 import WhatsAppButton from '../components/WhatsAppButton.astro';
-import { getProducts, getCategories, getSiteSettings } from '../services/supabase';
+import { supabase } from '../services/supabase';
+
+// Buscar produtos com suas categorias
+const { data: productsData } = await supabase
+  .from('products')
+  .select(`
+    *,
+    category:categories (
+      id,
+      name,
+      slug
+    ),
+    product_images (
+      id,
+      image_url,
+      is_primary
+    )
+  `)
+  .order('created_at', { ascending: false });
 
 // Buscar todas as categorias
-const categories = await getCategories();
-
-// Buscar produtos disponíveis e vendidos
-const products = await getProducts('all');
+const { data: categories } = await supabase
+  .from('categories')
+  .select('*')
+  .order('name');
 
 // Produtos em destaque (os 4 mais recentes)
-const featuredProducts = products.slice(0, 4);
+const featuredProducts = (productsData || []).slice(0, 4).map(product => {
+  if (product.product_images && product.product_images.length > 0) {
+    const primaryImage = product.product_images.find(img => img.is_primary);
+    product.image_url = primaryImage ? primaryImage.image_url : product.product_images[0].image_url;
+  }
+  return product;
+});
 
 // Definir tipos para as configurações do site
 interface SiteSettings {
@@ -27,7 +51,11 @@ interface SiteSettings {
 }
 
 // Buscar configurações do site
-const siteSettingsData = await getSiteSettings();
+const siteSettingsData = await supabase
+  .from('site_settings')
+  .select('*')
+  .single();
+
 const siteSettings: SiteSettings = siteSettingsData ? siteSettingsData as SiteSettings : {
   heroTitle: "Desapego dos Martins",
   heroDescription: "Encontre produtos de qualidade a preços acessíveis. Todos os itens estão em ótimo estado e prontos para um novo lar.",

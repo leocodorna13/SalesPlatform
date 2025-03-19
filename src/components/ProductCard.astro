@@ -32,6 +32,20 @@ const formattedPrice = new Intl.NumberFormat('pt-BR', {
 
 {product ? (
   <div class="product-card bg-white rounded-xl shadow-soft overflow-hidden h-full w-full relative flex flex-col">
+    <!-- Badge de categoria (se disponível) -->
+    {category && (
+      <div class="absolute top-3 right-3 z-10">
+        <a 
+          href={`/categoria/${category.slug}`} 
+          class="badge inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary-100 text-primary-800 hover:bg-primary-200 transition-colors"
+          data-category={category.slug}
+          data-name={category.name}
+        >
+          {category.name}
+        </a>
+      </div>
+    )}
+    
     <!-- Badge de status (se disponível) na diagonal -->
     {product.status && (
       <div class="absolute top-0 left-0 z-10">
@@ -48,20 +62,6 @@ const formattedPrice = new Intl.NumberFormat('pt-BR', {
               ? 'Vendido'
               : 'Reservado'}
         </div>
-      </div>
-    )}
-    
-    <!-- Badge de categoria (se disponível) -->
-    {category && (
-      <div class="absolute top-3 right-3 z-10">
-        <a 
-          href={`/categoria/${category.slug}`} 
-          class="badge inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary-100 text-primary-800 hover:bg-primary-200 transition-colors"
-          data-category={category.slug}
-          data-name={category.name}
-        >
-          {category.name}
-        </a>
       </div>
     )}
     
