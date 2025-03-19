@@ -291,8 +291,8 @@ export async function getRecommendedProducts(currentProductId, excludeIds = [], 
       .from('products')
       .select(`
         *,
-        product_images (*),
-        categories (*)
+        category:categories (*),
+        product_images (*)
       `, { count: 'exact' })
       .eq('status', 'available')
       .eq('visible', true)

@@ -191,7 +191,7 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
               src={mainImage?.image_url} 
               alt={product.title}
               class="w-full h-full object-cover cursor-zoom-in"
-              onclick="openModal(this.src)"
+              data-action="open-modal"
             />
           </div>
           
@@ -206,6 +206,7 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
                     src={image.image_url} 
                     alt={product.title}
                     class="w-full h-full object-cover"
+                    data-thumbnail="true"
                   />
                 </div>
               ))}
@@ -293,7 +294,7 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 class="text-2xl font-bold text-gray-900 mb-2">Produtos relacionados</h2>
           <p class="text-gray-600 mb-8">Outros produtos da mesma categoria</p>
-          <ProductGrid products={relatedProducts} />
+          <ProductGrid products={relatedProducts.map(product => ({ ...product, category: product.categories }))} />
         </div>
       </div>
     )}
@@ -304,7 +305,7 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <h2 class="text-2xl font-bold text-gray-900 mb-2">Você também pode gostar</h2>
           <p class="text-gray-600 mb-8">Produtos selecionados especialmente para você</p>
-          <ProductGrid products={recommendedProducts.data} />
+          <ProductGrid products={recommendedProducts.data.map(product => ({ ...product, category: product.categories }))} />
         </div>
       </div>
     )}
@@ -316,7 +317,7 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
           <h2 class="text-2xl font-bold text-gray-900 mb-2">Outros produtos</h2>
           <p class="text-gray-600 mb-8">Outros produtos disponíveis</p>
           <div id="otherProductsGrid">
-            <ProductGrid products={otherProducts} />
+            <ProductGrid products={otherProducts.map(product => ({ ...product, category: product.categories }))} />
           </div>
           <!-- Loading indicator -->
           <div id="loadingMoreProducts" class="hidden py-8 text-center">
@@ -336,7 +337,7 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
 
 <!-- Modal de imagem (no final do arquivo) -->
 <div id="imageModal" class="hidden fixed inset-0 bg-black/95 items-center justify-center" style="z-index: 99999;" onclick="closeModal()">
-  <button class="absolute top-4 right-4 text-white hover:text-gray-300 text-3xl" onclick="event.stopPropagation()">
+  <button id="closeModalBtn" class="absolute top-4 right-4 text-white hover:text-gray-300 text-3xl" onclick="event.stopPropagation(); closeModal()">
     <i class="fas fa-times"></i>
   </button>
   
@@ -353,7 +354,7 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
     src="" 
     alt=""
     class="max-h-[90vh] max-w-[90vw] object-contain cursor-zoom-out"
-    onclick="closeModal()"
+    onclick="event.stopPropagation(); closeModal()"
   />
 </div>
 
@@ -363,7 +364,44 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
     .map(el => el.getAttribute('data-image-url'))
     .filter((url): url is string => url !== null);
 
+  // Adicionar evento de clique para abrir o modal na imagem principal
+  document.addEventListener('DOMContentLoaded', () => {
+    // Configurar o modal para a imagem principal
+    const mainImage = document.getElementById('main-image');
+    if (mainImage) {
+      mainImage.addEventListener('click', () => {
+        if (mainImage instanceof HTMLImageElement) {
+          openModal(mainImage.src);
+        }
+      });
+    }
+
+    // Configurar o botão de fechar e o clique fora do modal
+    const modal = document.getElementById('imageModal');
+    const closeBtn = document.getElementById('closeModalBtn');
+    const modalImage = document.getElementById('modalImage');
+    
+    if (modal) {
+      modal.addEventListener('click', closeModal);
+    }
+    
+    if (closeBtn) {
+      closeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeModal();
+      });
+    }
+    
+    if (modalImage) {
+      modalImage.addEventListener('click', (e) => {
+        e.stopPropagation();
+        closeModal();
+      });
+    }
+  });
+
   function openModal(src: string) {
+    console.log('Abrindo modal com imagem:', src);
     const modal = document.getElementById('imageModal');
     const modalImage = document.getElementById('modalImage') as HTMLImageElement | null;
     if (modal && modalImage) {
@@ -413,7 +451,7 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
 
   // Galeria de imagens
   document.addEventListener('DOMContentLoaded', () => {
-    const thumbnails = document.querySelectorAll('[data-image-url]');
+    const thumbnails = document.querySelectorAll('[data-thumbnail]');
     thumbnails.forEach((thumbnail) => {
       thumbnail.addEventListener('click', () => {
         const imageUrl = thumbnail.getAttribute('data-image-url');
