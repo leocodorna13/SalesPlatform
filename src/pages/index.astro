@@ -67,11 +67,21 @@ const carouselImages = siteSettings.heroCarouselUrls
   ? JSON.parse(siteSettings.heroCarouselUrls) 
   : [];
 
-// Fallback para quando não há imagens
+// Se não houver imagens no carrossel, usar a imagem principal
+if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
+  carouselImages.push(siteSettings.heroImageUrl);
+}
+
+// Se ainda não houver imagens, usar uma imagem padrão
 if (carouselImages.length === 0) {
-  // Usar um gradiente como fallback
   carouselImages.push('/images/default-hero-bg.jpg');
 }
+
+// Fallback para quando não há imagens
+// if (carouselImages.length === 0) {
+//   // Usar um gradiente como fallback
+//   carouselImages.push('/images/default-hero-bg.jpg');
+// }
 
 // Se não houver imagens no carrossel, usar a imagem principal
 // if (carouselImages.length === 0 && siteSettings.heroImageUrl) {

@@ -1,44 +1,48 @@
-import { getProducts, getProductsByCategory, searchProducts } from '../../services/supabase.js';
+import { supabase } from '../../services/supabase';
 
 export async function get({ request }) {
   try {
     const url = new URL(request.url);
-    const searchQuery = url.searchParams.get('search');
-    const categoryId = url.searchParams.get('category');
-    
-    let products = [];
-    
-    // Se tiver query de busca, usamos a função de busca
-    if (searchQuery) {
-      products = await searchProducts(searchQuery, categoryId);
-    } 
-    // Se tiver apenas categoria, filtramos por categoria
-    else if (categoryId && categoryId !== 'all') {
-      products = await getProductsByCategory(categoryId);
-    } 
-    // Caso contrário, retornamos todos os produtos disponíveis
-    else {
-      products = await getProducts('available');
+    const page = parseInt(url.searchParams.get('page') || '1');
+    const excludeIds = url.searchParams.get('exclude')?.split(',').filter(Boolean) || [];
+    const perPage = 8;
+    const from = (page - 1) * perPage;
+    const to = from + perPage - 1;
+
+    let query = supabase
+      .from('products')
+      .select(`
+        *,
+        category:categories (
+          *
+        ),
+        product_images (
+          *
+        )
+      `)
+      .eq('status', 'available')
+      .eq('visible', true)
+      .order('created_at', { ascending: false });
+
+    if (excludeIds.length > 0) {
+      query = query.not('id', 'in', excludeIds);
     }
+
+    const { data, error } = await query.range(from, to);
     
-    return new Response(JSON.stringify(products), {
+    if (error) throw error;
+    return new Response(JSON.stringify(data || []), {
       status: 200,
       headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
+        'Content-Type': 'application/json'
       }
     });
+
   } catch (error) {
-    console.error('Erro na API de produtos:', error);
-    return new Response(JSON.stringify({ 
-      error: 'Erro ao buscar produtos',
-      message: error.message || 'Erro desconhecido'
-    }), {
+    console.error('Erro ao buscar produtos:', error);
+    return new Response(JSON.stringify([]), {
       status: 500,
-      headers: {
-        'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*'
-      }
+      headers: { 'Content-Type': 'application/json' }
     });
   }
 }
