@@ -201,6 +201,15 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
                 <div 
                   class={`aspect-square rounded-md overflow-hidden cursor-pointer border-2 ${image.id === mainImage?.id ? 'border-primary-500' : 'border-transparent'}`}
                   data-image-url={image.image_url}
+                  onclick="
+                    document.getElementById('main-image').src = this.getAttribute('data-image-url');
+                    document.querySelectorAll('[data-image-url]').forEach(el => {
+                      el.classList.remove('border-primary-500');
+                      el.classList.add('border-transparent');
+                    });
+                    this.classList.remove('border-transparent');
+                    this.classList.add('border-primary-500');
+                  "
                 >
                   <img 
                     src={image.image_url} 
@@ -361,10 +370,56 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
 </div>
 
 <script>
-  let currentImageIndex = 0;
-  const images: string[] = Array.from(document.querySelectorAll('[data-image-url]'))
+  // Variáveis e funções globais para o modal
+  window.currentImageIndex = 0;
+  window.productImages = Array.from(document.querySelectorAll('[data-image-url]'))
     .map(el => el.getAttribute('data-image-url'))
     .filter((url): url is string => url !== null);
+
+  window.openModal = function(src) {
+    const modal = document.getElementById('imageModal');
+    const modalImage = document.getElementById('modalImage') as HTMLImageElement | null;
+    if (modal && modalImage) {
+      modalImage.src = src;
+      window.currentImageIndex = window.productImages.indexOf(src);
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+    }
+  }
+
+  window.closeModal = function() {
+    const modal = document.getElementById('imageModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      document.body.style.overflow = '';
+    }
+  }
+
+  window.prevImage = function() {
+    if (window.currentImageIndex > 0) {
+      window.currentImageIndex--;
+    } else {
+      window.currentImageIndex = window.productImages.length - 1;
+    }
+    const modalImage = document.getElementById('modalImage') as HTMLImageElement | null;
+    if (modalImage) {
+      modalImage.src = window.productImages[window.currentImageIndex];
+    }
+  }
+
+  window.nextImage = function() {
+    if (window.currentImageIndex < window.productImages.length - 1) {
+      window.currentImageIndex++;
+    } else {
+      window.currentImageIndex = 0;
+    }
+    const modalImage = document.getElementById('modalImage') as HTMLImageElement | null;
+    if (modalImage) {
+      modalImage.src = window.productImages[window.currentImageIndex];
+    }
+  }
 
   // Adicionar evento de clique para abrir o modal na imagem principal
   document.addEventListener('DOMContentLoaded', () => {
@@ -401,48 +456,6 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
       });
     }
   });
-
-  function openModal(src: string) {
-    console.log('Abrindo modal com imagem:', src);
-    const modal = document.getElementById('imageModal');
-    const modalImage = document.getElementById('modalImage') as HTMLImageElement | null;
-    if (modal && modalImage) {
-      modalImage.src = src;
-      currentImageIndex = images.indexOf(src);
-      modal.classList.remove('hidden');
-      modal.classList.add('flex');
-      document.body.style.overflow = 'hidden';
-    }
-  }
-
-  function closeModal() {
-    const modal = document.getElementById('imageModal');
-    if (modal) {
-      modal.classList.add('hidden');
-      modal.classList.remove('flex');
-      document.body.style.overflow = '';
-    }
-  }
-
-  function prevImage() {
-    if (currentImageIndex > 0) {
-      currentImageIndex--;
-      const modalImage = document.getElementById('modalImage') as HTMLImageElement | null;
-      if (modalImage) {
-        modalImage.src = images[currentImageIndex];
-      }
-    }
-  }
-
-  function nextImage() {
-    if (currentImageIndex < images.length - 1) {
-      currentImageIndex++;
-      const modalImage = document.getElementById('modalImage') as HTMLImageElement | null;
-      if (modalImage) {
-        modalImage.src = images[currentImageIndex];
-      }
-    }
-  }
 
   // Fechar com ESC
   document.addEventListener('keydown', e => {
