@@ -14,6 +14,13 @@ interface SiteSettings {
   [key: string]: any;
 }
 
+interface HeroImage {
+  id: string;
+  url: string;
+  filename: string;
+  order: number;
+}
+
 // Verificar autenticação
 const user = await getCurrentUser();
 if (!user) {
@@ -22,7 +29,7 @@ if (!user) {
 
 // Buscar configurações e imagens
 const settings = await getSiteSettings();
-const heroImages = await getHeroImages();
+const heroImages: HeroImage[] = await getHeroImages();
 
 // Processar formulários
 let message = '';
@@ -313,24 +320,23 @@ if (Astro.request.method === 'POST') {
 </AdminLayout>
 
 <script>
+  interface HeroImage {
+    id: string;
+    url: string;
+    filename: string;
+    order: number;
+  }
+
   // Ordenação de imagens
   const imageList = document.querySelector('.space-y-4');
   const moveUpBtns = document.querySelectorAll('.move-up-btn');
   const moveDownBtns = document.querySelectorAll('.move-down-btn');
   
-  function updateOrder() {
-    const images = [];
-    document.querySelectorAll('[data-image-id]').forEach((el, index) => {
-      images.push({
-        id: el.dataset.imageId,
-        order: index
-      });
-    });
-    
+  function updateOrder(newImages: HeroImage[]) {
     // Enviar nova ordem para o servidor
     const formData = new FormData();
     formData.append('X-Form-Type', 'update-hero-order');
-    formData.append('order', JSON.stringify(images));
+    formData.append('order', JSON.stringify(newImages));
     
     fetch(window.location.href, {
       method: 'POST',
@@ -344,7 +350,12 @@ if (Astro.request.method === 'POST') {
       const prev = item?.previousElementSibling;
       if (item && prev) {
         item.parentNode?.insertBefore(item, prev);
-        updateOrder();
+        updateOrder(Array.from(document.querySelectorAll<HTMLElement>('[data-image-id]')).map(el => ({
+          id: el.dataset.imageId || '',
+          order: parseInt(el.dataset.order || '0'),
+          url: el.dataset.url || '',
+          filename: el.dataset.filename || ''
+        })));
       }
     });
   });
@@ -355,7 +366,12 @@ if (Astro.request.method === 'POST') {
       const next = item?.nextElementSibling;
       if (item && next) {
         item.parentNode?.insertBefore(next, item);
-        updateOrder();
+        updateOrder(Array.from(document.querySelectorAll<HTMLElement>('[data-image-id]')).map(el => ({
+          id: el.dataset.imageId || '',
+          order: parseInt(el.dataset.order || '0'),
+          url: el.dataset.url || '',
+          filename: el.dataset.filename || ''
+        })));
       }
     });
   });

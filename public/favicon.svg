@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- Fundo circular -->
+  <circle cx="256" cy="256" r="256" fill="#b37847"/>
+  
+  <!-- Ícone da loja estilizado -->
+  <path d="M128 192v192h256V192" stroke="white" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M384 160v-32H128v32l-32 64h320z" fill="white"/>
+  <path d="M256 224v128M192 224v128M320 224v128" stroke="white" stroke-width="16" stroke-linecap="round"/>
+  
+  <!-- Telhado -->
+  <path d="M96 160L256 64l160 96" stroke="white" stroke-width="32" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>
