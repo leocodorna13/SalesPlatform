@@ -42,7 +42,6 @@ const featuredProducts = (productsData || []).slice(0, 4).map(product => {
 interface SiteSettings {
   heroTitle: string;
   heroDescription: string;
-  heroImageUrl: string;
   heroCarouselUrls?: string;
   contactWhatsapp: string;
   projectName: string;
@@ -58,7 +57,6 @@ const siteSettingsData = await supabase
 const siteSettings: SiteSettings = siteSettingsData ? siteSettingsData as SiteSettings : {
   heroTitle: "Desapego dos Martins",
   heroDescription: "Encontre produtos de qualidade a preços acessíveis. Todos os itens estão em ótimo estado e prontos para um novo lar.",
-  heroImageUrl: "/images/hero-background.jpg",
   heroCarouselUrls: "[]",
   contactWhatsapp: "",
   projectName: "Desapego dos Martins"
@@ -69,10 +67,16 @@ const carouselImages = siteSettings.heroCarouselUrls
   ? JSON.parse(siteSettings.heroCarouselUrls) 
   : [];
 
-// Se não houver imagens no carrossel, usar a imagem principal
-if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
-  carouselImages.push(siteSettings.heroImageUrl);
+// Fallback para quando não há imagens
+if (carouselImages.length === 0) {
+  // Usar um gradiente como fallback
+  carouselImages.push('/images/default-hero-bg.jpg');
 }
+
+// Se não houver imagens no carrossel, usar a imagem principal
+// if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
+//   carouselImages.push(siteSettings.heroImageUrl);
+// }
 ---
 
 <Layout title={siteSettings.projectName || "Desapego dos Martins"}>

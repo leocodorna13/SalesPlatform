@@ -2,7 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import ProductGrid from '../../components/ProductGrid.astro';
 import WhatsAppButton from '../../components/WhatsAppButton.astro';
-import { getProductById, registerInterest, getRelatedProducts, getSiteSettings, getProductInterestCount, getRecommendedProducts, supabase } from '../../services/supabase';
+import { getProductById, registerInterest, getRelatedProducts, getSiteSettings, getProductInterestCount, getRecommendedProducts, supabase, getProducts } from '../../services/supabase';
 
 // Definir interface para o produto
 interface ProductImage {
@@ -45,8 +45,14 @@ if (!product || !product.visible) {
   return Astro.redirect('/');
 }
 
-// Buscar produtos relacionados
-const relatedProducts = await getRelatedProducts(id, product.categories.id);
+// Buscar produtos relacionados (mesma categoria)
+const relatedProducts = await getRelatedProducts(product.categories.id, id);
+
+// Buscar outros produtos disponíveis (excluindo o atual e os relacionados)
+const excludeIds = [id, ...relatedProducts.map(p => p.id)];
+const otherProducts = (await getProducts('available'))
+  .filter(p => !excludeIds.includes(p.id) && p.visible)
+  .slice(0, 8);
 
 // Buscar produtos recomendados
 const recommendedProducts = await getRecommendedProducts(id, relatedProducts.map(p => p.id));
@@ -299,6 +305,17 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
           <h2 class="text-2xl font-bold text-gray-900 mb-2">Você também pode gostar</h2>
           <p class="text-gray-600 mb-8">Produtos selecionados especialmente para você</p>
           <ProductGrid products={recommendedProducts} />
+        </div>
+      </div>
+    )}
+    
+    <!-- Outros produtos -->
+    {otherProducts.length > 0 && (
+      <div class="py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 class="text-2xl font-bold text-gray-900 mb-2">Outros produtos</h2>
+          <p class="text-gray-600 mb-8">Outros produtos disponíveis</p>
+          <ProductGrid products={otherProducts} />
         </div>
       </div>
     )}

@@ -98,8 +98,16 @@ export async function getProducts(status = 'all') {
       .from('products')
       .select(`
         *,
-        categories (id, name, slug),
-        product_images (id, image_url, is_primary)
+        category:categories (
+          id,
+          name,
+          slug
+        ),
+        product_images (
+          id,
+          image_url,
+          is_primary
+        )
       `)
       .order('created_at', { ascending: false });
     
@@ -243,13 +251,18 @@ export async function getRelatedProducts(categoryId, currentProductId) {
       .from('products')
       .select(`
         *,
-        product_images (*),
-        categories (*)
+        category:categories (
+          *
+        ),
+        product_images (
+          *
+        )
       `)
       .eq('category_id', categoryId)
       .eq('status', 'available')
-      .eq('visible', true) // Mostrar apenas produtos visíveis
+      .eq('visible', true)
       .neq('id', currentProductId)
+      .order('created_at', { ascending: false })
       .limit(4);
     
     if (error) throw error;
@@ -658,15 +671,15 @@ export async function getCategoryBySlug(slug) {
 export async function createCategory(name, slug) {
   try {
     // Verificar se o slug já existe
-    const { data: existingCategory, error: checkError } = await supabase
+    const { data: existingCategory, error: searchError } = await supabase
       .from('categories')
       .select('id')
       .eq('slug', slug)
       .single();
     
-    if (checkError && checkError.code !== 'PGRST116') {
+    if (searchError && searchError.code !== 'PGRST116') {
       // PGRST116 é o código para "não encontrado", que é o que queremos
-      throw checkError;
+      throw searchError;
     }
     
     if (existingCategory) {
@@ -1282,7 +1295,7 @@ export async function createBulkProducts(productsData) {
         }])
         .select()
         .single();
-      
+
       if (productError) {
         console.error('Erro ao criar produto:', productError);
         continue;
@@ -1733,15 +1746,15 @@ export async function searchProducts(query, categoryId) {
       .from('products')
       .select(`
         *,
+        category:categories (
+          id,
+          name,
+          slug
+        ),
         product_images (
           id,
           url,
           is_primary
-        ),
-        categories (
-          id,
-          name,
-          slug
         )
       `)
       .eq('status', 'available')
