@@ -93,11 +93,27 @@ class SearchBarController {
   checkUrlParams() {
     const params = new URLSearchParams(window.location.search);
     const searchQuery = params.get('q');
+    const categorySlug = params.get('categoria');
     
     if (searchQuery) {
       this.searchInput.value = searchQuery;
-      this.performLiveSearch();
     }
+
+    if (categorySlug) {
+      // Encontrar a categoria correspondente no dropdown
+      const categoryItem = Array.from(this.categoryItems).find(
+        item => item.getAttribute('data-category') === categorySlug
+      );
+      
+      if (categoryItem) {
+        const categoryName = categoryItem.getAttribute('data-name');
+        if (categoryName) {
+          this.updateSelectedCategory(categorySlug, categoryName);
+        }
+      }
+    }
+    
+    this.performLiveSearch();
   }
   
   /**

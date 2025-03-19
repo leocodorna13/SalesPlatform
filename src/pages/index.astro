@@ -131,7 +131,7 @@ if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
         {categories.map((category, index) => (
           <div class="w-full h-full">
             <a 
-              href={`/categoria/${category.slug}`} 
+              href={`/categoria/todos?categoria=${category.slug}`} 
               class="category-card group bg-white rounded-xl shadow-soft overflow-hidden transform transition-all duration-300 hover:shadow-xl hover:-translate-y-2 flex flex-col items-center justify-center h-40 w-full"
               data-delay={0.1 + index * 0.05}
             >
@@ -284,11 +284,12 @@ if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
   
   /* Animações para elementos com data-delay */
   [data-delay] {
-    opacity: 0;
-    transform: translateY(20px);
-    transition: opacity 0.5s ease, transform 0.5s ease;
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.5s ease-out, transform 0.5s ease-out;
   }
   
+  /* Animações para elementos com data-delay */
   [data-delay].is-visible {
     opacity: 1;
     transform: translateY(0);
