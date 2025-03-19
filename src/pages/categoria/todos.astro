@@ -1,86 +1,189 @@
 ---
 import Layout from '../../layouts/Layout.astro';
-import ProductGrid from '../../components/ProductGrid.astro';
-import CategoryFilter from '../../components/CategoryFilter.astro';
 import SearchBar from '../../components/SearchBar.astro';
-import { getProducts, getCategories } from '../../services/supabase';
+import CategoryFilter from '../../components/CategoryFilter.astro';
+import ProductCard from '../../components/ProductCard.astro';
+import { supabase } from '../../services/supabase';
+import type { Product, Category } from '../../types';
 
-// Buscar todas as categorias
-const categories = await getCategories();
+// Buscar produtos e categorias
+const { data: productsData } = await supabase
+  .from('products')
+  .select(`
+    *,
+    category:categories (
+      id,
+      name,
+      slug
+    )
+  `)
+  .order('created_at', { ascending: false });
 
-// Buscar todos os produtos disponíveis
-const products = await getProducts('available');
+const { data: categories } = await supabase
+  .from('categories')
+  .select('*')
+  .order('name');
 
-// Categoria atual é "todos"
-const currentCategory = 'todos';
+const currentCategory = 'all';
+
+const products = (productsData || []) as Product[];
+const typedCategories = (categories || []) as Category[];
 ---
 
-<Layout title="Todas as Categorias | Desapego dos Martins">
-  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-    <!-- Cabeçalho da categoria -->
+<Layout title="Todos os Produtos">
+  <div class="container mx-auto px-4 py-8">
+    <!-- Barra de pesquisa com categorias -->
     <div class="mb-8">
-      <h1 class="text-3xl font-bold text-gray-900 mb-2">
-        Todas as Categorias
-      </h1>
-      <p class="text-gray-600">
-        Todos os produtos disponíveis em nossa loja
-      </p>
+      <SearchBar 
+        placeholder="Busque por nome, preço ou categoria..." 
+        categories={typedCategories}
+        mobileFriendly={true}
+      />
     </div>
-    
-    <!-- Barra de pesquisa -->
-    <div class="mb-8">
-      <SearchBar categories={categories} />
-    </div>
-    
-    <!-- Filtro de categorias -->
-    <CategoryFilter categories={categories} currentCategory={currentCategory} />
-    
-    <!-- Produtos da categoria -->
-    <div id="categoryProducts">
-      {products.length > 0 ? (
-        <ProductGrid products={products} />
-      ) : (
-        <div class="text-center py-16 bg-gray-50 rounded-lg">
-          <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4" />
-          </svg>
-          <h3 class="text-xl font-semibold text-gray-900 mb-2">Nenhum produto disponível</h3>
-          <p class="text-gray-600">
-            No momento não há produtos disponíveis.
-          </p>
+
+    <!-- Grid de produtos -->
+    <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+      {products.map((product) => (
+        <div 
+          class="product-card transition-all duration-300 ease-in-out transform hover:scale-[1.02]" 
+          data-title={product.title.toLowerCase()}
+          data-price={product.price.toString()}
+          data-category={product.category?.slug || ''}
+          data-category-name={(product.category?.name || '').toLowerCase()}
+        >
+          <ProductCard product={product} />
         </div>
-      )}
-      
-      <!-- Mensagem de nenhum produto encontrado (inicialmente oculta) -->
-      <div id="noResults" class="hidden mt-8 text-center py-16 bg-gray-50 rounded-lg">
-        <svg xmlns="http://www.w3.org/2000/svg" class="h-16 w-16 text-gray-400 mx-auto mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-        </svg>
-        <h3 class="text-xl font-semibold text-gray-900 mb-2">Nenhum produto encontrado</h3>
-        <p class="text-gray-600">
-          Tente buscar com outras palavras ou explorar outras categorias.
+      ))}
+    </div>
+
+    <!-- Estado vazio -->
+    <div id="emptyState" class="hidden text-center py-16">
+      <div class="max-w-md mx-auto">
+        <i class="fas fa-search text-4xl text-neutral-300 mb-4"></i>
+        <h3 class="text-xl font-medium text-neutral-700 mb-2">Nenhum produto encontrado</h3>
+        <p class="text-neutral-500">
+          Tente ajustar seus filtros ou buscar por outros termos
         </p>
       </div>
     </div>
   </div>
 </Layout>
 
+<style>
+  .product-card {
+    opacity: 1;
+    transform: translateY(0);
+    transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+  }
+
+  .product-card.hidden {
+    opacity: 0;
+    transform: translateY(10px);
+    pointer-events: none;
+  }
+
+  #productsGrid {
+    min-height: 200px;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(10px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .fade-in {
+    animation: fadeIn 0.3s ease-out forwards;
+  }
+</style>
+
 <script>
-  // Quando a página carregar, inicializar a categoria "todos"
-  document.addEventListener('DOMContentLoaded', () => {
-    // Prevenir redirecionamento ao clicar nos botões de categoria
-    document.querySelectorAll('.category-btn').forEach(button => {
-      button.addEventListener('click', (e) => {
-        e.preventDefault();
-      });
-    });
-    
-    // Encontrar o botão da categoria "todos" e ativá-lo
-    const allCategoryButton = document.querySelector('[data-category="all"]');
-    if (allCategoryButton) {
-      setTimeout(() => {
-        (allCategoryButton as HTMLElement).click();
-      }, 100);
+  interface SearchEvent extends Event {
+    detail: {
+      searchTerm: string;
+      selectedCategory: string;
     }
-  });
+  }
+
+  // Função para normalizar texto (remover acentos e converter para minúsculas)
+  function normalizeText(text: string): string {
+    return text.normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
+  }
+
+  // Função para verificar se um produto corresponde aos critérios de busca
+  function matchesSearchCriteria(
+    productCard: HTMLElement,
+    searchTerm: string,
+    selectedCategory: string
+  ): boolean {
+    const title = normalizeText(productCard.dataset.title || '');
+    const price = normalizeText(productCard.dataset.price || '');
+    const category = productCard.dataset.category || '';
+    const categoryName = normalizeText(productCard.dataset.categoryName || '');
+    
+    const normalizedSearch = normalizeText(searchTerm);
+    
+    const matchesCategory = selectedCategory === 'all' || category === selectedCategory;
+    const matchesSearch = !normalizedSearch || 
+      title.includes(normalizedSearch) || 
+      price.includes(normalizedSearch) ||
+      categoryName.includes(normalizedSearch);
+
+    return matchesCategory && matchesSearch;
+  }
+
+  // Função para atualizar a visibilidade dos produtos
+  function updateProductsVisibility(searchTerm: string = '', selectedCategory: string = 'all'): void {
+    const productsGrid = document.getElementById('productsGrid');
+    const emptyState = document.getElementById('emptyState');
+    const productCards = document.querySelectorAll<HTMLElement>('.product-card');
+    
+    if (!productsGrid || !emptyState) return;
+    
+    let visibleCount = 0;
+    
+    productCards.forEach(card => {
+      if (matchesSearchCriteria(card, searchTerm, selectedCategory)) {
+        card.classList.remove('hidden');
+        card.classList.add('fade-in');
+        visibleCount++;
+      } else {
+        card.classList.add('hidden');
+        card.classList.remove('fade-in');
+      }
+    });
+
+    // Mostrar/esconder estado vazio
+    if (visibleCount === 0) {
+      productsGrid.classList.add('hidden');
+      emptyState.classList.remove('hidden');
+      emptyState.classList.add('fade-in');
+    } else {
+      productsGrid.classList.remove('hidden');
+      emptyState.classList.add('hidden');
+      emptyState.classList.remove('fade-in');
+    }
+
+    // Reordenar os cards visíveis para ficarem agrupados
+    const sortedCards = Array.from(productCards)
+      .filter(card => !card.classList.contains('hidden'))
+      .sort((a, b) => {
+        const titleA = normalizeText(a.dataset.title || '');
+        const titleB = normalizeText(b.dataset.title || '');
+        return titleA.localeCompare(titleB);
+      });
+
+    sortedCards.forEach(card => productsGrid.appendChild(card));
+  }
+
+  // Observar mudanças nos eventos de busca
+  document.addEventListener('searchUpdate', ((event: SearchEvent) => {
+    const { searchTerm, selectedCategory } = event.detail;
+    updateProductsVisibility(searchTerm, selectedCategory);
+  }) as EventListener);
+
+  // Inicializar a visibilidade dos produtos
+  updateProductsVisibility();
 </script>

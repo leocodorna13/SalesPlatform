@@ -11,9 +11,10 @@ interface Props {
     product_count?: number;
   }>;
   activeCategory?: string;
+  currentCategory?: string;
 }
 
-const { categories = [], activeCategory = 'all' } = Astro.props;
+const { categories = [], activeCategory = 'all', currentCategory } = Astro.props;
 ---
 
 <div class="category-filter my-8">

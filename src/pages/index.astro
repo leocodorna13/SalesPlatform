@@ -104,12 +104,14 @@ if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
   </section>
 
   <!-- Barra de pesquisa flutuante -->
-  <div id="searchBarContainer" class="search-container-wrapper fixed left-0 right-0 top-16 z-50 transition-all duration-300 px-4">
-    <SearchBar 
-      categories={categories} 
-      placeholder="Busque produtos por nome, categoria ou preço..." 
-      mobileFriendly={true}
-    />
+  <div id="searchBarContainer" class="search-container-wrapper sticky top-0 z-50 bg-white/90 backdrop-blur-md shadow-md py-3 px-4 transition-all duration-300">
+    <div class="max-w-7xl mx-auto">
+      <SearchBar 
+        categories={categories} 
+        placeholder="Busque produtos por nome, categoria ou preço..." 
+        mobileFriendly={true}
+      />
+    </div>
   </div>
 
   <!-- Categorias com design de cards modernos -->
@@ -317,7 +319,7 @@ if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
     pointer-events: none;
   }
   
-  .search-container-wrapper.fixed {
+  .search-container-wrapper.sticky {
     transform: translateY(0);
     pointer-events: auto;
   }
@@ -410,9 +412,9 @@ if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
         const heroBottom = heroSection.getBoundingClientRect().bottom;
         
         if (scrollPosition > 300 || heroBottom <= 0) {
-          searchContainer.classList.add('fixed');
+          searchContainer.classList.add('sticky');
         } else {
-          searchContainer.classList.remove('fixed');
+          searchContainer.classList.remove('sticky');
         }
       };
       

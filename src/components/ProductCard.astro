@@ -1,21 +1,19 @@
 ---
+import type { Product } from '../types';
+
 interface Props {
-  id: string;
-  title: string;
-  price: number;
-  status: 'available' | 'sold';
-  imageUrl: string | null;
-  category: {
-    name: string;
-    slug: string;
-  } | null;
-  viewsCount: number;
-  interestCount: number;
+  product: Product;
 }
 
-const { id, title, price, status, imageUrl, category, viewsCount = 0, interestCount = 0 } = Astro.props;
+const { product } = Astro.props;
 
-console.log('ProductCard recebeu interestCount:', interestCount, 'para produto:', id);
+// Verificar se o produto existe antes de desestruturar
+if (!product) {
+  console.error('ProductCard recebeu produto undefined');
+  return;
+}
+
+const { title, price, image_url, description, category } = product;
 
 // Formatar preço
 const formattedPrice = new Intl.NumberFormat('pt-BR', {
@@ -24,77 +22,88 @@ const formattedPrice = new Intl.NumberFormat('pt-BR', {
 }).format(price);
 ---
 
-<div class="product-card bg-white rounded-xl shadow-soft overflow-hidden h-full w-full relative">
-  <!-- Badge de status (se disponível) na diagonal -->
-  {status && (
-    <div class="absolute top-0 left-0 z-10">
-      <div class={`status-badge py-1 px-4 text-xs font-medium transform rotate-45 origin-left translate-y-3 -translate-x-2 ${
-        status === 'available' 
-          ? 'bg-green-500 text-white' 
-          : status === 'sold' 
-            ? 'bg-red-500 text-white'
-            : 'bg-yellow-500 text-white'
-      }`}>
-        {status === 'available' 
-          ? 'Disponível' 
-          : status === 'sold' 
-            ? 'Vendido'
-            : 'Reservado'}
+{product ? (
+  <div class="product-card bg-white rounded-xl shadow-soft overflow-hidden h-full w-full relative">
+    <!-- Badge de status (se disponível) na diagonal -->
+    {product.status && (
+      <div class="absolute top-0 left-0 z-10">
+        <div class={`status-badge py-1 px-4 text-xs font-medium transform rotate-45 origin-left translate-y-3 -translate-x-2 ${
+          product.status === 'available' 
+            ? 'bg-green-500 text-white' 
+            : product.status === 'sold' 
+              ? 'bg-red-500 text-white'
+              : 'bg-yellow-500 text-white'
+        }`}>
+          {product.status === 'available' 
+            ? 'Disponível' 
+            : product.status === 'sold' 
+              ? 'Vendido'
+              : 'Reservado'}
+        </div>
       </div>
-    </div>
-  )}
-  
-  <!-- Badge de categoria (se disponível) -->
-  {category && (
-    <div class="absolute top-3 right-3 z-10">
-      <a href={`/categoria/${category.slug}`} class="badge inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary-100 text-primary-800 hover:bg-primary-200 transition-colors">
-        {category.name}
-      </a>
-    </div>
-  )}
-  
-  <!-- Imagem do produto -->
-  <a href={`/produto/${id}`} class="block relative">
-    <div class="relative overflow-hidden w-full aspect-square">
-      <img 
-        src={imageUrl || 'https://via.placeholder.com/300x300?text=Sem+Imagem'} 
-        alt={title} 
-        class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
-        loading="lazy"
-      />
-    </div>
-  </a>
-  
-  <!-- Conteúdo do card -->
-  <div class="p-4 flex flex-col flex-grow">
-    <!-- Título do produto com altura fixa -->
-    <a href={`/produto/${id}`} class="block">
-      <div class="h-10 mb-0">
-        <h3 class="text-lg font-medium text-neutral-800 line-clamp-2">{title}</h3>
+    )}
+    
+    <!-- Badge de categoria (se disponível) -->
+    {category && (
+      <div class="absolute top-3 right-3 z-10">
+        <a 
+          href={`/categoria/${category.slug}`} 
+          class="badge inline-flex items-center px-2.5 py-0.5 rounded-md text-xs font-medium bg-primary-100 text-primary-800 hover:bg-primary-200 transition-colors"
+          data-category={category.slug}
+          data-name={category.name}
+        >
+          {category.name}
+        </a>
+      </div>
+    )}
+    
+    <!-- Imagem do produto -->
+    <a href={`/produto/${product.id}`} class="block relative">
+      <div class="relative overflow-hidden w-full aspect-square">
+        <img 
+          src={image_url || 'https://via.placeholder.com/300x300?text=Sem+Imagem'} 
+          alt={title} 
+          class="w-full h-full object-cover transition-transform duration-500 hover:scale-110"
+          loading="lazy"
+        />
       </div>
     </a>
     
-    <!-- Informações adicionais -->
-    <div class="flex items-center text-sm text-neutral-500 mb-2">
-      <span class="mr-3"><i class="fas fa-eye mr-1"></i> {viewsCount}</span>
-      <span><i class="fas fa-heart mr-1"></i> {interestCount}</span>
-    </div>
-    
-    <!-- Preço -->
-    <div class="mt-auto">
-      <p class="text-accent-600 text-xl font-bold">
-        {formattedPrice}
-      </p>
-    </div>
-    
-    <!-- Botão e ícones -->
-    <div class="mt-3">
-      <a href={`/produto/${id}`} class="btn btn-primary w-full block text-center py-2 px-4 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors">
-        Ver detalhes
+    <!-- Conteúdo do card -->
+    <div class="p-4 flex flex-col flex-grow">
+      <!-- Título do produto com altura fixa -->
+      <a href={`/produto/${product.id}`} class="block">
+        <div class="h-10 mb-0">
+          <h3 class="text-lg font-medium text-neutral-800 line-clamp-2">{title}</h3>
+        </div>
       </a>
+      
+      <!-- Informações adicionais -->
+      <div class="flex items-center text-sm text-neutral-500 mb-2">
+        <span class="mr-3"><i class="fas fa-eye mr-1"></i> {product.viewsCount || 0}</span>
+        <span><i class="fas fa-heart mr-1"></i> {product.interestCount || 0}</span>
+      </div>
+      
+      <!-- Preço -->
+      <div class="mt-auto">
+        <p class="text-accent-600 text-xl font-bold">
+          {formattedPrice}
+        </p>
+      </div>
+      
+      <!-- Botão e ícones -->
+      <div class="mt-3">
+        <a href={`/produto/${product.id}`} class="btn btn-primary w-full block text-center py-2 px-4 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors">
+          Ver detalhes
+        </a>
+      </div>
     </div>
   </div>
-</div>
+) : (
+  <div class="product-card bg-white rounded-xl shadow-soft overflow-hidden h-full w-full relative p-4 flex items-center justify-center">
+    <p class="text-neutral-500">Produto não disponível</p>
+  </div>
+)}
 
 <style>
   .line-clamp-2 {
@@ -106,12 +115,11 @@ const formattedPrice = new Intl.NumberFormat('pt-BR', {
   
   .status-badge {
     position: absolute;
-    top: 15px;
-    left: -30px;
-    width: 120px;
+    width: 100px;
     text-align: center;
-    transform: rotate(-45deg);
-    transform-origin: center;
-    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+  }
+  
+  .shadow-soft {
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
   }
 </style>

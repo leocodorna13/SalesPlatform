@@ -134,16 +134,24 @@ function formatPrice(price: number): string {
 // Imagem principal
 const mainImage = product.product_images.find(img => img.is_primary) || product.product_images[0];
 
-// Função para criar link do WhatsApp
-function createWhatsAppLink(productId: string, productTitle: string, productPrice: string) {
-  const productLink = `${Astro.url.origin}/produto/${productId}`;
-  return productLink;
-}
-
-const productLink = createWhatsAppLink(id, product.title, formatPrice(product.price));
 ---
 
 <Layout title={`${product.title} | ${projectName}`}>
+  <head>
+    <!-- Meta tags para compartilhamento -->
+    <meta property="og:title" content={`${product.title} | ${projectName}`} />
+    <meta property="og:description" content={product.description} />
+    <meta property="og:image" content={mainImage?.image_url} />
+    <meta property="og:url" content={`${Astro.url.origin}/produto/${id}`} />
+    <meta property="og:type" content="product" />
+    
+    <!-- Meta tags específicas para Twitter -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={`${product.title} | ${projectName}`} />
+    <meta name="twitter:description" content={product.description} />
+    <meta name="twitter:image" content={mainImage?.image_url} />
+  </head>
+  
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="mb-6">
       <a href="/" class="text-primary-600 hover:text-primary-800 flex items-center">

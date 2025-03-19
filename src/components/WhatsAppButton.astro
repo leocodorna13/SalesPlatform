@@ -35,11 +35,11 @@ let defaultMessage = siteSettings?.whatsappMessage || 'Olá, gostaria de mais in
 
 // Se for um produto específico, personalizar a mensagem com link
 if (productName && productId) {
-  defaultMessage = `Olá! Vi seu Desapego e tenho interesse no produto "${productName}"! ${productUrl}`;
+  defaultMessage = `Olá! Vi seu Desapego e tenho interesse no produto "${productName}"!\n\nLink: ${productUrl}`;
 }
 
 // Usar mensagem personalizada se fornecida
-const message = customMessage || defaultMessage;
+const message = customMessage ? `${customMessage}\n\nLink: ${productUrl}` : defaultMessage;
 
 // Codificar a mensagem para URL
 const encodedMessage = encodeURIComponent(message);

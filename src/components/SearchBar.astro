@@ -18,25 +18,23 @@ const {
 
 <div class={`search-container bg-white rounded-xl shadow-lg p-2 relative z-50 ${mobileFriendly ? 'mobile-friendly' : ''}`}>
   <div class="flex items-center flex-wrap md:flex-nowrap">
-    <!-- Ícone de busca -->
-    <div class="pl-3 text-primary-500">
-      <i class="fas fa-search text-lg"></i>
-    </div>
-    
-    <!-- Campo de busca -->
-    <div class="flex-grow">
+    <!-- Campo de busca com ícone -->
+    <div class="flex-grow flex items-center bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors">
+      <div class="pl-4 text-neutral-400">
+        <i class="fas fa-search"></i>
+      </div>
       <input 
         type="text" 
         id="searchInput" 
         placeholder={placeholder} 
-        class="w-full py-3 px-3 text-neutral-700 bg-transparent border-none focus:outline-none focus:ring-0 placeholder-neutral-400 text-lg"
+        class="w-full py-3 px-3 text-neutral-700 bg-transparent border-none focus:outline-none focus:ring-0 placeholder-neutral-400"
         autocomplete="off"
       />
     </div>
     
     <!-- Botão de categorias (visível apenas se houver categorias) -->
     {categories && categories.length > 0 && (
-      <div class="relative group">
+      <div class="relative group ml-2">
         <button 
           id="categoryDropdownButton" 
           class="flex items-center gap-2 py-3 px-4 text-primary-700 hover:text-primary-800 font-medium transition-colors rounded-lg hover:bg-primary-50 category-btn"
@@ -49,7 +47,7 @@ const {
         <!-- Dropdown de categorias -->
         <div 
           id="categoryDropdown" 
-          class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-neutral-100 hidden z-50 overflow-hidden"
+          class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-neutral-100 hidden z-50"
         >
           <div class="py-2 max-h-80 overflow-y-auto">
             <button 
@@ -77,19 +75,10 @@ const {
         </div>
       </div>
     )}
-    
-    <!-- Botão de busca -->
-    <button 
-      id="searchButton" 
-      class="bg-primary-600 hover:bg-primary-700 text-white py-3 px-6 rounded-lg transition-colors ml-2 flex items-center gap-2"
-    >
-      <span class="hidden sm:inline">Buscar</span>
-      <i class="fas fa-arrow-right"></i>
-    </button>
   </div>
   
   <!-- Chips de filtros ativos (inicialmente escondidos) -->
-  <div id="activeFilters" class="flex flex-wrap gap-2 pt-3 px-4 pb-2 hidden">
+  <div id="activeFilters" class="flex flex-wrap gap-2 pt-3 px-2 pb-1 hidden">
     <!-- Os chips serão adicionados via JavaScript -->
   </div>
 </div>
@@ -98,7 +87,6 @@ const {
   import { SearchBarController } from './SearchBarController.js';
   
   document.addEventListener('DOMContentLoaded', () => {
-    // Inicializar o controlador da barra de pesquisa
     new SearchBarController();
   });
 </script>
@@ -108,70 +96,21 @@ const {
   #categoryDropdown {
     transform-origin: top right;
     transition: opacity 0.2s, transform 0.2s;
+  }
+  
+  /* Estilo para o container em modo mobile-friendly */
+  .search-container.mobile-friendly {
+    position: sticky;
+    top: 0;
+    z-index: 50;
+  }
+  
+  /* Animação de fade para os resultados */
+  .product-card {
+    transition: opacity 0.3s ease-in-out;
+  }
+  
+  .product-card.hidden {
     opacity: 0;
-    transform: scale(0.95);
-  }
-  
-  #categoryDropdown:not(.hidden) {
-    opacity: 1;
-    transform: scale(1);
-  }
-  
-  /* Estilo para o scrollbar do dropdown */
-  #categoryDropdown div::-webkit-scrollbar {
-    width: 6px;
-  }
-  
-  #categoryDropdown div::-webkit-scrollbar-track {
-    background: #f1f1f1;
-    border-radius: 10px;
-  }
-  
-  #categoryDropdown div::-webkit-scrollbar-thumb {
-    background: #ddd;
-    border-radius: 10px;
-  }
-  
-  #categoryDropdown div::-webkit-scrollbar-thumb:hover {
-    background: #ccc;
-  }
-  
-  /* Animação de fade para o grid de produtos */
-  @keyframes fade {
-    0% { opacity: 0.7; }
-    100% { opacity: 1; }
-  }
-  
-  .animate-fade {
-    animation: fade 0.5s ease-in-out;
-  }
-  
-  /* Animação para os cards de produto */
-  @keyframes fadeIn {
-    0% { opacity: 0; transform: translateY(10px); }
-    100% { opacity: 1; transform: translateY(0); }
-  }
-  
-  .animate-fade-in {
-    animation: fadeIn 0.3s ease-out forwards;
-  }
-  
-  /* Estilos específicos para mobile */
-  @media (max-width: 768px) {
-    .mobile-friendly input {
-      font-size: 1rem;
-      padding: 0.75rem 0.5rem;
-    }
-    
-    .mobile-friendly .category-btn {
-      padding: 0.5rem 0.75rem;
-      font-size: 0.875rem;
-    }
-    
-    .mobile-friendly #categoryDropdown {
-      width: calc(100vw - 2rem);
-      max-width: 100%;
-      right: 0;
-    }
   }
 </style>

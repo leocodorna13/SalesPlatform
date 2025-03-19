@@ -1,9 +1,11 @@
 /**
  * Controller para a funcionalidade de busca em tempo real
- * Este arquivo contém a lógica de busca que pode ser reutilizada em várias páginas
  */
-
-export class SearchBarController {
+/**
+ * @typedef {import('../types').Product} Product
+ * @typedef {import('../types').Category} Category
+ */
+class SearchBarController {
   constructor(options = {}) {
     this.options = {
       productSelector: '.product-card',
@@ -30,72 +32,50 @@ export class SearchBarController {
   }
   
   init() {
-    this.setupEventListeners();
     this.setupCategoryAttributes();
+    this.setupEventListeners();
     this.checkUrlParams();
   }
   
-  // Configurar atributos de categoria nos cards de produto
   setupCategoryAttributes() {
-    document.querySelectorAll(this.options.productSelector).forEach(card => {
-      const categoryElement = card.querySelector(this.options.categorySelector);
-      if (categoryElement) {
-        const categoryText = categoryElement.textContent?.trim();
-        const categorySlug = this.normalizeText(categoryText || '')
-          .replace(/\s+/g, '-')
-          .replace(/[^\w\-]+/g, '');
-        card.setAttribute('data-category', categorySlug);
+    const products = document.querySelectorAll(this.options.productSelector);
+    products.forEach(product => {
+      const categoryBadge = product.querySelector(this.options.categorySelector);
+      if (categoryBadge) {
+        const categorySlug = categoryBadge.getAttribute('data-category');
+        const categoryName = categoryBadge.getAttribute('data-name');
+        product.setAttribute('data-category', categorySlug || '');
+        product.setAttribute('data-category-name', categoryName || '');
       }
     });
   }
   
-  // Configurar todos os event listeners
   setupEventListeners() {
-    // Evento de input no campo de busca
-    if (this.searchInput) {
-      this.searchInput.addEventListener('input', () => this.performLiveSearch());
-      
-      // Focar no input ao clicar na barra de pesquisa
-      document.querySelector('.search-container')?.addEventListener('click', (e) => {
-        if (!this.categoryDropdownButton?.contains(e.target) && !this.categoryDropdown?.contains(e.target)) {
-          this.searchInput.focus();
-        }
-      });
-    }
+    // Busca em tempo real ao digitar
+    this.searchInput?.addEventListener('input', () => {
+      clearTimeout(this.searchTimeout);
+      this.searchTimeout = setTimeout(() => {
+        this.performLiveSearch();
+      }, 300); // Debounce de 300ms
+    });
     
-    // Evento de clique no botão de busca
-    if (this.searchButton) {
-      this.searchButton.addEventListener('click', () => this.performSearch());
-    }
-    
-    // Evento de pressionar Enter no campo de busca
-    if (this.searchInput) {
-      this.searchInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          this.performSearch();
-        }
-      });
-    }
+    // Botão de busca (opcional, mantido para compatibilidade)
+    this.searchButton?.addEventListener('click', () => {
+      this.performLiveSearch();
+    });
     
     // Toggle do dropdown de categorias
-    if (this.categoryDropdownButton && this.categoryDropdown) {
-      this.categoryDropdownButton.addEventListener('click', (e) => {
-        e.stopPropagation();
-        this.categoryDropdown.classList.toggle('hidden');
-      });
-      
-      // Fechar dropdown ao clicar fora
-      document.addEventListener('click', () => {
-        if (this.categoryDropdown && !this.categoryDropdown.classList.contains('hidden')) {
-          this.categoryDropdown.classList.add('hidden');
-        }
-      });
-      
-      // Evitar que o clique dentro do dropdown o feche
-      this.categoryDropdown?.addEventListener('click', (e) => {
-        e.stopPropagation();
-      });
-    }
+    this.categoryDropdownButton?.addEventListener('click', () => {
+      this.toggleCategoryDropdown();
+    });
+    
+    // Fechar dropdown ao clicar fora
+    document.addEventListener('click', (e) => {
+      if (!this.categoryDropdownButton?.contains(e.target) && 
+          !this.categoryDropdown?.contains(e.target)) {
+        this.categoryDropdown?.classList.add('hidden');
+      }
+    });
     
     // Selecionar categoria do dropdown
     this.categoryItems.forEach(item => {
@@ -104,175 +84,115 @@ export class SearchBarController {
         const categoryName = item.getAttribute('data-name');
         
         if (category && categoryName) {
-          this.selectedCategory = category;
-          this.selectedCategoryName = categoryName;
-          
-          // Atualizar texto do botão de categorias
-          if (this.categoryDropdownButton) {
-            const buttonText = this.categoryDropdownButton.querySelector('span');
-            if (buttonText) {
-              buttonText.textContent = category === 'all' ? 'Categorias' : categoryName;
-            }
-          }
-          
-          // Fechar dropdown
-          if (this.categoryDropdown) {
-            this.categoryDropdown.classList.add('hidden');
-          }
-          
-          // Mostrar filtro ativo
-          this.updateActiveFilters();
-          
-          // Atualizar resultados de pesquisa
-          this.performLiveSearch();
+          this.updateSelectedCategory(category, categoryName);
         }
       });
     });
   }
   
-  // Verificar parâmetros na URL para preencher a busca
   checkUrlParams() {
-    const urlParams = new URLSearchParams(window.location.search);
-    const queryParam = urlParams.get('q');
+    const params = new URLSearchParams(window.location.search);
+    const searchQuery = params.get('q');
     
-    if (queryParam && this.searchInput) {
-      this.searchInput.value = queryParam;
+    if (searchQuery) {
+      this.searchInput.value = searchQuery;
       this.performLiveSearch();
     }
   }
   
-  // Normalizar texto (remover acentos e caracteres especiais)
+  /**
+   * Normaliza o texto removendo acentos e convertendo para minúsculas
+   * @param {string} text 
+   * @returns {string}
+   */
   normalizeText(text) {
-    return text.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+    return text
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()
+      .trim();
   }
   
-  // Realizar busca em tempo real diretamente na página
   performLiveSearch() {
-    if (!this.searchInput) return;
+    const searchTerm = this.searchInput?.value.trim().toLowerCase() || '';
+    const products = document.querySelectorAll(this.options.productSelector);
+    let visibleCount = 0;
     
-    const searchTerm = this.searchInput.value.trim().toLowerCase();
-    const normalizedQuery = this.normalizeText(searchTerm);
-    
-    // Limpar timeout anterior
-    if (this.searchTimeout) {
-      clearTimeout(this.searchTimeout);
-    }
-    
-    // Definir timeout para evitar muitas buscas durante digitação
-    this.searchTimeout = setTimeout(() => {
-      const productCards = document.querySelectorAll(this.options.productSelector);
-      let visibleCount = 0;
+    products.forEach(product => {
+      const title = this.normalizeText(product.querySelector(this.options.titleSelector)?.textContent || '');
+      const category = product.getAttribute('data-category') || '';
+      const categoryName = this.normalizeText(product.getAttribute('data-category-name') || '');
+      const price = this.normalizeText(product.querySelector(this.options.priceSelector)?.textContent || '');
       
-      // Filtrar produtos
-      productCards.forEach(card => {
-        const title = this.normalizeText(card.querySelector(this.options.titleSelector)?.textContent || '');
-        const category = this.normalizeText(card.querySelector(this.options.categorySelector)?.textContent || '');
-        const price = card.querySelector(this.options.priceSelector)?.textContent || '';
-        
-        // Verificar se o produto corresponde à pesquisa
-        const matchesSearch = !searchTerm || title.includes(normalizedQuery) || category.includes(normalizedQuery) || price.includes(normalizedQuery);
-        
-        // Verificar se o produto corresponde à categoria selecionada
-        const cardCategory = card.getAttribute('data-category');
-        const matchesCategory = this.selectedCategory === 'all' || cardCategory === this.selectedCategory;
-        
-        // Mostrar ou esconder o produto
-        if (matchesSearch && matchesCategory) {
-          card.classList.remove('hidden');
-          card.classList.add('animate-fade-in');
-          visibleCount++;
-        } else {
-          card.classList.add('hidden');
-          card.classList.remove('animate-fade-in');
-        }
-      });
+      const matchesCategory = this.selectedCategory === 'all' || category === this.selectedCategory;
+      const matchesSearch = !searchTerm || 
+                          title.includes(this.normalizeText(searchTerm)) || 
+                          price.includes(this.normalizeText(searchTerm)) ||
+                          categoryName.includes(this.normalizeText(searchTerm));
       
-      this.updateNoResultsMessage(visibleCount, searchTerm);
-      this.updateResultsCount(visibleCount);
-      
-      // Adicionar efeito de animação ao filtrar
-      if (this.productGrid) {
-        this.productGrid.classList.add('animate-fade');
-        setTimeout(() => {
-          this.productGrid.classList.remove('animate-fade');
-        }, 500);
+      if (matchesCategory && matchesSearch) {
+        product.classList.remove('hidden');
+        product.style.display = '';
+        visibleCount++;
+        
+        // Adicionar animação de fade
+        product.style.opacity = '0';
+        requestAnimationFrame(() => {
+          product.style.transition = 'opacity 0.3s ease-in-out';
+          product.style.opacity = '1';
+        });
+      } else {
+        product.classList.add('hidden');
+        product.style.display = 'none';
       }
-    }, 300); // 300ms de delay
+    });
+    
+    this.updateNoResultsMessage(visibleCount, searchTerm);
+    this.updateResultsCount(visibleCount);
   }
   
-  // Atualizar mensagem de nenhum resultado
   updateNoResultsMessage(visibleCount, searchTerm) {
     const noResultsElement = document.getElementById('noResults');
     if (noResultsElement) {
       if (visibleCount === 0) {
         noResultsElement.classList.remove('hidden');
-        noResultsElement.textContent = `Nenhum resultado encontrado para "${searchTerm}"`;
+        noResultsElement.innerHTML = `
+          <div class="flex flex-col items-center">
+            <i class="fas fa-search text-neutral-300 text-4xl mb-4"></i>
+            <p class="text-lg text-neutral-600">
+              ${searchTerm ? 
+                `Nenhum produto encontrado para "${searchTerm}"` : 
+                'Nenhum produto encontrado nesta categoria'}
+            </p>
+            ${searchTerm ? `
+              <button id="clearSearch" class="mt-4 text-primary-600 hover:text-primary-800 font-medium">
+                <i class="fas fa-times-circle mr-1"></i> Limpar busca
+              </button>
+            ` : ''}
+          </div>
+        `;
+        
+        // Adicionar evento para limpar busca
+        document.getElementById('clearSearch')?.addEventListener('click', () => {
+          if (this.searchInput) {
+            this.searchInput.value = '';
+            this.performLiveSearch();
+          }
+        });
       } else {
         noResultsElement.classList.add('hidden');
       }
-    } else if (visibleCount === 0 && this.productGrid) {
-      // Criar elemento de "nenhum resultado" se não existir
-      const noResults = document.createElement('div');
-      noResults.id = 'noResults';
-      noResults.className = 'w-full py-16 text-center text-neutral-500';
-      noResults.innerHTML = `
-        <div class="flex flex-col items-center">
-          <i class="fas fa-search text-neutral-300 text-4xl mb-4"></i>
-          <p class="text-lg">Nenhum resultado encontrado para "${searchTerm}"</p>
-          <button id="clearSearch" class="mt-4 text-primary-600 hover:text-primary-800 font-medium">
-            <i class="fas fa-times-circle mr-1"></i> Limpar busca
-          </button>
-        </div>
-      `;
-      this.productGrid.parentNode?.insertBefore(noResults, this.productGrid.nextSibling);
-      
-      // Adicionar evento para limpar busca
-      document.getElementById('clearSearch')?.addEventListener('click', () => {
-        if (this.searchInput) {
-          this.searchInput.value = '';
-          this.performLiveSearch();
-        }
-      });
     }
   }
   
-  // Atualizar contador de resultados
   updateResultsCount(visibleCount) {
     const resultsCountElement = document.getElementById('resultsCount');
     if (resultsCountElement) {
       resultsCountElement.textContent = `${visibleCount} ${visibleCount === 1 ? 'produto encontrado' : 'produtos encontrados'}`;
       resultsCountElement.classList.toggle('hidden', visibleCount === 0);
-    } else if (visibleCount > 0 && this.productGrid) {
-      const resultsCount = document.createElement('div');
-      resultsCount.id = 'resultsCount';
-      resultsCount.className = 'text-sm text-neutral-500 mb-4';
-      resultsCount.textContent = `${visibleCount} ${visibleCount === 1 ? 'produto encontrado' : 'produtos encontrados'}`;
-      this.productGrid.parentNode?.insertBefore(resultsCount, this.productGrid);
     }
   }
   
-  // Realizar a busca e navegar
-  performSearch() {
-    const searchTerm = this.searchInput?.value.trim();
-    
-    if (searchTerm || this.selectedCategory !== 'all') {
-      let url = '/categoria/todos';
-      
-      // Se tiver uma categoria específica, usa a URL da categoria
-      if (this.selectedCategory !== 'all') {
-        url = `/categoria/${this.selectedCategory}`;
-      }
-      
-      // Adiciona o termo de busca como parâmetro se existir
-      if (searchTerm) {
-        url += `?q=${encodeURIComponent(searchTerm)}`;
-      }
-      
-      window.location.href = url;
-    }
-  }
-  
-  // Atualizar chips de filtros ativos
   updateActiveFilters() {
     if (!this.activeFilters) return;
     
@@ -288,69 +208,58 @@ export class SearchBarController {
       categoryChip.innerHTML = `
         <i class="fas fa-tag text-xs"></i>
         <span>${this.selectedCategoryName}</span>
-        <button class="ml-1 text-primary-500 hover:text-primary-700" data-clear="category">
-          <i class="fas fa-times-circle"></i>
+        <button class="ml-1 hover:text-primary-800" data-clear="category">
+          <i class="fas fa-times text-xs"></i>
         </button>
       `;
-      this.activeFilters.appendChild(categoryChip);
-      hasActiveFilters = true;
       
       // Evento para limpar categoria
-      const clearButton = categoryChip.querySelector('[data-clear="category"]');
-      if (clearButton) {
-        clearButton.addEventListener('click', () => {
-          this.selectedCategory = 'all';
-          this.selectedCategoryName = 'Todos';
-          
-          // Atualizar texto do botão
-          if (this.categoryDropdownButton) {
-            const buttonText = this.categoryDropdownButton.querySelector('span');
-            if (buttonText) {
-              buttonText.textContent = 'Categorias';
-            }
+      categoryChip.querySelector('[data-clear="category"]')?.addEventListener('click', () => {
+        this.selectedCategory = 'all';
+        this.selectedCategoryName = 'Todos';
+        if (this.categoryDropdownButton) {
+          const buttonText = this.categoryDropdownButton.querySelector('span');
+          if (buttonText) {
+            buttonText.textContent = 'Categorias';
           }
-          
-          this.updateActiveFilters();
-          this.performLiveSearch();
-        });
-      }
-    }
-    
-    // Adicionar chip de termo de busca se existir
-    if (this.searchInput && this.searchInput.value.trim()) {
-      const searchChip = document.createElement('div');
-      searchChip.className = 'inline-flex items-center gap-2 bg-accent-100 text-accent-700 px-3 py-1.5 rounded-full text-sm font-medium';
-      searchChip.innerHTML = `
-        <i class="fas fa-search text-xs"></i>
-        <span>${this.searchInput.value.trim()}</span>
-        <button class="ml-1 text-accent-500 hover:text-accent-700" data-clear="search">
-          <i class="fas fa-times-circle"></i>
-        </button>
-      `;
-      this.activeFilters.appendChild(searchChip);
-      hasActiveFilters = true;
+        }
+        this.updateActiveFilters();
+        this.performLiveSearch();
+      });
       
-      // Evento para limpar termo de busca
-      const clearButton = searchChip.querySelector('[data-clear="search"]');
-      if (clearButton) {
-        clearButton.addEventListener('click', () => {
-          if (this.searchInput) {
-            this.searchInput.value = '';
-            this.updateActiveFilters();
-            this.performLiveSearch();
-          }
-        });
-      }
+      this.activeFilters.appendChild(categoryChip);
+      hasActiveFilters = true;
     }
     
-    // Mostrar ou esconder a seção de filtros ativos
-    if (hasActiveFilters) {
-      this.activeFilters.classList.remove('hidden');
-    } else {
-      this.activeFilters.classList.add('hidden');
+    // Mostrar ou esconder container de filtros
+    this.activeFilters.classList.toggle('hidden', !hasActiveFilters);
+  }
+  
+  /**
+   * Alterna a visibilidade do dropdown de categorias
+   */
+  toggleCategoryDropdown() {
+    this.categoryDropdown?.classList.toggle('hidden');
+  }
+
+  /**
+   * Atualiza a categoria selecionada
+   * @param {string} category 
+   * @param {string} name 
+   */
+  updateSelectedCategory(category, name) {
+    this.selectedCategory = category;
+    this.selectedCategoryName = name;
+    if (this.categoryDropdownButton) {
+      const buttonText = this.categoryDropdownButton.querySelector('span');
+      if (buttonText) {
+        buttonText.textContent = category === 'all' ? 'Categorias' : name;
+      }
     }
+    this.categoryDropdown?.classList.add('hidden');
+    this.updateActiveFilters();
+    this.performLiveSearch();
   }
 }
 
-// Exportar a classe para uso em outros arquivos
-export default SearchBarController;
+export { SearchBarController };
