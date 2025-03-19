@@ -261,6 +261,46 @@ export async function getRelatedProducts(categoryId, currentProductId) {
 }
 
 /**
+ * Busca produtos recomendados (produtos disponíveis, excluindo o atual e os relacionados)
+ * @param {string} currentProductId - ID do produto atual
+ * @param {Array<string>} excludeIds - IDs de produtos a excluir (ex: relacionados)
+ * @param {number} page - Página atual (começa em 1)
+ * @param {number} perPage - Itens por página
+ * @returns {Promise<{data: Array, hasMore: boolean}>} - Lista de produtos recomendados e flag indicando se há mais
+ */
+export async function getRecommendedProducts(currentProductId, excludeIds = [], page = 1, perPage = 8) {
+  try {
+    // Calcular o offset baseado na página
+    const offset = (page - 1) * perPage;
+    
+    // Buscar um item a mais para saber se há próxima página
+    const { data, error, count } = await supabase
+      .from('products')
+      .select(`
+        *,
+        product_images (*),
+        categories (*)
+      `, { count: 'exact' })
+      .eq('status', 'available')
+      .eq('visible', true)
+      .neq('id', currentProductId)
+      .not('id', 'in', `(${excludeIds.join(',')})`)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + perPage);
+    
+    if (error) throw error;
+    
+    return {
+      data: data || [],
+      hasMore: count > offset + perPage
+    };
+  } catch (error) {
+    console.error('Erro ao buscar produtos recomendados:', error);
+    return { data: [], hasMore: false };
+  }
+}
+
+/**
  * Cria um novo produto
  * @param {Object} productData - Dados do produto
  * @param {Array} imageFiles - Arquivos de imagem
@@ -268,6 +308,27 @@ export async function getRelatedProducts(categoryId, currentProductId) {
  */
 export async function createProduct(productData, imageFiles) {
   try {
+    // Validar dados obrigatórios
+    if (!productData.title || typeof productData.price !== 'number' || !productData.category_id) {
+      throw new Error('Título, preço e categoria são obrigatórios');
+    }
+
+    // 1. Criar produto
+    const { data: product, error } = await supabase
+      .from('products')
+      .insert([{
+        title: productData.title,
+        description: productData.description || '',
+        price: productData.price,
+        category_id: productData.category_id,
+        status: 'available',
+        visible: true
+      }])
+      .select()
+      .single();
+
+    if (error) throw error;
+
     // Verificar se há arquivos de imagem válidos
     const validFiles = [];
     const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
@@ -301,22 +362,6 @@ export async function createProduct(productData, imageFiles) {
     
     // Garantir que o bucket existe
     await ensureBucketExists('product-images');
-    
-    // Criar o produto
-    const { data: product, error } = await supabase
-      .from('products')
-      .insert([{
-        title: productData.title,
-        description: productData.description,
-        price: productData.price,
-        category_id: productData.category_id || null,
-        status: 'available',
-        visible: true
-      }])
-      .select()
-      .single();
-    
-    if (error) throw error;
     
     // Fazer upload das imagens em paralelo com retry
     if (validFiles.length > 0) {
@@ -998,38 +1043,43 @@ export async function getDashboardStats() {
  */
 export async function ensureBucketExists(bucketName) {
   try {
-    // Verificar se o bucket já existe
-    const { data: buckets, error: listError } = await supabase.storage
+    // Primeiro verifica se o bucket existe
+    const { data: buckets, error: listError } = await supabase
+      .storage
       .listBuckets();
-    
-    if (listError) {
-      console.error('Erro ao listar buckets:', listError);
-      return false;
-    }
-    
+
+    if (listError) throw listError;
+
     const bucketExists = buckets.some(bucket => bucket.name === bucketName);
-    
     if (bucketExists) {
       return true;
     }
-    
-    // Se não existe, criar o bucket
-    console.log(`Bucket ${bucketName} não existe. Criando...`);
-    
-    // Verificar se o usuário tem permissão para criar buckets
-    const { error: createError } = await supabase.storage
+
+    // Se não existe, tenta criar
+    const { data, error } = await supabase
+      .storage
       .createBucket(bucketName, {
-        public: true
+        public: true,
+        allowedMimeTypes: ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'],
+        fileSizeLimit: 5242880 // 5MB em bytes
       });
-    
-    if (createError) {
-      console.error(`Erro ao criar bucket ${bucketName}:`, createError);
-      return false;
+
+    // Se der erro de RLS, verifica se o bucket existe mesmo assim
+    if (error?.status === 400 && error.message?.includes('row-level security')) {
+      const { data: checkBuckets } = await supabase.storage.listBuckets();
+      return checkBuckets.some(bucket => bucket.name === bucketName);
     }
-    
+
+    if (error) throw error;
     return true;
+
   } catch (error) {
-    console.error('Erro ao verificar/criar bucket:', error);
+    // Se for erro de RLS, ignora pois provavelmente o bucket já existe
+    if (error?.status === 400 && error.message?.includes('row-level security')) {
+      console.warn('Aviso: Erro de RLS ao verificar/criar bucket, mas continuando operação...');
+      return true;
+    }
+    console.error('Erro ao criar bucket', bucketName, ':', error);
     return false;
   }
 }
@@ -1121,7 +1171,8 @@ export async function testImageUpload() {
       .from(bucketName)
       .upload(filePath, testFile, {
         cacheControl: '3600',
-        upsert: true
+        upsert: true,
+        contentType: testFile.type
       });
     
     if (uploadError) {

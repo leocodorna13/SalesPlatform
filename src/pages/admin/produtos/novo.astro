@@ -11,6 +11,7 @@ const categories = await getCategories();
 let success = false;
 let bulkSuccess = false;
 let errorMessage = null;
+let redirectUrl = '';
 
 if (Astro.request.method === 'POST') {
   try {
@@ -29,6 +30,8 @@ if (Astro.request.method === 'POST') {
       const productCount = parseInt(formData.get('product_count')?.toString() || '0');
       const productsData = [];
       
+      // Processar todos os produtos de uma vez
+      const productPromises = [];
       for (let i = 0; i < productCount; i++) {
         const productTitle = formData.get(`title_${i}`)?.toString() || '';
         const productPrice = parseFloat(formData.get(`price_${i}`)?.toString() || '0');
@@ -41,22 +44,34 @@ if (Astro.request.method === 'POST') {
           continue;
         }
         
-        // Criar nova categoria se necessário
+        // Adicionar à lista de promessas
         if ((!productCategoryId || productCategoryId === '') && productCategoryName) {
-          const newCategory = await findOrCreateCategory(productCategoryName);
-          if (newCategory && typeof newCategory === 'object' && 'id' in newCategory) {
-            productCategoryId = String(newCategory.id);
-          }
+          productPromises.push(
+            findOrCreateCategory(productCategoryName).then(newCategory => {
+              if (newCategory && typeof newCategory === 'object' && 'id' in newCategory) {
+                productsData.push({
+                  title: productTitle,
+                  price: productPrice,
+                  description: productDescription,
+                  category_id: String(newCategory.id),
+                  image: productImage
+                });
+              }
+            })
+          );
+        } else {
+          productsData.push({
+            title: productTitle,
+            price: productPrice,
+            description: productDescription,
+            category_id: productCategoryId,
+            image: productImage
+          });
         }
-        
-        productsData.push({
-          title: productTitle,
-          price: productPrice,
-          description: productDescription,
-          category_id: productCategoryId,
-          image: productImage
-        });
       }
+      
+      // Aguardar todas as categorias serem criadas/encontradas
+      await Promise.all(productPromises);
       
       // Criar produtos em massa
       if (productsData.length > 0) {
@@ -67,27 +82,35 @@ if (Astro.request.method === 'POST') {
       // Upload de produto único
       const imageFiles = formData.getAll('images');
       
-      // Criar nova categoria se necessário
-      if ((!categoryId || categoryId === '') && categoryName) {
-        // Criar nova categoria
-        const newCategory = await findOrCreateCategory(categoryName);
-        if (newCategory && typeof newCategory === 'object' && 'id' in newCategory) {
-          categoryId = String(newCategory.id);
-        }
-      }
-      
-      // Criar produto
-      if (title && price && categoryId && imageFiles.length > 0) {
-        await createProduct({
+      // Criar categoria e produto em paralelo
+      const [categoryResult, product] = await Promise.all([
+        // Criar categoria se necessário
+        (!categoryId && categoryName) ? findOrCreateCategory(categoryName) : Promise.resolve(null),
+        
+        // Criar produto
+        createProduct({
           title,
           price,
           description,
-          category_id: categoryId
-        }, imageFiles);
-        
-        success = true;
+          category_id: categoryId || '' // Não enviar null, enviar o categoryId atual
+        }, imageFiles)
+      ]);
+      
+      // Atualizar categoria do produto se uma nova foi criada
+      if (categoryResult && typeof categoryResult === 'object' && 'id' in categoryResult) {
+        categoryId = String(categoryResult.id);
+        // Atualizar categoria do produto aqui se necessário
       }
+      
+      success = true;
+      // Não redirecionar para a página do produto, apenas marcar como sucesso
     }
+    
+    // Não redirecionar, deixar mostrar a página de sucesso
+    // if (success || bulkSuccess) {
+    //   return Astro.redirect(redirectUrl || '/admin/produtos');
+    // }
+    
   } catch (error) {
     console.error('Erro ao criar produto:', error);
     errorMessage = 'Ocorreu um erro ao criar o produto. Por favor, tente novamente.';
@@ -291,8 +314,7 @@ if (Astro.request.method === 'POST') {
     const categoryOptions = document.getElementById('category-options');
     
     if (categoryInput && categoryIdInput && categoryOptions) {
-      // Quando o usuário seleciona ou digita uma categoria
-      categoryInput.addEventListener('input', () => {
+      function updateCategoryId() {
         const value = categoryInput.value;
         let categoryId = null;
         
@@ -305,8 +327,23 @@ if (Astro.request.method === 'POST') {
           }
         }
         
-        // Atualizar o campo hidden com o ID da categoria (ou null para nova categoria)
+        // Atualizar o campo hidden com o ID da categoria
         categoryIdInput.value = categoryId || '';
+      }
+
+      // Atualizar quando o usuário digita
+      categoryInput.addEventListener('input', updateCategoryId);
+      
+      // Atualizar quando o usuário seleciona uma opção
+      categoryInput.addEventListener('change', updateCategoryId);
+      
+      // Validar antes do envio do formulário
+      categoryInput.closest('form').addEventListener('submit', (e) => {
+        const value = categoryInput.value.trim();
+        if (!value) {
+          e.preventDefault();
+          alert('Por favor, selecione ou digite uma categoria');
+        }
       });
     }
   });

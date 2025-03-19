@@ -2,7 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import ProductGrid from '../../components/ProductGrid.astro';
 import WhatsAppButton from '../../components/WhatsAppButton.astro';
-import { getProductById, registerInterest, getRelatedProducts, getSiteSettings, getProductInterestCount, supabase } from '../../services/supabase';
+import { getProductById, registerInterest, getRelatedProducts, getSiteSettings, getProductInterestCount, getRecommendedProducts, supabase } from '../../services/supabase';
 
 // Definir interface para o produto
 interface ProductImage {
@@ -47,6 +47,9 @@ if (!product || !product.visible) {
 
 // Buscar produtos relacionados
 const relatedProducts = await getRelatedProducts(id, product.categories.id);
+
+// Buscar produtos recomendados
+const recommendedProducts = await getRecommendedProducts(id, relatedProducts.map(p => p.id));
 
 // Buscar configurações do site
 const siteSettings = await getSiteSettings();
@@ -280,9 +283,23 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
     
     <!-- Produtos relacionados -->
     {relatedProducts.length > 0 && (
-      <div class="mt-16">
-        <h2 class="text-2xl font-bold text-gray-900 mb-6">Produtos relacionados</h2>
-        <ProductGrid products={relatedProducts} />
+      <div class="mt-16 bg-neutral-50/50 py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 class="text-2xl font-bold text-gray-900 mb-2">Produtos relacionados</h2>
+          <p class="text-gray-600 mb-8">Outros produtos da mesma categoria</p>
+          <ProductGrid products={relatedProducts} />
+        </div>
+      </div>
+    )}
+
+    <!-- Produtos recomendados -->
+    {recommendedProducts.length > 0 && (
+      <div class="py-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <h2 class="text-2xl font-bold text-gray-900 mb-2">Você também pode gostar</h2>
+          <p class="text-gray-600 mb-8">Produtos selecionados especialmente para você</p>
+          <ProductGrid products={recommendedProducts} />
+        </div>
       </div>
     )}
   </div>
