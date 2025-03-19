@@ -498,12 +498,12 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
           
           div.innerHTML = `
             <div class="product-card bg-white rounded-xl shadow-soft overflow-hidden h-full w-full relative flex flex-col">
-              ${product.category ? `
+              ${product.categories ? `
                 <div class="absolute top-3 right-3 z-10">
-                  <a href="/categoria/${product.category.slug}" class="badge inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold 
+                  <a href="/categoria/${product.categories.slug}" class="badge inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold 
                     bg-white/90 backdrop-blur-sm text-primary-700 hover:bg-white 
                     transition-all duration-300 shadow-lg hover:shadow-xl">
-                    ${product.category.name}
+                    ${product.categories.name}
                   </a>
                 </div>
               ` : ''}

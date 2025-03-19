@@ -98,7 +98,7 @@ export async function getProducts(status = 'all') {
       .from('products')
       .select(`
         *,
-        category:categories (
+        categories (
           id,
           name,
           slug
@@ -177,7 +177,7 @@ export async function getProductsByCategorySlug(categorySlug) {
           product_images (*),
           categories (*)
         `)
-        .neq('status', 'hidden')  // Mostrar produtos disponíveis e vendidos, mas não ocultos
+        .eq('status', 'available')
         .eq('visible', true)
         .order('created_at', { ascending: false });
       
@@ -202,8 +202,8 @@ export async function getProductsByCategorySlug(categorySlug) {
         categories (*)
       `)
       .eq('category_id', category.id)
-      .neq('status', 'hidden')  // Mostrar produtos disponíveis e vendidos, mas não ocultos
-      .eq('visible', true) // Mostrar apenas produtos visíveis
+      .eq('status', 'available')
+      .eq('visible', true)
       .order('created_at', { ascending: false });
     
     if (error) throw error;
@@ -251,7 +251,7 @@ export async function getRelatedProducts(categoryId, currentProductId) {
       .from('products')
       .select(`
         *,
-        category:categories (
+        categories (
           *
         ),
         product_images (
@@ -291,8 +291,8 @@ export async function getRecommendedProducts(currentProductId, excludeIds = [], 
       .from('products')
       .select(`
         *,
-        category:categories (*),
-        product_images (*)
+        product_images (*),
+        categories (*)
       `, { count: 'exact' })
       .eq('status', 'available')
       .eq('visible', true)
@@ -1608,14 +1608,16 @@ export async function uploadMultipleImages(files, bucketName = 'site-images', fo
 
     const uploadPromises = [];
     for (const file of files) {
-      // Gerar um nome de arquivo único
+      if (!file || file.size === 0) continue;
+      
       const fileExt = file.name.split('.').pop();
-      const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
+      const filePath = `${folder}/${fileName}`;
       
       // Fazer upload do arquivo
       const uploadPromise = supabase.storage
         .from(bucketName)
-        .upload(fileName, file, {
+        .upload(filePath, file, {
           cacheControl: '3600',
           upsert: false
         })
@@ -1625,7 +1627,7 @@ export async function uploadMultipleImages(files, bucketName = 'site-images', fo
           // Obter URL pública da imagem
           const { data: urlData } = supabase.storage
             .from(bucketName)
-            .getPublicUrl(fileName);
+            .getPublicUrl(filePath);
           
           return urlData.publicUrl;
         });
@@ -1746,7 +1748,7 @@ export async function searchProducts(query, categoryId) {
       .from('products')
       .select(`
         *,
-        category:categories (
+        categories (
           id,
           name,
           slug

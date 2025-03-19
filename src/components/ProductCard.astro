@@ -21,7 +21,14 @@ const mainImage = product.product_images?.find(img => img.is_primary)?.image_url
                  product.product_images?.[0]?.image_url ||
                  'https://via.placeholder.com/300x300?text=Sem+Imagem';
 
-const { title, price, description, category } = product;
+// Extrair propriedades do produto
+const { title, price, description } = product;
+// Usar category se disponível, caso contrário tentar categories
+const category = product.category || product.categories || { 
+  id: '0', 
+  name: 'Sem categoria', 
+  slug: 'sem-categoria' 
+};
 
 // Formatar preço
 const formattedPrice = new Intl.NumberFormat('pt-BR', {
@@ -32,23 +39,21 @@ const formattedPrice = new Intl.NumberFormat('pt-BR', {
 
 {product ? (
   <div class="product-card bg-white rounded-xl shadow-soft overflow-hidden h-full w-full relative flex flex-col">
-    <!-- Badge de categoria (se disponível) -->
-    {category && (
-      <div class="absolute top-3 right-3 z-10">
-        <a 
-          href={`/categoria/${category.slug}`} 
-          class="badge inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold 
-          bg-white/90 backdrop-blur-sm text-primary-700 hover:bg-white 
-          transition-all duration-300 shadow-lg hover:shadow-xl
-          border border-primary-200 hover:border-primary-300"
-          data-category={category.slug}
-          data-name={category.name}
-        >
-          <i class="fas fa-tag mr-1.5 text-primary-500"></i>
-          {category.name}
-        </a>
-      </div>
-    )}
+    <!-- Badge de categoria (sempre exibir) -->
+    <div class="absolute top-3 right-3 z-10">
+      <a 
+        href={`/categoria/${category.slug}`} 
+        class="badge inline-flex items-center px-3 py-1.5 rounded-lg text-sm font-semibold 
+        bg-white/90 backdrop-blur-sm text-primary-700 hover:bg-white 
+        transition-all duration-300 shadow-lg hover:shadow-xl
+        border border-primary-200 hover:border-primary-300"
+        data-category={category.slug}
+        data-name={category.name}
+      >
+        <i class="fas fa-tag mr-1.5 text-primary-500"></i>
+        {category.name}
+      </a>
+    </div>
     
     <!-- Badge de status (se disponível) na diagonal -->
     {product.status && (
