@@ -37,66 +37,87 @@ if (Astro.request.method === 'POST') {
   try {
     const formData = await Astro.request.formData();
     
-    // Extrair dados do produto
+    // Extrair dados do formulário
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
     const price = parseFloat(formData.get('price') as string);
     const category_id = formData.get('category_id') as string;
     
-    // Atualizar produto
+    // Atualizar o produto
     const { error: updateError } = await supabase
       .from('products')
       .update({
         title,
         description,
         price,
-        category_id
+        category_id,
+        updated_at: new Date().toISOString()
       })
       .eq('id', id);
     
-    if (updateError) {
-      throw updateError;
-    }
+    if (updateError) throw updateError;
     
-    // Extrair arquivos de imagem
+    // Processar imagens
     const imageFiles = formData.getAll('images') as File[];
+    // Verificar se há arquivos válidos
+    const validFiles = imageFiles.filter(file => file instanceof File && file.size > 0);
     
-    // Se houver novas imagens, fazer upload
-    if (imageFiles.length > 0 && imageFiles[0].size > 0) {
-      // Primeiro excluir as imagens antigas
-      await supabase
-        .from('product_images')
-        .delete()
-        .eq('product_id', id);
-      
-      // Fazer upload das novas imagens
-      for (let i = 0; i < imageFiles.length; i++) {
-        const file = imageFiles[i];
+    if (validFiles.length > 0) {
+      // Upload das novas imagens
+      for (let i = 0; i < validFiles.length; i++) {
+        const file = validFiles[i];
         const fileExt = file.name.split('.').pop();
-        const fileName = `${id}/${Date.now()}.${fileExt}`;
+        const fileName = `${id}/${Date.now()}-${i}.${fileExt}`;
         const filePath = `products/${fileName}`;
         
         const { error: uploadError } = await supabase.storage
           .from('product-images')
           .upload(filePath, file);
         
-        if (uploadError) {
-          console.error('Erro ao fazer upload da imagem:', uploadError);
-          continue;
-        }
+        if (uploadError) continue;
         
         const { data: publicURL } = supabase.storage
           .from('product-images')
           .getPublicUrl(filePath);
         
-        // Salvar referência da imagem no banco
+        // Verificar se já existem imagens para este produto
+        const { data: existingImages } = await supabase
+          .from('product_images')
+          .select('*')
+          .eq('product_id', id);
+        
+        // Salvar referência da imagem
         await supabase
           .from('product_images')
           .insert([{
             product_id: id,
             image_url: publicURL.publicUrl,
-            is_primary: i === 0 // A primeira imagem é a principal
+            is_primary: existingImages && existingImages.length === 0 && i === 0 // Só é primária se for a primeira e não existirem outras
           }]);
+      }
+    }
+    
+    // Processar imagens a remover
+    const imagesToRemove = formData.get('images_to_remove') as string;
+    if (imagesToRemove) {
+      const imagesToRemoveArray = JSON.parse(imagesToRemove);
+      for (const imageUrl of imagesToRemoveArray) {
+        // Remover da tabela product_images
+        await supabase
+          .from('product_images')
+          .delete()
+          .eq('image_url', imageUrl);
+          
+        // Extrair o caminho do arquivo da URL
+        const filePathMatch = imageUrl.match(/\/product-images\/([^?]+)/);
+        if (filePathMatch && filePathMatch[1]) {
+          const filePath = filePathMatch[1];
+          
+          // Remover do bucket de armazenamento
+          await supabase.storage
+            .from('product-images')
+            .remove([filePath]);
+        }
       }
     }
     
@@ -220,7 +241,7 @@ const formattedPrice = product.price.toString();
           <textarea 
             id="description" 
             name="description" 
-            rows="5"
+            rows="4"
             class="input"
           >{product.description}</textarea>
         </div>
@@ -229,7 +250,7 @@ const formattedPrice = product.price.toString();
           <div class="mb-2">
             <label class="label">Imagens atuais</label>
             <p class="text-sm text-gray-500 mb-2">
-              Se adicionar novas imagens, as imagens atuais serão substituídas.
+              Se adicionar novas imagens, as imagens atuais serão mantidas.
             </p>
           </div>
           
@@ -241,6 +262,15 @@ const formattedPrice = product.price.toString();
                   alt={`${product.title} - Imagem ${index + 1}`}
                   class="w-full h-32 object-cover rounded-lg"
                 />
+                <button 
+                  type="button" 
+                  class="remove-image absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                  data-image-url={image.image_url}
+                >
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                  </svg>
+                </button>
                 {image.is_primary && (
                   <div class="absolute bottom-2 right-2 bg-green-500 text-white rounded-full p-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -253,7 +283,7 @@ const formattedPrice = product.price.toString();
           </div>
         </div>
         
-        <ImageUploader />
+        <ImageUploader required={false} />
         
         <div class="flex justify-end space-x-3">
           <a href="/admin/produtos" class="btn btn-outline">
@@ -269,46 +299,61 @@ const formattedPrice = product.price.toString();
 </AdminLayout>
 
 <script>
-  // Manipular o envio do formulário para incluir as imagens
-  document.getElementById('product-form')?.addEventListener('submit', function(e) {
-    e.preventDefault(); // Impedir o envio padrão para processar as imagens
+  // Script para o botão de salvar alterações
+  document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('product-form') as HTMLFormElement;
+    if (!form) return;
     
-    // Garantir que o target é um HTMLFormElement
-    const form = this as HTMLFormElement;
-    const formData = new FormData(form);
+    // Array para armazenar URLs de imagens a serem removidas
+    const imagesToRemove: string[] = [];
     
-    // Adicionar as imagens do uploader, se houver
-    // @ts-ignore - Acessando propriedade adicionada ao window
-    if (window.getUploadedFiles) {
-      // @ts-ignore - Acessando propriedade adicionada ao window
-      const files = window.getUploadedFiles();
+    // Adicionar handlers para botões de remoção de imagem
+    document.querySelectorAll('.remove-image').forEach((button: HTMLElement) => {
+      button.addEventListener('click', function(this: HTMLElement) {
+        const imageUrl = this.getAttribute('data-image-url');
+        if (imageUrl) {
+          // Adicionar URL à lista de imagens a remover
+          imagesToRemove.push(imageUrl);
+          
+          // Remover visualmente o elemento pai (container da imagem)
+          const imageContainer = this.closest('.relative');
+          if (imageContainer) {
+            imageContainer.remove();
+          }
+        }
+      });
+    });
+    
+    // Handler de submissão do formulário
+    form.addEventListener('submit', function(this: HTMLFormElement, e: Event) {
+      e.preventDefault();
       
-      if (files.length > 0) {
-        // Remover o campo de imagens existente (se houver)
-        formData.delete('images');
-        
-        // Adicionar cada arquivo ao FormData
-        files.forEach((file: File) => {
-          formData.append('images', file);
-        });
+      const formData = new FormData(this);
+      
+      // Adicionar lista de imagens a remover
+      if (imagesToRemove.length > 0) {
+        formData.append('images_to_remove', JSON.stringify(imagesToRemove));
       }
-    }
-    
-    // Enviar o formulário manualmente
-    fetch(form.action, {
-      method: 'POST',
-      body: formData
-    })
-    .then(response => {
-      if (response.redirected) {
-        window.location.href = response.url;
-      } else {
+      
+      // Adicionar as imagens do uploader, se disponível
+      if ((window as any).getUploadedFiles && typeof (window as any).getUploadedFiles === 'function') {
+        const files = (window as any).getUploadedFiles();
+        if (files && files.length > 0) {
+          // Adicionar cada arquivo ao FormData
+          files.forEach((file: File) => {
+            formData.append('images', file);
+          });
+        }
+      }
+      
+      // Enviar o formulário via fetch
+      fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+      })
+      .then(() => {
         window.location.reload();
-      }
-    })
-    .catch(error => {
-      console.error('Erro ao enviar formulário:', error);
-      alert('Ocorreu um erro ao salvar as alterações. Por favor, tente novamente.');
+      });
     });
   });
 </script>

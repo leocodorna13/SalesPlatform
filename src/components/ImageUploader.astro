@@ -19,7 +19,7 @@ const {
     id={name}
     accept="image/*"
     multiple={multiple}
-    required={required}
+    required={required ? true : undefined}
     class="hidden"
   />
   
@@ -45,6 +45,9 @@ const {
     const previewContainer = document.getElementById('preview-container');
     
     if (!input || !previewContainer) return;
+    
+    // Limpar o input ao iniciar para evitar duplicações
+    input.value = '';
     
     // Verificar se já existem imagens no preview
     if (previewContainer.children.length > 0) {
