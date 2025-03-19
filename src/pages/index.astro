@@ -9,7 +9,7 @@ import { getProducts, getCategories, getSiteSettings } from '../services/supabas
 // Buscar todas as categorias
 const categories = await getCategories();
 
-// Buscar produtos disponíveis
+// Buscar produtos disponíveis e vendidos
 const products = await getProducts('all');
 
 // Produtos em destaque (os 4 mais recentes)
@@ -174,7 +174,7 @@ if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
         </p>
       </div>
       
-      <ProductGrid products={featuredProducts} />
+      <ProductGrid products={featuredProducts} showSold={true} />
       
       <div class="mt-12 text-center">
         <a href="/categoria/todos" class="btn btn-primary text-lg px-8 py-3 rounded-lg shadow-md hover:shadow-lg transition-all">
@@ -422,16 +422,5 @@ if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
       
       window.addEventListener('scroll', handleScroll);
     }
-    
-    // Adicionar animação de fade para produtos
-    const products = document.querySelectorAll('.product');
-    products.forEach(product => {
-      // Adicionar animação de fade
-      (product as HTMLElement).style.opacity = '0';
-      requestAnimationFrame(() => {
-        (product as HTMLElement).style.transition = 'opacity 0.3s ease-in-out';
-        (product as HTMLElement).style.opacity = '1';
-      });
-    });
   });
 </script>
