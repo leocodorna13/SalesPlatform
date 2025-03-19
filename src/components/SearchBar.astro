@@ -7,16 +7,18 @@ interface Props {
     slug: string;
   }>;
   mobileFriendly?: boolean;
+  enableSearch?: boolean;
 }
 
 const { 
   placeholder = "Buscar produtos...", 
   categories = [],
-  mobileFriendly = false
+  mobileFriendly = false,
+  enableSearch = true
 } = Astro.props;
 ---
 
-<div class={`search-container bg-white rounded-xl shadow-lg p-2 relative z-50 ${mobileFriendly ? 'mobile-friendly' : ''}`}>
+<div class={`search-container bg-white rounded-xl shadow-lg p-2 relative z-50 ${mobileFriendly ? 'mobile-friendly' : ''}`} data-enable-search={enableSearch}>
   <div class="flex items-center flex-wrap md:flex-nowrap">
     <!-- Campo de busca com ícone -->
     <div class="flex-grow flex items-center bg-neutral-50 rounded-lg hover:bg-neutral-100 transition-colors">
@@ -86,9 +88,10 @@ const {
 <script>
   import { SearchBarController } from './SearchBarController.js';
   
-  document.addEventListener('DOMContentLoaded', () => {
+  // Só inicializa o controller se enableSearch for true
+  if (document.querySelector('[data-enable-search="true"]')) {
     new SearchBarController();
-  });
+  }
 </script>
 
 <style>
