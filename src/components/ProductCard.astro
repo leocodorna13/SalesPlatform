@@ -13,7 +13,10 @@ if (!product) {
   return;
 }
 
-const { title, price, image_url, description, category } = product;
+// Adicionar logs para debug
+console.log('Product data:', JSON.stringify(product, null, 2));
+
+const { title, price, description, category, image_url } = product;
 
 // Formatar preço
 const formattedPrice = new Intl.NumberFormat('pt-BR', {
