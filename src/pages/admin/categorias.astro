@@ -1,6 +1,12 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import { getCategories, createCategory, deleteCategory, moveProductsBetweenCategories, getProductCountByCategory, updateCategory } from '../../services/supabase';
+import { getCategories, createCategory, deleteCategory, moveProductsBetweenCategories, getProductCountByCategory, updateCategory, deleteBulkCategories, getCurrentUser } from '../../services/supabase';
+
+// Verificar autenticação primeiro
+const user = await getCurrentUser();
+if (!user) {
+  return Astro.redirect('/admin/login');
+}
 
 // Definir interfaces para os resultados das operações
 interface OperationResult {
@@ -52,7 +58,17 @@ if (Astro.request.method === 'POST') {
       const categoryId = formData.get('categoryId');
       
       if (categoryId && typeof categoryId === 'string') {
-        const result = await deleteCategory(categoryId) as OperationResult;
+        const result = await deleteCategory(categoryId);
+        
+        message = result.message;
+        messageType = result.success ? 'success' : 'error';
+      }
+    } else if (action === 'bulk-delete') {
+      // Excluir categorias em lote
+      const selectedCategories = formData.getAll('selectedCategories');
+      
+      if (selectedCategories && selectedCategories.length > 0) {
+        const result = await deleteBulkCategories(selectedCategories);
         
         message = result.message;
         messageType = result.success ? 'success' : 'error';
@@ -104,6 +120,7 @@ const categoriesWithCount = await Promise.all(
     return { ...category, productCount: count };
   })
 );
+
 ---
 
 <AdminLayout title="Gerenciar Categorias">
@@ -111,71 +128,100 @@ const categoriesWithCount = await Promise.all(
     <!-- Lista de categorias -->
     <div class="md:col-span-2">
       <div class="bg-white rounded-lg shadow overflow-hidden">
-        <div class="p-4 border-b border-gray-200">
-          <h2 class="text-lg font-medium text-gray-900">Categorias</h2>
-        </div>
-        
-        {message && (
-          <div class={`m-4 p-3 rounded-md ${messageType === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
-            {message}
+        <form method="POST" id="bulk-delete-form">
+          <input type="hidden" name="action" value="bulk-delete" />
+          <div class="p-4 border-b border-gray-200 flex justify-between items-center">
+            <h2 class="text-lg font-medium text-gray-900">Categorias</h2>
+            <div class="flex space-x-2">
+              <button 
+                type="button" 
+                id="select-all-btn"
+                class="px-3 py-1 text-sm bg-gray-100 hover:bg-gray-200 text-gray-700 rounded"
+              >
+                Selecionar Todas
+              </button>
+              <button 
+                type="submit" 
+                id="bulk-delete-btn"
+                class="px-3 py-1 text-sm bg-red-100 hover:bg-red-200 text-red-700 rounded hidden"
+              >
+                Excluir Selecionadas
+              </button>
+            </div>
           </div>
-        )}
-        
-        <div class="divide-y divide-gray-200">
-          {categoriesWithCount.length > 0 ? (
-            categoriesWithCount.map((category) => (
-              <div class="flex items-center justify-between p-4 hover:bg-gray-50" id={`category-${category.id}`} draggable="true" data-category-id={category.id} data-category-name={category.name} data-category-slug={category.slug}>
-                <div>
-                  <h3 class="font-medium text-gray-900">{category.name}</h3>
-                  <p class="text-sm text-gray-500">Slug: {category.slug}</p>
-                  <p class="text-xs text-gray-500 mt-1">Produtos: {category.productCount}</p>
-                </div>
-                <div class="flex space-x-2">
-                  <button 
-                    type="button"
-                    class="text-blue-400 hover:text-blue-500 edit-category" 
-                    title="Editar categoria"
-                    data-category-id={category.id}
-                    data-category-name={category.name}
-                    data-category-slug={category.slug}
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                    </svg>
-                  </button>
-                  <a 
-                    href={`/categoria/${category.slug}`} 
-                    class="text-gray-400 hover:text-gray-500" 
-                    title="Ver produtos nesta categoria"
-                    target="_blank"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                    </svg>
-                  </a>
-                  {category.productCount === 0 && (
-                    <button
-                      type="button"
-                      class="text-red-400 hover:text-red-500 delete-category"
-                      title="Excluir categoria"
-                      data-category-id={category.id}
-                      data-category-name={category.name}
-                    >
-                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
-                    </button>
-                  )}
-                </div>
-              </div>
-            ))
-          ) : (
-            <div class="text-center py-8">
-              <p class="text-gray-500">Nenhuma categoria cadastrada.</p>
+          
+          {message && (
+            <div class={`m-4 p-3 rounded-md ${messageType === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+              {message}
             </div>
           )}
-        </div>
+          
+          <div class="divide-y divide-gray-200">
+            {categoriesWithCount.length > 0 ? (
+              categoriesWithCount.map((category) => (
+                <div class="flex items-center justify-between p-4 hover:bg-gray-50" id={`category-${category.id}`}>
+                  <div class="flex items-center space-x-3">
+                    {category.productCount === 0 && (
+                      <input 
+                        type="checkbox" 
+                        name="selectedCategories" 
+                        value={category.id}
+                        class="category-checkbox h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                      />
+                    )}
+                    <div>
+                      <h3 class="font-medium text-gray-900">{category.name}</h3>
+                      <p class="text-sm text-gray-500">Slug: {category.slug}</p>
+                      <p class="text-xs text-gray-500 mt-1">Produtos: {category.productCount}</p>
+                    </div>
+                  </div>
+                  <div class="flex space-x-2">
+                    <button 
+                      type="button"
+                      class="text-blue-400 hover:text-blue-500 edit-category" 
+                      title="Editar categoria"
+                      data-category-id={category.id}
+                      data-category-name={category.name}
+                      data-category-slug={category.slug}
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                      </svg>
+                    </button>
+                    <a 
+                      href={`/categoria/${category.slug}`} 
+                      class="text-gray-400 hover:text-gray-500" 
+                      title="Ver produtos nesta categoria"
+                      target="_blank"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
+                      </svg>
+                    </a>
+                    {category.productCount === 0 && (
+                      <button
+                        type="button"
+                        class="text-red-400 hover:text-red-500 delete-category"
+                        title="Excluir categoria"
+                        data-category-id={category.id}
+                        data-category-name={category.name}
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div class="text-center py-8">
+                <p class="text-gray-500">Nenhuma categoria cadastrada.</p>
+              </div>
+            )}
+          </div>
+        </form>
       </div>
       
       <!-- Formulário para mover produtos -->
@@ -532,6 +578,45 @@ const categoriesWithCount = await Promise.all(
         });
       });
     }
+    
+    // Manipulação de seleção em lote
+    const selectAllBtn = document.getElementById('select-all-btn');
+    const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+    const categoryCheckboxes = document.querySelectorAll('.category-checkbox');
+    const bulkDeleteForm = document.getElementById('bulk-delete-form');
+    
+    function updateBulkDeleteButton() {
+      const selectedCount = document.querySelectorAll('.category-checkbox:checked').length;
+      if (selectedCount > 0) {
+        bulkDeleteBtn.classList.remove('hidden');
+        bulkDeleteBtn.textContent = `Excluir Selecionadas (${selectedCount})`;
+      } else {
+        bulkDeleteBtn.classList.add('hidden');
+      }
+    }
+    
+    selectAllBtn.addEventListener('click', () => {
+      const isAllSelected = document.querySelectorAll('.category-checkbox:checked').length === categoryCheckboxes.length;
+      categoryCheckboxes.forEach(checkbox => {
+        checkbox.checked = !isAllSelected;
+      });
+      updateBulkDeleteButton();
+    });
+    
+    categoryCheckboxes.forEach(checkbox => {
+      checkbox.addEventListener('change', updateBulkDeleteButton);
+    });
+    
+    bulkDeleteBtn.addEventListener('click', (e) => {
+      const selectedCount = document.querySelectorAll('.category-checkbox:checked').length;
+      if (selectedCount > 0) {
+        if (!confirm(`Tem certeza que deseja excluir ${selectedCount} categorias?`)) {
+          e.preventDefault();
+        }
+      } else {
+        e.preventDefault();
+      }
+    });
   </script>
 
 <style>

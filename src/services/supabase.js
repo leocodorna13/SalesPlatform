@@ -890,6 +890,49 @@ export async function updateCategory(id, name, slug) {
   }
 }
 
+/**
+ * Exclui múltiplas categorias em lote
+ * @param {string[]} categoryIds - Array com IDs das categorias a serem excluídas
+ * @returns {Promise<object>} - Resultado da operação
+ */
+export async function deleteBulkCategories(categoryIds) {
+  try {
+    // Verificar se todas as categorias estão vazias
+    const { data: categoriesWithProducts, error: countError } = await supabase
+      .from('products')
+      .select('category_id')
+      .in('category_id', categoryIds);
+
+    if (countError) throw countError;
+
+    if (categoriesWithProducts && categoriesWithProducts.length > 0) {
+      return {
+        success: false,
+        message: 'Algumas categorias não podem ser excluídas pois contêm produtos.'
+      };
+    }
+
+    // Excluir as categorias
+    const { error } = await supabase
+      .from('categories')
+      .delete()
+      .in('id', categoryIds);
+
+    if (error) throw error;
+
+    return {
+      success: true,
+      message: `${categoryIds.length} categorias foram excluídas com sucesso.`
+    };
+  } catch (error) {
+    console.error('Erro ao excluir categorias:', error);
+    return {
+      success: false,
+      message: 'Erro ao excluir categorias: ' + error.message
+    };
+  }
+}
+
 // ======= Funções de Interessados =======
 
 /**
