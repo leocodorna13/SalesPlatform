@@ -1152,7 +1152,7 @@ export async function testImageUpload() {
       console.log(`Bucket '${bucketName}' não encontrado. Criando...`);
       const { error: createBucketError } = await supabase.storage.createBucket(bucketName, {
         public: true,
-        fileSizeLimit: 5242880, // 5MB
+        fileSizeLimit: 5242880 // 5MB
       });
       
       if (createBucketError) {
@@ -1598,7 +1598,7 @@ export async function uploadImage(file, bucketName = 'site-images', folder = 'he
  * @param {string} folder - Pasta dentro do bucket (default: 'hero')
  * @returns {Promise<{success: boolean, urls: string[], error: any}>}
  */
-export async function uploadMultipleImages(files, bucketName = 'site-images', folder = 'hero') {
+export async function uploadHeroCarouselImages(files, bucketName = 'site-images', folder = 'hero') {
   try {
     // Garantir que o bucket existe
     const bucketExists = await createBucketIfNotExists(bucketName);
@@ -1675,7 +1675,7 @@ export async function updateSiteSettings(settings, heroImageFile = null, heroCar
     
     // Upload carousel images if provided
     if (heroCarouselFiles && heroCarouselFiles.length > 0) {
-      const newCarouselUrls = await uploadMultipleImages(heroCarouselFiles);
+      const newCarouselUrls = await uploadHeroCarouselImages(heroCarouselFiles);
       
       // Combine with existing carousel images
       let existingUrls = [];
@@ -1696,17 +1696,18 @@ export async function updateSiteSettings(settings, heroImageFile = null, heroCar
     // Check if settings already exist
     const { data: existingSettings } = await supabase
       .from('site_settings')
-      .select('id')
-      .limit(1);
+      .select('*')
+      .limit(1)
+      .single();
     
     let result;
     
-    if (existingSettings && existingSettings.length > 0) {
+    if (existingSettings) {
       // Update existing settings
       const { data, error } = await supabase
         .from('site_settings')
         .update(updatedSettings)
-        .eq('id', existingSettings[0].id);
+        .eq('id', existingSettings.id);
       
       if (error) {
         console.error('Erro ao atualizar configurações:', error);
@@ -1786,144 +1787,11 @@ export async function searchProducts(query, categoryId) {
 }
 
 /**
- * Upload multiple images to Supabase Storage
- * @param {File[]} files - Array of files to upload
- * @param {string} bucketName - Name of the bucket to upload to
- * @param {string} folder - Folder within the bucket to upload to
- * @returns {Promise<string[]>} - Array of URLs of the uploaded images
- */
-async function uploadMultipleImages(files, bucketName = 'site-images', folder = 'hero') {
-  try {
-    if (!files || files.length === 0) {
-      return [];
-    }
-    
-    const supabase = createClient();
-    const urls = [];
-    
-    // Upload each file and collect the URLs
-    for (const file of files) {
-      if (!file || file.size === 0) continue;
-      
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
-      const filePath = `${folder}/${fileName}`;
-      
-      const { data, error } = await supabase.storage
-        .from(bucketName)
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        });
-      
-      if (error) {
-        console.error('Erro ao fazer upload da imagem:', error);
-        continue;
-      }
-      
-      // Get the public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from(bucketName)
-        .getPublicUrl(filePath);
-      
-      urls.push(publicUrl);
-    }
-    
-    return urls;
-  } catch (error) {
-    console.error('Erro ao fazer upload das imagens:', error);
-    return [];
-  }
-}
-
-/**
- * Update site settings
- * @param {Object} settings - Site settings to update
- * @param {File} heroImageFile - Hero image file to upload (optional)
- * @param {File[]} heroCarouselFiles - Hero carousel image files to upload (optional)
- * @returns {Promise<Object>} - Result of the update operation
- */
-async function updateSiteSettings(settings, heroImageFile = null, heroCarouselFiles = null) {
-  try {
-    const supabase = createClient();
-    let updatedSettings = { ...settings };
-    
-    // Upload hero image if provided
-    if (heroImageFile) {
-      const heroImageUrl = await uploadImage(heroImageFile);
-      if (heroImageUrl) {
-        updatedSettings.heroImageUrl = heroImageUrl;
-      }
-    }
-    
-    // Upload carousel images if provided
-    if (heroCarouselFiles && heroCarouselFiles.length > 0) {
-      const newCarouselUrls = await uploadMultipleImages(heroCarouselFiles);
-      
-      // Combine with existing carousel images
-      let existingUrls = [];
-      try {
-        existingUrls = JSON.parse(settings.heroCarouselUrls || '[]');
-      } catch (e) {
-        console.error('Erro ao analisar URLs do carrossel:', e);
-        existingUrls = [];
-      }
-      
-      // Merge existing and new URLs
-      const combinedUrls = [...existingUrls, ...newCarouselUrls];
-      
-      // Update the settings with the combined URLs
-      updatedSettings.heroCarouselUrls = JSON.stringify(combinedUrls);
-    }
-    
-    // Check if settings already exist
-    const { data: existingSettings } = await supabase
-      .from('site_settings')
-      .select('id')
-      .limit(1);
-    
-    let result;
-    
-    if (existingSettings && existingSettings.length > 0) {
-      // Update existing settings
-      const { data, error } = await supabase
-        .from('site_settings')
-        .update(updatedSettings)
-        .eq('id', existingSettings[0].id);
-      
-      if (error) {
-        console.error('Erro ao atualizar configurações:', error);
-        return { success: false, message: `Erro ao atualizar configurações: ${error.message}` };
-      }
-      
-      result = { success: true, message: 'Configurações atualizadas com sucesso!' };
-    } else {
-      // Insert new settings
-      const { data, error } = await supabase
-        .from('site_settings')
-        .insert([updatedSettings]);
-      
-      if (error) {
-        console.error('Erro ao inserir configurações:', error);
-        return { success: false, message: `Erro ao inserir configurações: ${error.message}` };
-      }
-      
-      result = { success: true, message: 'Configurações criadas com sucesso!' };
-    }
-    
-    return result;
-  } catch (error) {
-    console.error('Erro ao atualizar configurações:', error);
-    return { success: false, message: `Erro ao processar configurações: ${error.message}` };
-  }
-}
-
-/**
  * Remove an image from the carousel
  * @param {string} imageUrl - URL of the image to remove
  * @returns {Promise<Object>} - Result of the operation
  */
-async function removeCarouselImage(imageUrl) {
+export async function removeCarouselImage(imageUrl) {
   try {
     const supabase = createClient();
     
@@ -1944,16 +1812,18 @@ async function removeCarouselImage(imageUrl) {
       carouselUrls = JSON.parse(settings.heroCarouselUrls || '[]');
     } catch (e) {
       console.error('Erro ao analisar URLs do carrossel:', e);
-      return { success: false, message: 'Erro ao processar URLs do carrossel' };
+      carouselUrls = [];
     }
     
     // Remove the specified URL
-    const updatedUrls = carouselUrls.filter(url => url !== imageUrl);
+    carouselUrls = carouselUrls.filter(url => url !== imageUrl);
     
-    // Update settings with new URLs
+    // Update settings with new carousel URLs
     const { data, error } = await supabase
       .from('site_settings')
-      .update({ heroCarouselUrls: JSON.stringify(updatedUrls) })
+      .update({
+        heroCarouselUrls: JSON.stringify(carouselUrls)
+      })
       .eq('id', settings.id);
     
     if (error) {
@@ -1986,30 +1856,3 @@ async function removeCarouselImage(imageUrl) {
     return { success: false, message: `Erro ao processar a remoção: ${error.message}` };
   }
 }
-
-export {
-  getProducts,
-  getProductById,
-  getProductsByCategory,
-  getCategories,
-  getCategoryBySlug,
-  createProduct,
-  updateProduct,
-  deleteProduct,
-  createCategory,
-  updateCategory,
-  deleteCategory,
-  uploadImage,
-  uploadMultipleImages,
-  registerInterest,
-  getInterests,
-  getInterestsByProduct,
-  deleteInterest,
-  getSiteSettings,
-  updateSiteSettings,
-  removeCarouselImage,
-  getCurrentUser,
-  signIn,
-  signOut,
-  createClient
-};

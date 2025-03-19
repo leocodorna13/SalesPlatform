@@ -3,13 +3,11 @@ import AdminLayout from '../../layouts/AdminLayout.astro';
 import { getSiteSettings, updateSiteSettings, getCurrentUser } from '../../services/supabase';
 
 // Definir interface para as configurações do site
-// Garantir que esta interface seja compatível com a definida em supabase.js
 interface SiteSettings {
   id?: number | null;
   projectName: string;
   heroTitle: string;
   heroDescription: string;
-  heroImageUrl: string;
   heroCarouselUrls?: string; // JSON string de URLs
   contactPhone: string;
   contactWhatsapp: string;
@@ -30,7 +28,6 @@ const settings: SiteSettings = settingsData || {
   projectName: 'Desapego dos Martins',
   heroTitle: 'Desapego dos Martins',
   heroDescription: 'Produtos de qualidade a preços acessíveis',
-  heroImageUrl: '',
   heroCarouselUrls: '[]',
   contactPhone: '',
   contactWhatsapp: '',
@@ -50,7 +47,6 @@ if (Astro.request.method === 'POST') {
       projectName: formData.get('projectName')?.toString() || '',
       heroTitle: formData.get('heroTitle')?.toString() || '',
       heroDescription: formData.get('heroDescription')?.toString() || '',
-      heroImageUrl: formData.get('heroImageUrl')?.toString() || settings.heroImageUrl || '',
       heroCarouselUrls: settings.heroCarouselUrls || '[]',
       contactPhone: formData.get('contactPhone')?.toString() || '',
       contactWhatsapp: formData.get('contactWhatsapp')?.toString() || '',
@@ -58,20 +54,14 @@ if (Astro.request.method === 'POST') {
       whatsappMessage: formData.get('whatsappMessage')?.toString() || ''
     };
     
-    // Verificar se há um arquivo de imagem principal
-    const heroImageFile = formData.get('heroImageFile') as File;
-    const hasImageFile = heroImageFile && heroImageFile.size > 0;
-    
     // Verificar se há arquivos para o carrossel
     const heroCarouselFiles = formData.getAll('heroCarouselFiles') as File[];
-    const hasCarouselFiles = heroCarouselFiles.length > 0 && heroCarouselFiles.some(file => file.size > 0);
     const validCarouselFiles = heroCarouselFiles.filter(file => file.size > 0);
     
     // Atualizar configurações
     result = await updateSiteSettings(
       updatedSettings, 
-      hasImageFile ? heroImageFile : undefined, 
-      hasCarouselFiles ? validCarouselFiles : undefined
+      validCarouselFiles.length > 0 ? validCarouselFiles : undefined
     );
     
     if (result.success) {
@@ -101,7 +91,7 @@ const carouselImages = settings.heroCarouselUrls ? JSON.parse(settings.heroCarou
     
     {result.message && (
       <div class={`p-4 mb-6 rounded-md ${result.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
-        {result.message}
+        <p>{result.message}</p>
       </div>
     )}
     
@@ -159,57 +149,6 @@ const carouselImages = settings.heroCarouselUrls ? JSON.parse(settings.heroCarou
               rows="3"
               class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
             >{settings.heroDescription}</textarea>
-          </div>
-          
-          <!-- Imagem principal (para compatibilidade) -->
-          <div class="mt-6">
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              Imagem Principal (Legado)
-            </label>
-            <div class="text-xs text-gray-500 mb-2">
-              Esta opção é mantida para compatibilidade. Recomendamos usar o carrossel acima.
-            </div>
-            
-            <!-- Preview da imagem atual -->
-            {settings.heroImageUrl && (
-              <div class="mb-3">
-                <img 
-                  src={settings.heroImageUrl} 
-                  alt="Imagem de fundo atual" 
-                  class="w-full max-w-md h-40 object-cover rounded-lg shadow-sm"
-                />
-              </div>
-            )}
-            
-            <!-- Upload de nova imagem -->
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">
-                  Fazer upload de nova imagem
-                </label>
-                <input
-                  type="file"
-                  id="heroImageFile"
-                  name="heroImageFile"
-                  accept="image/*"
-                  class="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-md file:border-0 file:text-sm file:font-medium file:bg-primary-50 file:text-primary-700 hover:file:bg-primary-100"
-                />
-              </div>
-              
-              <div>
-                <label for="heroImageUrl" class="block text-sm font-medium text-gray-700 mb-1">
-                  Ou use uma URL externa
-                </label>
-                <input
-                  type="text"
-                  id="heroImageUrl"
-                  name="heroImageUrl"
-                  value={settings.heroImageUrl}
-                  placeholder="https://exemplo.com/imagem.jpg"
-                  class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-                />
-              </div>
-            </div>
           </div>
           
           <!-- Imagens do Carrossel -->
@@ -270,7 +209,7 @@ const carouselImages = settings.heroCarouselUrls ? JSON.parse(settings.heroCarou
                       <button 
                         type="button"
                         data-image-url={imageUrl}
-                        class="remove-carousel-image absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                        class="remove-carousel-image absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
                         aria-label="Remover imagem"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -291,86 +230,73 @@ const carouselImages = settings.heroCarouselUrls ? JSON.parse(settings.heroCarou
         <h2 class="text-lg font-medium text-gray-900 mb-4">Informações de Contato</h2>
         
         <div class="space-y-6">
-          <!-- Telefone de Contato -->
+          <!-- Telefone -->
           <div>
             <label for="contactPhone" class="block text-sm font-medium text-gray-700 mb-1">
               Telefone de Contato
             </label>
-            <div class="text-xs text-gray-500 mb-2">
-              Este telefone será exibido no rodapé do site para contato.
-            </div>
             <input
-              type="text"
+              type="tel"
               id="contactPhone"
               name="contactPhone"
               value={settings.contactPhone}
+              placeholder="(00) 0000-0000"
               class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
             />
           </div>
           
-          <!-- WhatsApp de Contato -->
+          <!-- WhatsApp -->
           <div>
             <label for="contactWhatsapp" class="block text-sm font-medium text-gray-700 mb-1">
-              WhatsApp de Contato
+              WhatsApp
             </label>
-            <div class="text-xs text-gray-500 mb-2">
-              Este número será usado para o botão de WhatsApp no rodapé e nas páginas de produto.
-              Formato: 5511999999999 (com código do país e DDD, sem espaços ou caracteres especiais)
-            </div>
             <input
-              type="text"
+              type="tel"
               id="contactWhatsapp"
               name="contactWhatsapp"
               value={settings.contactWhatsapp}
+              placeholder="(00) 00000-0000"
               class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
             />
           </div>
-        </div>
-      </div>
-      
-      <!-- Seção: Configurações de Pagamento e Mensagens -->
-      <div class="bg-white shadow rounded-lg p-6">
-        <h2 class="text-lg font-medium text-gray-900 mb-4">Pagamento e Mensagens</h2>
-        
-        <div class="space-y-6">
-          <!-- Formas de Pagamento -->
-          <div>
-            <label for="paymentMethods" class="block text-sm font-medium text-gray-700 mb-1">
-              Formas de Pagamento
-            </label>
-            <div class="text-xs text-gray-500 mb-2">
-              Estas formas de pagamento serão exibidas nas páginas de produto.
-            </div>
-            <textarea
-              id="paymentMethods"
-              name="paymentMethods"
-              rows="3"
-              class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
-            >{settings.paymentMethods}</textarea>
-          </div>
           
-          <!-- Mensagem de WhatsApp -->
+          <!-- Mensagem padrão do WhatsApp -->
           <div>
             <label for="whatsappMessage" class="block text-sm font-medium text-gray-700 mb-1">
               Mensagem Padrão do WhatsApp
             </label>
-            <div class="text-xs text-gray-500 mb-2">
-              Esta mensagem será enviada quando um usuário clicar no botão de WhatsApp em um produto.
-            </div>
             <textarea
               id="whatsappMessage"
               name="whatsappMessage"
-              rows="3"
+              rows="2"
               class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
             >{settings.whatsappMessage}</textarea>
+          </div>
+          
+          <!-- Formas de Pagamento -->
+          <div>
+            <label for="paymentMethods" class="block text-sm font-medium text-gray-700 mb-1">
+              Formas de Pagamento Aceitas
+            </label>
+            <textarea
+              id="paymentMethods"
+              name="paymentMethods"
+              rows="2"
+              placeholder="Pix, Transferência, Cartão de Crédito, etc."
+              class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
+            >{settings.paymentMethods}</textarea>
           </div>
         </div>
       </div>
       
-      <div class="flex justify-end">
+      <!-- Botões de ação -->
+      <div class="flex justify-end space-x-3">
+        <a href="/admin" class="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+          Cancelar
+        </a>
         <button
           type="submit"
-          class="inline-flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+          class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
         >
           Salvar Configurações
         </button>
@@ -390,19 +316,18 @@ const carouselImages = settings.heroCarouselUrls ? JSON.parse(settings.heroCarou
     const removeButtons = document.querySelectorAll('.remove-carousel-image');
     
     // Função para mostrar preview das imagens selecionadas
-    const handleFiles = (files) => {
-      if (files.length === 0) return;
+    function showImagePreviews(files) {
+      if (!files || files.length === 0) return;
       
       previewContainer.classList.remove('hidden');
       previewGrid.innerHTML = '';
       
       Array.from(files).forEach((file, index) => {
-        // Criar elemento de preview
         const reader = new FileReader();
-        reader.onload = (e) => {
-          const preview = document.createElement('div');
-          preview.className = 'relative group';
-          preview.innerHTML = `
+        reader.onload = function(e) {
+          const previewItem = document.createElement('div');
+          previewItem.className = 'relative group';
+          previewItem.innerHTML = `
             <img 
               src="${e.target.result}" 
               alt="Preview ${index + 1}" 
@@ -411,7 +336,7 @@ const carouselImages = settings.heroCarouselUrls ? JSON.parse(settings.heroCarou
             />
             <button 
               type="button"
-              class="preview-remove-btn absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+              class="preview-remove-btn absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
               aria-label="Remover imagem"
               data-index="${index}"
             >
@@ -420,73 +345,66 @@ const carouselImages = settings.heroCarouselUrls ? JSON.parse(settings.heroCarou
               </svg>
             </button>
           `;
+          previewGrid.appendChild(previewItem);
           
-          previewGrid.appendChild(preview);
-          
-          // Adicionar evento para remover preview
-          const removeBtn = preview.querySelector('.preview-remove-btn');
-          removeBtn.addEventListener('click', () => {
-            preview.remove();
+          // Adicionar evento para remover a imagem do preview
+          const removeBtn = previewItem.querySelector('.preview-remove-btn');
+          removeBtn.addEventListener('click', function() {
+            const dataTransfer = new DataTransfer();
+            const files = fileInput.files;
             
-            // Se não houver mais previews, esconder o container
-            if (previewGrid.children.length === 0) {
+            Array.from(files).forEach((file, i) => {
+              if (i !== parseInt(this.dataset.index)) {
+                dataTransfer.items.add(file);
+              }
+            });
+            
+            fileInput.files = dataTransfer.files;
+            previewItem.remove();
+            
+            if (fileInput.files.length === 0) {
               previewContainer.classList.add('hidden');
             }
           });
         };
-        
         reader.readAsDataURL(file);
       });
-    };
+    }
     
-    // Eventos do dropzone
+    // Eventos para o dropzone
     if (dropzone && fileInput) {
-      // Evento de clique
+      // Evento de clique no dropzone
       dropzone.addEventListener('click', () => {
         fileInput.click();
       });
       
       // Evento de mudança no input de arquivo
       fileInput.addEventListener('change', (e) => {
-        handleFiles(e.target.files);
+        showImagePreviews(e.target.files);
       });
       
       // Eventos de drag and drop
-      ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(eventName => {
-        dropzone.addEventListener(eventName, (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-        }, false);
+      dropzone.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropzone.classList.add('border-primary-500', 'bg-primary-50');
       });
       
-      // Adicionar classe de highlight durante o drag
-      ['dragenter', 'dragover'].forEach(eventName => {
-        dropzone.addEventListener(eventName, () => {
-          dropzone.classList.add('border-primary-500', 'bg-primary-50');
-        }, false);
+      dropzone.addEventListener('dragleave', () => {
+        dropzone.classList.remove('border-primary-500', 'bg-primary-50');
       });
       
-      // Remover classe de highlight quando o drag terminar
-      ['dragleave', 'drop'].forEach(eventName => {
-        dropzone.addEventListener(eventName, () => {
-          dropzone.classList.remove('border-primary-500', 'bg-primary-50');
-        }, false);
-      });
-      
-      // Processar arquivos quando forem soltos
       dropzone.addEventListener('drop', (e) => {
-        const dt = e.dataTransfer;
-        const files = dt.files;
-        handleFiles(files);
+        e.preventDefault();
+        dropzone.classList.remove('border-primary-500', 'bg-primary-50');
         
-        // Atualizar o input de arquivo com os arquivos soltos
-        if (files.length > 0) {
-          fileInput.files = files;
+        if (e.dataTransfer.files.length > 0) {
+          fileInput.files = e.dataTransfer.files;
+          showImagePreviews(fileInput.files);
         }
-      }, false);
+      });
     }
     
-    // Eventos para remover imagens existentes
+    // Evento para remover imagens do carrossel
     removeButtons.forEach(button => {
       button.addEventListener('click', async (e) => {
         e.preventDefault();
@@ -495,43 +413,33 @@ const carouselImages = settings.heroCarouselUrls ? JSON.parse(settings.heroCarou
         
         if (!imageUrl) return;
         
-        // Confirmar a remoção
-        if (!confirm('Tem certeza que deseja remover esta imagem do carrossel?')) {
-          return;
-        }
-        
-        // Desabilitar o botão durante o processamento
-        target.disabled = true;
+        // Confirmar remoção
+        if (!confirm('Tem certeza que deseja remover esta imagem?')) return;
         
         try {
-          // Fazer requisição para remover a imagem
-          const response = await fetch('/api/remove-carousel-image', {
+          // Buscar configurações atuais
+          const response = await fetch('/api/settings/remove-carousel-image', {
             method: 'POST',
             headers: {
-              'Content-Type': 'application/json'
+              'Content-Type': 'application/json',
             },
-            body: JSON.stringify({ imageUrl })
+            body: JSON.stringify({ imageUrl }),
           });
           
           const result = await response.json();
           
           if (result.success) {
-            // Remover o elemento da UI
-            const imageContainer = target.closest('.relative');
-            if (imageContainer) {
-              imageContainer.remove();
-            }
+            // Remover a imagem da interface
+            target.closest('.relative')?.remove();
             
             // Mostrar mensagem de sucesso
             alert('Imagem removida com sucesso!');
           } else {
             alert(`Erro ao remover imagem: ${result.message}`);
-            target.disabled = false;
           }
         } catch (error) {
-          console.error('Erro ao processar remoção:', error);
-          alert('Ocorreu um erro ao tentar remover a imagem.');
-          target.disabled = false;
+          console.error('Erro ao remover imagem:', error);
+          alert('Ocorreu um erro ao tentar remover a imagem. Por favor, tente novamente.');
         }
       });
     });
