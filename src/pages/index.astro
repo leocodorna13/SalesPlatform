@@ -2,7 +2,6 @@
 import Layout from '../layouts/Layout.astro';
 import ProductGrid from '../components/ProductGrid.astro';
 import CategoryFilter from '../components/CategoryFilter.astro';
-import SearchBar from '../components/SearchBar.astro';
 import WhatsAppButton from '../components/WhatsAppButton.astro';
 import { supabase } from '../services/supabase';
 
@@ -130,18 +129,6 @@ if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
       </svg>
     </div>
   </section>
-
-  <!-- Barra de pesquisa flutuante -->
-  <div id="searchBarContainer" class="search-container-wrapper sticky top-0 z-50 bg-white/90 backdrop-blur-md shadow-md py-3 px-4 transition-all duration-300">
-    <div class="max-w-7xl mx-auto">
-      <SearchBar 
-        categories={categories} 
-        placeholder="Busque produtos por nome, categoria ou preço..." 
-        mobileFriendly={true}
-        enableSearch={false}
-      />
-    </div>
-  </div>
 
   <!-- Categorias com design de cards modernos -->
   <section id="categorias" class="py-20 bg-neutral-50 relative">
@@ -431,24 +418,5 @@ if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
     
     // Adicionar listener para scroll
     window.addEventListener('scroll', animateOnScroll);
-    
-    // Barra de pesquisa flutuante
-    const searchContainer = document.getElementById('searchBarContainer');
-    const heroSection = document.querySelector('section'); // Primeira seção (hero)
-    
-    if (searchContainer && heroSection) {
-      const handleScroll = () => {
-        const scrollPosition = window.scrollY;
-        const heroBottom = heroSection.getBoundingClientRect().bottom;
-        
-        if (scrollPosition > 300 || heroBottom <= 0) {
-          (searchContainer as HTMLElement).classList.add('sticky');
-        } else {
-          (searchContainer as HTMLElement).classList.remove('sticky');
-        }
-      };
-      
-      window.addEventListener('scroll', handleScroll);
-    }
   });
 </script>
