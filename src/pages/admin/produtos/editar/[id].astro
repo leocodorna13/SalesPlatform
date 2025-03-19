@@ -308,15 +308,15 @@ const formattedPrice = product.price.toString();
     const imagesToRemove: string[] = [];
     
     // Adicionar handlers para botões de remoção de imagem
-    document.querySelectorAll('.remove-image').forEach((button: HTMLElement) => {
-      button.addEventListener('click', function(this: HTMLElement) {
-        const imageUrl = this.getAttribute('data-image-url');
+    document.querySelectorAll('.remove-image').forEach((button) => {
+      button.addEventListener('click', function() {
+        const imageUrl = (this as HTMLElement).getAttribute('data-image-url');
         if (imageUrl) {
           // Adicionar URL à lista de imagens a remover
           imagesToRemove.push(imageUrl);
           
           // Remover visualmente o elemento pai (container da imagem)
-          const imageContainer = this.closest('.relative');
+          const imageContainer = (this as HTMLElement).closest('.relative');
           if (imageContainer) {
             imageContainer.remove();
           }

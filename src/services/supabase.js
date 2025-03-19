@@ -1667,83 +1667,20 @@ export async function uploadHeroCarouselImages(files, bucketName = 'site-images'
 /**
  * Atualiza as configurações do site
  * @param {object} settings - Novas configurações
- * @param {File|null} heroImageFile - Arquivo de imagem para o hero (opcional)
- * @param {File[]|null} heroCarouselFiles - Arquivos de imagem para o carrossel (opcional)
  * @returns {Promise<object>} - Resultado da operação
  */
-export async function updateSiteSettings(settings, heroImageFile = null, heroCarouselFiles = null) {
+export async function updateSiteSettings(settings) {
   try {
-    const supabase = createClient();
-    let updatedSettings = { ...settings };
-    
-    // Upload hero image if provided
-    if (heroImageFile) {
-      const heroImageUrl = await uploadImage(heroImageFile);
-      if (heroImageUrl) {
-        updatedSettings.heroImageUrl = heroImageUrl;
-      }
-    }
-    
-    // Upload carousel images if provided
-    if (heroCarouselFiles && heroCarouselFiles.length > 0) {
-      const newCarouselUrls = await uploadHeroCarouselImages(heroCarouselFiles);
-      
-      // Combine with existing carousel images
-      let existingUrls = [];
-      try {
-        existingUrls = JSON.parse(settings.heroCarouselUrls || '[]');
-      } catch (e) {
-        console.error('Erro ao analisar URLs do carrossel:', e);
-        existingUrls = [];
-      }
-      
-      // Merge existing and new URLs
-      const combinedUrls = [...existingUrls, ...newCarouselUrls];
-      
-      // Update the settings with the combined URLs
-      updatedSettings.heroCarouselUrls = JSON.stringify(combinedUrls);
-    }
-    
-    // Check if settings already exist
-    const { data: existingSettings } = await supabase
+    const { error } = await supabase
       .from('site_settings')
-      .select('*')
-      .limit(1)
-      .single();
-    
-    let result;
-    
-    if (existingSettings) {
-      // Update existing settings
-      const { data, error } = await supabase
-        .from('site_settings')
-        .update(updatedSettings)
-        .eq('id', existingSettings.id);
-      
-      if (error) {
-        console.error('Erro ao atualizar configurações:', error);
-        return { success: false, message: `Erro ao atualizar configurações: ${error.message}` };
-      }
-      
-      result = { success: true, message: 'Configurações atualizadas com sucesso!' };
-    } else {
-      // Insert new settings
-      const { data, error } = await supabase
-        .from('site_settings')
-        .insert([updatedSettings]);
-      
-      if (error) {
-        console.error('Erro ao inserir configurações:', error);
-        return { success: false, message: `Erro ao inserir configurações: ${error.message}` };
-      }
-      
-      result = { success: true, message: 'Configurações criadas com sucesso!' };
-    }
-    
-    return result;
+      .update(settings)
+      .eq('id', 1);  // Sempre usa ID 1 pois só temos uma configuração
+
+    if (error) throw error;
+    return { success: true, message: 'Configurações atualizadas com sucesso!' };
   } catch (error) {
     console.error('Erro ao atualizar configurações:', error);
-    return { success: false, message: `Erro ao processar configurações: ${error.message}` };
+    return { success: false, message: `Erro ao atualizar configurações: ${error.message}` };
   }
 }
 
@@ -1804,7 +1741,7 @@ export async function searchProducts(query, categoryId) {
  */
 export async function removeCarouselImage(imageUrl) {
   try {
-    const supabase = createClient();
+    // Usar o cliente supabase já inicializado em vez de criar um novo
     
     // Get current settings
     const { data: settings } = await supabase

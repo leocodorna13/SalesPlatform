@@ -1,6 +1,6 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import { getSiteSettings, updateSiteSettings, getCurrentUser } from '../../services/supabase';
+import { getSiteSettings, getCurrentUser, supabase } from '../../services/supabase';
 
 // Definir interface para as configurações do site
 interface SiteSettings {
@@ -8,12 +8,12 @@ interface SiteSettings {
   projectName: string;
   heroTitle: string;
   heroDescription: string;
-  heroCarouselUrls?: string; // JSON string de URLs
   contactPhone: string;
   contactWhatsapp: string;
   paymentMethods: string;
   whatsappMessage: string;
-  [key: string]: any; // Para permitir propriedades adicionais
+  heroImageUrl?: string;
+  [key: string]: any;
 }
 
 // Verificar se o usuário está autenticado
@@ -28,60 +28,85 @@ const settings: SiteSettings = settingsData || {
   projectName: 'Desapego dos Martins',
   heroTitle: 'Desapego dos Martins',
   heroDescription: 'Produtos de qualidade a preços acessíveis',
-  heroCarouselUrls: '[]',
   contactPhone: '',
   contactWhatsapp: '',
   paymentMethods: '',
-  whatsappMessage: 'Olá! Vi seu produto no site e tenho interesse.'
+  whatsappMessage: 'Olá! Vi seu produto no site e tenho interesse.',
+  heroImageUrl: ''
 };
 
-// Processar formulário
+// Processar formulário principal
 let result: { success: boolean; message: string } = { success: false, message: '' };
+let heroImageResult: { success: boolean; message: string } = { success: false, message: '' };
 
 if (Astro.request.method === 'POST') {
+  const formType = Astro.request.headers.get('X-Form-Type');
+  
   try {
     const formData = await Astro.request.formData();
     
-    // Extrair dados do formulário
-    const updatedSettings: SiteSettings = {
-      projectName: formData.get('projectName')?.toString() || '',
-      heroTitle: formData.get('heroTitle')?.toString() || '',
-      heroDescription: formData.get('heroDescription')?.toString() || '',
-      heroCarouselUrls: settings.heroCarouselUrls || '[]',
-      contactPhone: formData.get('contactPhone')?.toString() || '',
-      contactWhatsapp: formData.get('contactWhatsapp')?.toString() || '',
-      paymentMethods: formData.get('paymentMethods')?.toString() || '',
-      whatsappMessage: formData.get('whatsappMessage')?.toString() || ''
-    };
-    
-    // Verificar se há arquivos para o carrossel
-    const heroCarouselFiles = formData.getAll('heroCarouselFiles') as File[];
-    const validCarouselFiles = heroCarouselFiles.filter(file => file.size > 0);
-    
-    // Atualizar configurações
-    result = await updateSiteSettings(
-      updatedSettings, 
-      validCarouselFiles.length > 0 ? validCarouselFiles : undefined
-    );
-    
-    if (result.success) {
-      // Atualizar as configurações locais após o sucesso
-      const updatedSettingsData = await getSiteSettings();
-      if (updatedSettingsData) {
-        Object.assign(settings, updatedSettingsData);
+    if (formType === 'hero-image') {
+      // Upload da imagem do hero
+      const heroImage = formData.get('heroImage') as File;
+      if (heroImage?.size > 0) {
+        const { data, error } = await supabase.storage
+          .from('siteimages')
+          .upload(`hero/${Date.now()}-${heroImage.name}`, heroImage, {
+            cacheControl: '3600',
+            upsert: false
+          });
+
+        if (error) throw error;
+
+        // Obter URL pública
+        const { data: urlData } = supabase.storage
+          .from('siteimages')
+          .getPublicUrl(data.path);
+
+        // Atualizar URL na tabela site_settings
+        const { error: updateError } = await supabase
+          .from('site_settings')
+          .update({ heroImageUrl: urlData.publicUrl })
+          .eq('id', 1);
+
+        if (updateError) throw updateError;
+        heroImageResult = { success: true, message: 'Imagem do hero atualizada com sucesso!' };
       }
+    } else {
+      // Atualização das configurações gerais
+      const updatedSettings: SiteSettings = {
+        projectName: formData.get('projectName')?.toString() || '',
+        heroTitle: formData.get('heroTitle')?.toString() || '',
+        heroDescription: formData.get('heroDescription')?.toString() || '',
+        contactPhone: formData.get('contactPhone')?.toString() || '',
+        contactWhatsapp: formData.get('contactWhatsapp')?.toString() || '',
+        paymentMethods: formData.get('paymentMethods')?.toString() || '',
+        whatsappMessage: formData.get('whatsappMessage')?.toString() || ''
+      };
+      
+      const { error } = await supabase
+        .from('site_settings')
+        .update(updatedSettings)
+        .eq('id', 1);
+
+      if (error) throw error;
+      result = { success: true, message: 'Configurações atualizadas com sucesso!' };
     }
   } catch (error: any) {
     console.error('Erro ao processar formulário:', error);
-    result = {
-      success: false,
-      message: `Erro ao processar formulário: ${error.message}`
-    };
+    if (formType === 'hero-image') {
+      heroImageResult = {
+        success: false,
+        message: `Erro ao atualizar imagem do hero: ${error.message}`
+      };
+    } else {
+      result = {
+        success: false,
+        message: `Erro ao atualizar configurações: ${error.message}`
+      };
+    }
   }
 }
-
-// Converter heroCarouselUrls de string JSON para array
-const carouselImages = settings.heroCarouselUrls ? JSON.parse(settings.heroCarouselUrls as string) : [];
 
 ---
 
@@ -94,8 +119,59 @@ const carouselImages = settings.heroCarouselUrls ? JSON.parse(settings.heroCarou
         <p>{result.message}</p>
       </div>
     )}
+
+    {heroImageResult.message && (
+      <div class={`p-4 mb-6 rounded-md ${heroImageResult.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+        <p>{heroImageResult.message}</p>
+      </div>
+    )}
     
-    <form method="POST" class="space-y-8" enctype="multipart/form-data">
+    <!-- Formulário de Upload da Imagem do Hero -->
+    <div class="bg-white shadow rounded-lg p-6 mb-8">
+      <h2 class="text-lg font-medium text-gray-900 mb-4">Imagem do Hero</h2>
+      <form method="POST" enctype="multipart/form-data" id="heroImageForm">
+        <input type="hidden" name="_method" value="PATCH">
+        <input type="hidden" name="X-Form-Type" value="hero-image">
+        <div class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-gray-700 mb-2">
+              Imagem atual do hero
+            </label>
+            {settings.heroImageUrl && (
+              <img src={settings.heroImageUrl} alt="Hero atual" class="w-full max-h-48 object-cover rounded-lg mb-4">
+            )}
+          </div>
+          <div>
+            <label for="heroImage" class="block text-sm font-medium text-gray-700 mb-2">
+              Nova imagem
+            </label>
+            <input
+              type="file"
+              id="heroImage"
+              name="heroImage"
+              accept="image/*"
+              class="block w-full text-sm text-gray-500
+                file:mr-4 file:py-2 file:px-4
+                file:rounded-full file:border-0
+                file:text-sm file:font-semibold
+                file:bg-primary-50 file:text-primary-700
+                hover:file:bg-primary-100"
+            />
+          </div>
+          <div class="flex justify-end">
+            <button
+              type="submit"
+              class="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
+            >
+              Atualizar Imagem
+            </button>
+          </div>
+        </div>
+      </form>
+    </div>
+
+    <!-- Formulário Principal -->
+    <form method="POST" class="space-y-8">
       <!-- Seção: Informações Gerais -->
       <div class="bg-white shadow rounded-lg p-6">
         <h2 class="text-lg font-medium text-gray-900 mb-4">Informações Gerais</h2>
@@ -149,78 +225,6 @@ const carouselImages = settings.heroCarouselUrls ? JSON.parse(settings.heroCarou
               rows="3"
               class="block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500"
             >{settings.heroDescription}</textarea>
-          </div>
-          
-          <!-- Imagens do Carrossel -->
-          <div>
-            <label class="block text-sm font-medium text-gray-700 mb-1">
-              Imagens para o Carrossel
-            </label>
-            <div class="text-xs text-gray-500 mb-2">
-              Estas imagens serão exibidas em um carrossel na seção principal da página inicial.
-            </div>
-            
-            <!-- Área de upload com drag and drop -->
-            <div class="mt-3">
-              <div 
-                id="carouselDropzone" 
-                class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center hover:bg-gray-50 transition-colors cursor-pointer"
-              >
-                <div class="space-y-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" class="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                  </svg>
-                  <div class="text-sm text-gray-600">
-                    <label for="carousel-file-upload" class="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none">
-                      <span>Arraste imagens aqui</span>
-                      <span class="block mt-1">ou clique para selecionar</span>
-                      <input 
-                        id="carousel-file-upload" 
-                        name="heroCarouselFiles" 
-                        type="file" 
-                        multiple 
-                        accept="image/*"
-                        class="sr-only" 
-                      />
-                    </label>
-                  </div>
-                </div>
-              </div>
-            </div>
-            
-            <!-- Preview das imagens selecionadas para upload -->
-            <div id="carousel-preview" class="mt-4 hidden">
-              <h4 class="text-sm font-medium text-gray-700 mb-2">Imagens selecionadas:</h4>
-              <div id="carousel-preview-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3"></div>
-            </div>
-            
-            <!-- Preview das imagens atuais do carrossel -->
-            {carouselImages.length > 0 && (
-              <div class="mt-6">
-                <h4 class="text-sm font-medium text-gray-700 mb-2">Imagens atuais do carrossel:</h4>
-                <div id="carousel-current-images" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
-                  {carouselImages.map((imageUrl: string, index: number) => (
-                    <div class="relative group">
-                      <img 
-                        src={imageUrl} 
-                        alt={`Imagem do carrossel ${index + 1}`} 
-                        class="w-full h-24 object-cover rounded-lg shadow-sm"
-                      />
-                      <button 
-                        type="button"
-                        data-image-url={imageUrl}
-                        class="remove-carousel-image absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                        aria-label="Remover imagem"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
         </div>
       </div>
@@ -306,142 +310,27 @@ const carouselImages = settings.heroCarouselUrls ? JSON.parse(settings.heroCarou
 </AdminLayout>
 
 <script>
-  // Script para remover imagens do carrossel
-  document.addEventListener('DOMContentLoaded', () => {
-    // Configuração do dropzone para upload de imagens
-    const dropzone = document.getElementById('carouselDropzone');
-    const fileInput = document.getElementById('carousel-file-upload');
-    const previewContainer = document.getElementById('carousel-preview');
-    const previewGrid = document.getElementById('carousel-preview-container');
-    const removeButtons = document.querySelectorAll('.remove-carousel-image');
-    
-    // Função para mostrar preview das imagens selecionadas
-    function showImagePreviews(files) {
-      if (!files || files.length === 0) return;
-      
-      previewContainer.classList.remove('hidden');
-      previewGrid.innerHTML = '';
-      
-      Array.from(files).forEach((file, index) => {
-        const reader = new FileReader();
-        reader.onload = function(e) {
-          const previewItem = document.createElement('div');
-          previewItem.className = 'relative group';
-          previewItem.innerHTML = `
-            <img 
-              src="${e.target.result}" 
-              alt="Preview ${index + 1}" 
-              class="w-full h-24 object-cover rounded-lg shadow-sm"
-              data-file-index="${index}"
-            />
-            <button 
-              type="button"
-              class="preview-remove-btn absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md opacity-0 group-hover:opacity-100 transition-opacity"
-              aria-label="Remover imagem"
-              data-index="${index}"
-            >
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-              </svg>
-            </button>
-          `;
-          previewGrid.appendChild(previewItem);
-          
-          // Adicionar evento para remover a imagem do preview
-          const removeBtn = previewItem.querySelector('.preview-remove-btn');
-          removeBtn.addEventListener('click', function() {
-            const dataTransfer = new DataTransfer();
-            const files = fileInput.files;
-            
-            Array.from(files).forEach((file, i) => {
-              if (i !== parseInt(this.dataset.index)) {
-                dataTransfer.items.add(file);
-              }
-            });
-            
-            fileInput.files = dataTransfer.files;
-            previewItem.remove();
-            
-            if (fileInput.files.length === 0) {
-              previewContainer.classList.add('hidden');
-            }
-          });
-        };
-        reader.readAsDataURL(file);
-      });
-    }
-    
-    // Eventos para o dropzone
-    if (dropzone && fileInput) {
-      // Evento de clique no dropzone
-      dropzone.addEventListener('click', () => {
-        fileInput.click();
-      });
-      
-      // Evento de mudança no input de arquivo
-      fileInput.addEventListener('change', (e) => {
-        showImagePreviews(e.target.files);
-      });
-      
-      // Eventos de drag and drop
-      dropzone.addEventListener('dragover', (e) => {
-        e.preventDefault();
-        dropzone.classList.add('border-primary-500', 'bg-primary-50');
-      });
-      
-      dropzone.addEventListener('dragleave', () => {
-        dropzone.classList.remove('border-primary-500', 'bg-primary-50');
-      });
-      
-      dropzone.addEventListener('drop', (e) => {
-        e.preventDefault();
-        dropzone.classList.remove('border-primary-500', 'bg-primary-50');
-        
-        if (e.dataTransfer.files.length > 0) {
-          fileInput.files = e.dataTransfer.files;
-          showImagePreviews(fileInput.files);
+  // Script para enviar o header X-Form-Type no formulário de imagem
+  document.getElementById('heroImageForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const form = e.target as HTMLFormElement;
+    const formData = new FormData(form);
+
+    try {
+      const response = await fetch(form.action, {
+        method: 'POST',
+        body: formData,
+        headers: {
+          'X-Form-Type': 'hero-image'
         }
       });
+
+      if (!response.ok) throw new Error('Erro ao enviar formulário');
+      
+      // Recarregar a página para mostrar as atualizações
+      window.location.reload();
+    } catch (error) {
+      console.error('Erro:', error);
     }
-    
-    // Evento para remover imagens do carrossel
-    removeButtons.forEach(button => {
-      button.addEventListener('click', async (e) => {
-        e.preventDefault();
-        const target = e.currentTarget as HTMLButtonElement;
-        const imageUrl = target.dataset.imageUrl;
-        
-        if (!imageUrl) return;
-        
-        // Confirmar remoção
-        if (!confirm('Tem certeza que deseja remover esta imagem?')) return;
-        
-        try {
-          // Buscar configurações atuais
-          const response = await fetch('/api/settings/remove-carousel-image', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({ imageUrl }),
-          });
-          
-          const result = await response.json();
-          
-          if (result.success) {
-            // Remover a imagem da interface
-            target.closest('.relative')?.remove();
-            
-            // Mostrar mensagem de sucesso
-            alert('Imagem removida com sucesso!');
-          } else {
-            alert(`Erro ao remover imagem: ${result.message}`);
-          }
-        } catch (error) {
-          console.error('Erro ao remover imagem:', error);
-          alert('Ocorreu um erro ao tentar remover a imagem. Por favor, tente novamente.');
-        }
-      });
-    });
   });
 </script>
