@@ -140,6 +140,20 @@ const {
   }
   
   document.addEventListener('DOMContentLoaded', initImageUploader);
+  
+  // Adicionar função para obter os arquivos carregados
+  // @ts-ignore - Adicionando propriedade ao window
+  window.getUploadedFiles = function() {
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
+    const files: File[] = [];
+    
+    // Se houver arquivos no input, retorná-los
+    if (input && input.files && input.files.length > 0) {
+      return Array.from(input.files);
+    }
+    
+    return files;
+  };
 </script>
 
 <style>

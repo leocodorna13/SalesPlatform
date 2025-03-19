@@ -295,9 +295,10 @@
       
       // Pegar apenas os produtos que têm imagens
       const validProducts = Array.from(document.querySelectorAll('.bg-white')).filter(item => 
-        item.querySelector('.product-images img')
+        item.querySelector('.product-images img:not([style*="display: none"])')
       );
       
+      console.log(`Produtos válidos encontrados: ${validProducts.length}`);
       formData.append('product_count', validProducts.length.toString());
       let hasErrors = false;
       
@@ -309,7 +310,9 @@
         const priceInput = item.querySelector('.bulk-price');
         const categoryInput = item.querySelector('.bulk-category');
         const descriptionInput = item.querySelector('.bulk-description');
-        const images = item.querySelectorAll('.product-images img');
+        const images = item.querySelectorAll('.product-images img:not([style*="display: none"])');
+        
+        console.log(`Produto ${productIndex}: ${titleInput?.value}, imagens: ${images.length}`);
         
         if (!titleInput || !priceInput || !categoryInput) {
           console.error(`Campos não encontrados para o produto ${productIndex}`);
@@ -343,8 +346,9 @@
         formData.append(`category_id_${productIndex}`, categoryId || '');
         formData.append(`description_${productIndex}`, descriptionInput?.value || '');
         
-        // Adicionar cada imagem
-        images.forEach((img, imgIndex) => {
+        // Adicionar cada imagem - apenas imagens visíveis
+        const visibleImages = Array.from(images);
+        visibleImages.forEach((img, imgIndex) => {
           const imagePromise = fetch(img.src)
             .then(res => res.blob())
             .then(blob => {
@@ -355,7 +359,7 @@
         });
         
         // Registrar o número de imagens para este produto
-        formData.append(`image_count_${productIndex}`, images.length.toString());
+        formData.append(`image_count_${productIndex}`, visibleImages.length.toString());
       });
       
       if (hasErrors) {
