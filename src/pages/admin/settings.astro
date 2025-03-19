@@ -1,10 +1,9 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import { getSiteSettings, getCurrentUser, supabase } from '../../services/supabase';
+import { getSiteSettings, updateSiteSettings, getCurrentUser, getHeroImages, addHeroImage, deleteHeroImage, updateHeroImageOrder, supabase } from '../../services/supabase';
 
-// Definir interface para as configurações do site
+// Interface para as configurações
 interface SiteSettings {
-  id?: string | number | null;
   projectName: string;
   heroTitle: string;
   heroDescription: string;
@@ -12,164 +11,168 @@ interface SiteSettings {
   contactWhatsapp: string;
   paymentMethods: string;
   whatsappMessage: string;
-  heroImageUrl?: string;
   [key: string]: any;
 }
 
-// Verificar se o usuário está autenticado
+// Verificar autenticação
 const user = await getCurrentUser();
 if (!user) {
   return Astro.redirect('/admin/login');
 }
 
-// Buscar configurações atuais
-const settingsData = await getSiteSettings();
-const settings: SiteSettings = settingsData || {
-  projectName: 'Desapego dos Martins',
-  heroTitle: 'Desapego dos Martins',
-  heroDescription: 'Produtos de qualidade a preços acessíveis',
-  contactPhone: '',
-  contactWhatsapp: '',
-  paymentMethods: '',
-  whatsappMessage: 'Olá! Vi seu produto no site e tenho interesse.',
-  heroImageUrl: ''
-};
+// Buscar configurações e imagens
+const settings = await getSiteSettings();
+const heroImages = await getHeroImages();
 
-// Processar formulário principal
-let result: { success: boolean; message: string } = { success: false, message: '' };
-let heroImageResult: { success: boolean; message: string } = { success: false, message: '' };
+// Processar formulários
+let message = '';
+let messageType = '';
 
 if (Astro.request.method === 'POST') {
-  const formType = Astro.request.headers.get('X-Form-Type');
-  
-  try {
-    const formData = await Astro.request.formData();
+  const formData = await Astro.request.formData();
+  const formType = formData.get('X-Form-Type');
+
+  if (formType === 'hero-image') {
+    const file = formData.get('heroImage');
+    if (file instanceof File) {
+      const result = await addHeroImage(file);
+      message = result.message;
+      messageType = result.success ? 'success' : 'error';
+    }
+  } else if (formType === 'delete-hero-image') {
+    const imageId = formData.get('imageId')?.toString();
+    if (imageId) {
+      const result = await deleteHeroImage(imageId);
+      message = result.message;
+      messageType = result.success ? 'success' : 'error';
+    }
+  } else if (formType === 'update-hero-order') {
+    const orderData = formData.get('order')?.toString();
+    if (orderData) {
+      const images = JSON.parse(orderData);
+      const result = await updateHeroImageOrder(images);
+      message = result.message;
+      messageType = result.success ? 'success' : 'error';
+    }
+  } else {
+    const updatedSettings: SiteSettings = {
+      projectName: formData.get('projectName')?.toString() || '',
+      heroTitle: formData.get('heroTitle')?.toString() || '',
+      heroDescription: formData.get('heroDescription')?.toString() || '',
+      contactPhone: formData.get('contactPhone')?.toString() || '',
+      contactWhatsapp: formData.get('contactWhatsapp')?.toString() || '',
+      paymentMethods: formData.get('paymentMethods')?.toString() || '',
+      whatsappMessage: formData.get('whatsappMessage')?.toString() || ''
+    };
     
-    if (formType === 'hero-image') {
-      // Upload da imagem do hero
-      const heroImage = formData.get('heroImage') as File;
-      if (heroImage?.size > 0) {
-        const { data, error } = await supabase.storage
-          .from('siteimages')
-          .upload(`hero/${Date.now()}-${heroImage.name}`, heroImage, {
-            cacheControl: '3600',
-            upsert: false
-          });
+    const { error } = await supabase
+      .from('site_settings')
+      .update(updatedSettings)
+      .eq('id', 1);
 
-        if (error) throw error;
-
-        // Obter URL pública
-        const { data: urlData } = supabase.storage
-          .from('siteimages')
-          .getPublicUrl(data.path);
-
-        // Atualizar URL na tabela site_settings
-        const { error: updateError } = await supabase
-          .from('site_settings')
-          .update({ heroImageUrl: urlData.publicUrl })
-          .eq('id', 1);
-
-        if (updateError) throw updateError;
-        heroImageResult = { success: true, message: 'Imagem do hero atualizada com sucesso!' };
-      }
-    } else {
-      // Atualização das configurações gerais
-      const updatedSettings: SiteSettings = {
-        projectName: formData.get('projectName')?.toString() || '',
-        heroTitle: formData.get('heroTitle')?.toString() || '',
-        heroDescription: formData.get('heroDescription')?.toString() || '',
-        contactPhone: formData.get('contactPhone')?.toString() || '',
-        contactWhatsapp: formData.get('contactWhatsapp')?.toString() || '',
-        paymentMethods: formData.get('paymentMethods')?.toString() || '',
-        whatsappMessage: formData.get('whatsappMessage')?.toString() || ''
-      };
-      
-      const { error } = await supabase
-        .from('site_settings')
-        .update(updatedSettings)
-        .eq('id', 1);
-
-      if (error) throw error;
-      result = { success: true, message: 'Configurações atualizadas com sucesso!' };
-    }
-  } catch (error: any) {
-    console.error('Erro ao processar formulário:', error);
-    if (formType === 'hero-image') {
-      heroImageResult = {
-        success: false,
-        message: `Erro ao atualizar imagem do hero: ${error.message}`
-      };
-    } else {
-      result = {
-        success: false,
-        message: `Erro ao atualizar configurações: ${error.message}`
-      };
-    }
+    if (error) throw error;
+    message = 'Configurações atualizadas com sucesso!';
+    messageType = 'success';
   }
 }
-
 ---
 
 <AdminLayout title="Configurações do Site">
   <div class="max-w-4xl mx-auto px-4 py-8">
     <h1 class="text-2xl font-bold text-gray-900 mb-6">Configurações do Site</h1>
     
-    {result.message && (
-      <div class={`p-4 mb-6 rounded-md ${result.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
-        <p>{result.message}</p>
-      </div>
-    )}
-
-    {heroImageResult.message && (
-      <div class={`p-4 mb-6 rounded-md ${heroImageResult.success ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
-        <p>{heroImageResult.message}</p>
+    {message && (
+      <div class={`mb-4 p-4 rounded-md ${messageType === 'success' ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+        {message}
       </div>
     )}
     
-    <!-- Formulário de Upload da Imagem do Hero -->
+    <!-- Seção de imagem do Hero -->
     <div class="bg-white shadow rounded-lg p-6 mb-8">
-      <h2 class="text-lg font-medium text-gray-900 mb-4">Imagem do Hero</h2>
+      <h2 class="text-lg font-medium text-gray-900 mb-4">Imagens do Hero</h2>
+      
+      <!-- Imagens atuais -->
+      {heroImages.length > 0 && (
+        <div class="mb-6">
+          <h3 class="text-md font-medium text-gray-700 mb-3">Imagens Atuais</h3>
+          <div class="space-y-4">
+            {heroImages.map((image) => (
+              <div class="flex items-center space-x-4 p-3 border rounded-lg" data-image-id={image.id}>
+                <div class="flex-shrink-0">
+                  <img 
+                    src={image.url} 
+                    alt="Hero image" 
+                    class="w-24 h-16 object-cover rounded-md"
+                  />
+                </div>
+                <div class="flex-grow">
+                  <p class="text-sm text-gray-500 truncate">{image.filename || 'Imagem do Hero'}</p>
+                </div>
+                <div class="flex-shrink-0 flex space-x-2">
+                  <button 
+                    type="button" 
+                    class="move-up-btn p-1 text-gray-500 hover:text-gray-700"
+                    title="Mover para cima"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                  <button 
+                    type="button" 
+                    class="move-down-btn p-1 text-gray-500 hover:text-gray-700"
+                    title="Mover para baixo"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd" />
+                    </svg>
+                  </button>
+                  <form method="POST" class="inline">
+                    <input type="hidden" name="X-Form-Type" value="delete-hero-image" />
+                    <input type="hidden" name="imageId" value={image.id} />
+                    <button
+                      type="submit"
+                      class="p-1 text-red-500 hover:text-red-700"
+                      title="Remover imagem"
+                    >
+                      <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                      </svg>
+                    </button>
+                  </form>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+      
+      <!-- Formulário de upload -->
       <form method="POST" enctype="multipart/form-data" id="heroImageForm">
-        <input type="hidden" name="_method" value="PATCH">
-        <input type="hidden" name="X-Form-Type" value="hero-image">
+        <input type="hidden" name="X-Form-Type" value="hero-image" />
         <div class="space-y-4">
           <div>
             <label class="block text-sm font-medium text-gray-700 mb-2">
-              Imagem atual do hero
+              Adicionar nova imagem
             </label>
-            {settings.heroImageUrl && (
-              <img src={settings.heroImageUrl} alt="Hero atual" class="w-full max-h-48 object-cover rounded-lg mb-4">
-            )}
-          </div>
-          <div>
-            <label for="heroImage" class="block text-sm font-medium text-gray-700 mb-2">
-              Nova imagem
-            </label>
-            <input
-              type="file"
-              id="heroImage"
-              name="heroImage"
+            <input 
+              type="file" 
+              name="heroImage" 
               accept="image/*"
-              class="block w-full text-sm text-gray-500
-                file:mr-4 file:py-2 file:px-4
-                file:rounded-full file:border-0
-                file:text-sm file:font-semibold
-                file:bg-primary-50 file:text-primary-700
-                hover:file:bg-primary-100"
+              class="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+              required
             />
           </div>
-          <div class="flex justify-end">
-            <button
-              type="submit"
-              class="bg-primary-600 text-white px-4 py-2 rounded-md hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-primary-500"
-            >
-              Atualizar Imagem
-            </button>
-          </div>
+          <button
+            type="submit"
+            class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+          >
+            Adicionar Imagem
+          </button>
         </div>
       </form>
     </div>
-
+    
     <!-- Formulário Principal -->
     <form method="POST" class="space-y-8">
       <!-- Seção: Informações Gerais -->
@@ -310,83 +313,50 @@ if (Astro.request.method === 'POST') {
 </AdminLayout>
 
 <script>
-  // Script para enviar o header X-Form-Type no formulário de imagem
-  document.getElementById('heroImageForm')?.addEventListener('submit', async (e) => {
-    e.preventDefault();
-    const form = e.target as HTMLFormElement;
-    const formData = new FormData(form);
-
-    try {
-      const response = await fetch(form.action, {
-        method: 'POST',
-        body: formData,
-        headers: {
-          'X-Form-Type': 'hero-image'
-        }
+  // Ordenação de imagens
+  const imageList = document.querySelector('.space-y-4');
+  const moveUpBtns = document.querySelectorAll('.move-up-btn');
+  const moveDownBtns = document.querySelectorAll('.move-down-btn');
+  
+  function updateOrder() {
+    const images = [];
+    document.querySelectorAll('[data-image-id]').forEach((el, index) => {
+      images.push({
+        id: el.dataset.imageId,
+        order: index
       });
-
-      if (!response.ok) throw new Error('Erro ao enviar formulário');
-      
-      // Recarregar a página para mostrar as atualizações
-      window.location.reload();
-    } catch (error) {
-      console.error('Erro:', error);
-    }
-  });
-</script>
-
-<script>
-  import { supabase } from '../../services/supabase';
-
-  // Upload de imagens
-  const fileInput = document.getElementById('heroImages') as HTMLInputElement;
-  const uploadButton = document.getElementById('uploadButton');
-
-  // Botões de exclusão
-  document.querySelectorAll('[data-filename]').forEach(button => {
-    button.addEventListener('click', async () => {
-      const filename = button.getAttribute('data-filename');
-      if (!filename) return;
-
-      try {
-        const { error } = await supabase.storage
-          .from('siteimages')
-          .remove([`hero/${filename}`]);
-
-        if (error) throw error;
-        
-        // Remover o elemento da imagem
-        button.closest('.relative')?.remove();
-      } catch (error) {
-        console.error('Erro ao excluir:', error);
+    });
+    
+    // Enviar nova ordem para o servidor
+    const formData = new FormData();
+    formData.append('X-Form-Type', 'update-hero-order');
+    formData.append('order', JSON.stringify(images));
+    
+    fetch(window.location.href, {
+      method: 'POST',
+      body: formData
+    });
+  }
+  
+  moveUpBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = btn.closest('[data-image-id]');
+      const prev = item?.previousElementSibling;
+      if (item && prev) {
+        item.parentNode?.insertBefore(item, prev);
+        updateOrder();
       }
     });
   });
-
-  // Upload de novas imagens
-  uploadButton?.addEventListener('click', async () => {
-    const files = fileInput.files;
-    if (!files?.length) return;
-
-    try {
-      for (const file of files) {
-        const filename = `hero/${Date.now()}-${file.name}`;
-        console.log('Fazendo upload:', filename);
-        
-        const { error } = await supabase.storage
-          .from('siteimages')
-          .upload(filename, file);
-
-        if (error) {
-          console.error('Erro no upload:', error);
-          throw error;
-        }
+  
+  moveDownBtns.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const item = btn.closest('[data-image-id]');
+      const next = item?.nextElementSibling;
+      if (item && next) {
+        item.parentNode?.insertBefore(next, item);
+        updateOrder();
       }
-      
-      // Recarregar a página
-      window.location.reload();
-    } catch (error) {
-      console.error('Erro:', error);
-    }
+    });
   });
 </script>

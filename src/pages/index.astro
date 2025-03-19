@@ -3,34 +3,20 @@ import Layout from '../layouts/Layout.astro';
 import ProductGrid from '../components/ProductGrid.astro';
 import CategoryFilter from '../components/CategoryFilter.astro';
 import WhatsAppButton from '../components/WhatsAppButton.astro';
-import { supabase } from '../services/supabase';
+import { getProducts, getCategories, getSiteSettings, getHeroImages } from '../services/supabase';
 
-// Buscar produtos com suas categorias
-const { data: productsData } = await supabase
-  .from('products')
-  .select(`
-    *,
-    category:categories (
-      id,
-      name,
-      slug
-    ),
-    product_images (
-      id,
-      image_url,
-      is_primary
-    )
-  `)
-  .order('created_at', { ascending: false });
+// Buscar produtos e categorias
+const products = await getProducts('available');
+const categories = await getCategories();
+const siteSettings = await getSiteSettings();
+const heroImages = await getHeroImages();
 
-// Buscar todas as categorias
-const { data: categories } = await supabase
-  .from('categories')
-  .select('*')
-  .order('name');
+// Configurações
+const whatsappMessage = encodeURIComponent(siteSettings.whatsappMessage || 'Olá, gostaria de mais informações sobre os produtos.');
+const whatsappNumber = siteSettings.contactWhatsapp?.replace(/\D/g, '') || '';
 
 // Produtos em destaque (os 4 mais recentes)
-const featuredProducts = (productsData || []).slice(0, 4).map(product => {
+const featuredProducts = (products || []).slice(0, 4).map(product => {
   if (product.product_images && product.product_images.length > 0) {
     const primaryImage = product.product_images.find((img: { is_primary: boolean, image_url: string }) => img.is_primary);
     product.image_url = primaryImage ? primaryImage.image_url : product.product_images[0].image_url;
@@ -38,69 +24,15 @@ const featuredProducts = (productsData || []).slice(0, 4).map(product => {
   return product;
 });
 
-// Definir tipos para as configurações do site
-interface SiteSettings {
-  heroTitle: string;
-  heroDescription: string;
-  heroCarouselUrls?: string;
-  contactWhatsapp: string;
-  projectName: string;
-  [key: string]: any;
-}
-
-// Buscar configurações do site
-const siteSettingsData = await supabase
-  .from('site_settings')
-  .select('*')
-  .single();
-
-const defaultSettings: SiteSettings = {
-  heroTitle: "Desapego dos Martins",
-  heroDescription: "Encontre produtos de qualidade a preços acessíveis. Todos os itens estão em ótimo estado e prontos para um novo lar.",
-  heroCarouselUrls: "[]",
-  contactWhatsapp: "",
-  projectName: "Desapego dos Martins"
-};
-
-const siteSettings: SiteSettings = siteSettingsData?.data ? { ...defaultSettings, ...siteSettingsData.data } : defaultSettings;
-
-// Buscar imagens do hero
-const { data } = await supabase.storage.from('siteimages').list('hero');
-const heroImagesData = data || [];
-
-// Processar imagens do hero
-const heroImages = heroImagesData.length > 0 ? heroImagesData : [{ name: 'default-hero-bg.jpg' }];
-
-// Se não houver imagens no carrossel, usar uma imagem padrão
-if (!siteSettings.heroCarouselUrls) {
-  siteSettings.heroCarouselUrls = '["/images/default-hero-bg.jpg"]';
-}
-
-// Processar imagens do carrossel
-const carouselImages = siteSettings.heroCarouselUrls 
-  ? JSON.parse(siteSettings.heroCarouselUrls) 
-  : [];
-
-// Se não houver imagens no carrossel, usar a imagem principal
-if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
-  carouselImages.push(siteSettings.heroImageUrl);
-}
-
-// Se ainda não houver imagens, usar uma imagem padrão
-if (carouselImages.length === 0) {
-  carouselImages.push('/images/default-hero-bg.jpg');
-}
-
 // Fallback para quando não há imagens
-// if (carouselImages.length === 0) {
-//   // Usar um gradiente como fallback
-//   carouselImages.push('/images/default-hero-bg.jpg');
-// }
-
-// Se não houver imagens no carrossel, usar a imagem principal
-// if (carouselImages.length === 0 && siteSettings.heroImageUrl) {
-//   carouselImages.push(siteSettings.heroImageUrl);
-// }
+if (heroImages.length === 0) {
+  heroImages.push({ 
+    url: '/images/default-hero-bg.jpg',
+    filename: 'default-hero-bg.jpg',
+    id: 'default',
+    order: 0
+  });
+}
 ---
 
 <Layout title={siteSettings.projectName || "Desapego dos Martins"}>
@@ -111,16 +43,30 @@ if (carouselImages.length === 0) {
     
     <!-- Imagens do hero -->
     <div class="absolute inset-0 overflow-hidden">
-      {heroImages && heroImages.length > 0 ? (
-        <div class="w-full h-full">
+      {heroImages.length > 0 ? (
+        <div class="w-full h-full" id="hero-carousel">
           {heroImages.map((image, index) => (
             <img 
-              src={supabase.storage.from('siteimages').getPublicUrl(`hero/${image.name}`).data.publicUrl}
+              src={image.url}
               alt={`Hero image ${index + 1}`}
               class={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${index === 0 ? 'opacity-100' : 'opacity-0'}`}
+              data-slide={index}
               loading={index === 0 ? "eager" : "lazy"}
             />
           ))}
+          
+          {heroImages.length > 1 && (
+            <div class="absolute bottom-4 left-0 right-0 z-30 flex justify-center space-x-2">
+              {heroImages.map((_, index) => (
+                <button
+                  type="button"
+                  class="w-3 h-3 rounded-full bg-white/50 hover:bg-white/80 transition-colors"
+                  data-carousel-indicator={index}
+                  aria-label={`Slide ${index + 1}`}
+                ></button>
+              ))}
+            </div>
+          )}
         </div>
       ) : (
         <div class="w-full h-full bg-gradient-to-r from-primary-700 to-primary-900"></div>
@@ -298,6 +244,33 @@ if (carouselImages.length === 0) {
   />
 </Layout>
 
+<script>
+  // Carrossel simples
+  const slides = document.querySelectorAll('[data-slide]');
+  const buttons = document.querySelectorAll('[data-carousel-indicator]');
+  let currentSlide = 0;
+  
+  function showSlide(index: number) {
+    slides.forEach((slide: Element, i) => {
+      slide.classList.toggle('opacity-0', i !== index);
+      slide.classList.toggle('opacity-100', i === index);
+    });
+    
+    buttons.forEach((button, i) => {
+      button.classList.toggle('bg-white/50', i !== index);
+      button.classList.toggle('bg-white', i === index);
+    });
+    
+    currentSlide = index;
+  }
+  
+  // Autoplay e controles
+  if (slides.length > 1) {
+    setInterval(() => showSlide((currentSlide + 1) % slides.length), 5000);
+    buttons.forEach((button, index) => button.addEventListener('click', () => showSlide(index)));
+  }
+</script>
+
 <style>
   /* Animações para o carrossel */
   .carousel-slide {
@@ -380,71 +353,3 @@ if (carouselImages.length === 0) {
     }
   }
 </style>
-
-<script>
-  document.addEventListener('DOMContentLoaded', () => {
-    // Configuração do carrossel
-    const slides = document.querySelectorAll('.carousel-slide');
-    if (slides.length > 1) {
-      let currentSlide = 0;
-      
-      // Função para trocar os slides
-      const nextSlide = () => {
-        (slides[currentSlide] as HTMLElement).classList.remove('opacity-100');
-        (slides[currentSlide] as HTMLElement).classList.add('opacity-0');
-        
-        currentSlide = (currentSlide + 1) % slides.length;
-        
-        (slides[currentSlide] as HTMLElement).classList.remove('opacity-0');
-        (slides[currentSlide] as HTMLElement).classList.add('opacity-100');
-      };
-      
-      // Iniciar o carrossel
-      setInterval(nextSlide, 5000);
-    }
-    
-    // Animação para os cards de categoria
-    const categoryCards = document.querySelectorAll('.category-card');
-    categoryCards.forEach(card => {
-      card.addEventListener('mouseenter', () => {
-        card.classList.add('hover');
-      });
-      card.addEventListener('mouseleave', () => {
-        card.classList.remove('hover');
-      });
-    });
-    
-    // Efeito parallax para o hero
-    const heroImage = document.querySelector('.hero-parallax');
-    if (heroImage) {
-      window.addEventListener('scroll', () => {
-        const scrolled = window.scrollY;
-        if (scrolled < 600) { // Limitar o efeito para melhor performance
-          (heroImage as HTMLElement).style.transform = `scale(1.1) translateY(${scrolled * 0.2}px)`;
-        }
-      });
-    }
-    
-    // Animação de fade-in para elementos
-    const animateOnScroll = () => {
-      const elements = document.querySelectorAll('.animate-fade-in');
-      elements.forEach(element => {
-        const elementTop = element.getBoundingClientRect().top;
-        const elementBottom = element.getBoundingClientRect().bottom;
-        const isVisible = (elementTop < window.innerHeight - 100) && (elementBottom > 0);
-        
-        if (isVisible) {
-          const delay = (element as HTMLElement).style.getPropertyValue('--animation-delay') || '0s';
-          (element as HTMLElement).style.transitionDelay = delay;
-          element.classList.add('visible');
-        }
-      });
-    };
-    
-    // Iniciar animação
-    animateOnScroll();
-    
-    // Adicionar listener para scroll
-    window.addEventListener('scroll', animateOnScroll);
-  });
-</script>

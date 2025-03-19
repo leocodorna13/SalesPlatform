@@ -1667,7 +1667,7 @@ export async function uploadHeroCarouselImages(files, bucketName = 'site-images'
       const fileExt = file.name.split('.').pop();
       const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
       const filePath = `${folder}/${fileName}`;
-      
+
       // Fazer upload do arquivo
       const uploadPromise = supabase.storage
         .from(bucketName)
@@ -1845,5 +1845,122 @@ export async function removeCarouselImage(imageUrl) {
   } catch (error) {
     console.error('Erro ao remover imagem do carrossel:', error);
     return { success: false, message: `Erro ao processar a remoção: ${error.message}` };
+  }
+}
+
+// Funções para gerenciar imagens do hero
+export async function getHeroImages() {
+  const { data, error } = await supabase
+    .from('hero_images')
+    .select('*')
+    .order('order');
+    
+  if (error) {
+    console.error('Erro ao buscar imagens do hero:', error);
+    return [];
+  }
+  
+  // Retorna as imagens encontradas ou array vazio
+  return data || [];
+}
+
+export async function addHeroImage(file) {
+  try {
+    const timestamp = Date.now();
+    const fileName = `${timestamp}-${file.name}`;
+    const filePath = `hero/${fileName}`;
+
+    // Upload da imagem
+    const { error: uploadError } = await supabase.storage
+      .from('siteimages')
+      .upload(filePath, file);
+
+    if (uploadError) throw uploadError;
+
+    // Gerar URL pública
+    const { data: { publicUrl } } = supabase.storage
+      .from('siteimages')
+      .getPublicUrl(filePath);
+
+    // Buscar a ordem mais alta atual
+    const { data: currentImages } = await supabase
+      .from('hero_images')
+      .select('order')
+      .order('order', { ascending: false })
+      .limit(1);
+    
+    const nextOrder = currentImages && currentImages.length > 0 ? currentImages[0].order + 1 : 0;
+
+    // Inserir nova imagem na tabela hero_images
+    const { error: dbError } = await supabase
+      .from('hero_images')
+      .insert({
+        url: publicUrl,
+        filename: fileName,
+        order: nextOrder
+      });
+
+    if (dbError) throw dbError;
+
+    return { success: true, message: 'Imagem adicionada com sucesso' };
+  } catch (error) {
+    console.error('Erro ao adicionar imagem:', error);
+    return { success: false, message: 'Erro ao adicionar imagem' };
+  }
+}
+
+export async function deleteHeroImage(imageId) {
+  try {
+    // Buscar dados da imagem
+    const { data } = await supabase
+      .from('hero_images')
+      .select('url, filename')
+      .eq('id', imageId)
+      .single();
+
+    if (data?.filename) {
+      // Deletar arquivo do storage
+      const { error: storageError } = await supabase.storage
+        .from('siteimages')
+        .remove([`hero/${data.filename}`]);
+
+      if (storageError) {
+        console.error('Erro ao deletar arquivo:', storageError);
+      }
+    }
+
+    // Remover registro do banco
+    const { error: dbError } = await supabase
+      .from('hero_images')
+      .delete()
+      .eq('id', imageId);
+
+    if (dbError) throw dbError;
+
+    return { success: true, message: 'Imagem removida com sucesso' };
+  } catch (error) {
+    console.error('Erro ao remover imagem:', error);
+    return { success: false, message: 'Erro ao remover imagem' };
+  }
+}
+
+export async function updateHeroImageOrder(images) {
+  try {
+    const { error } = await supabase
+      .from('hero_images')
+      .upsert(
+        images.map(img => ({
+          id: img.id,
+          order: img.order
+        })),
+        { onConflict: 'id' }
+      );
+
+    if (error) throw error;
+
+    return { success: true, message: 'Ordem das imagens atualizada com sucesso' };
+  } catch (error) {
+    console.error('Erro ao atualizar ordem das imagens:', error);
+    return { success: false, message: 'Erro ao atualizar ordem das imagens' };
   }
 }
