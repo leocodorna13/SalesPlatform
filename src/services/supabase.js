@@ -1235,15 +1235,14 @@ export async function findOrCreateCategory(categoryName) {
       .replace(/[^\w\s-]/g, '')
       .replace(/\s+/g, '-');
     
-    // Verificar se a categoria já existe
-    const { data: existingCategory, error: searchError } = await supabase
+    // Verificar se a categoria já existe pelo nome ou pelo slug
+    const { data: existingCategories, error: searchError } = await supabase
       .from('categories')
       .select('*')
-      .ilike('name', name)
-      .single();
+      .or(`name.ilike.${name},slug.eq.${slug}`);
     
-    if (!searchError && existingCategory) {
-      return existingCategory;
+    if (!searchError && existingCategories && existingCategories.length > 0) {
+      return existingCategories[0];
     }
     
     // Criar nova categoria

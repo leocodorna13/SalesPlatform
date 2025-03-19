@@ -43,7 +43,7 @@ if (Astro.request.method === 'POST') {
         const imageCount = parseInt(formData.get(`image_count_${i}`)?.toString() || '0');
         
         // Coletar todas as imagens para este produto
-        const productImages = [];
+        const productImages: File[] = [];
         for (let j = 0; j < imageCount; j++) {
           const productImage = formData.get(`image_${i}_${j}`);
           if (productImage && productImage instanceof File) {

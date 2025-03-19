@@ -168,27 +168,21 @@
     
     // Adicionar uma nova imagem a um produto
     function addImageToProduct(productElement, imageDataURL) {
-      const imagesContainer = productElement.querySelector('.product-images');
-      if (!imagesContainer) return;
+      const container = productElement.querySelector('.product-images');
+      if (!container) return;
       
-      const imageElement = document.createElement('div');
-      imageElement.className = 'relative group inline-block mr-2 mb-2';
-      imageElement.innerHTML = `
-        <img src="${imageDataURL}" class="w-20 h-20 object-cover rounded-lg" />
-        <button type="button" class="remove-image absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity">
-          <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+      const imageContainer = document.createElement('div');
+      imageContainer.className = 'relative group';
+      imageContainer.innerHTML = `
+        <img src="${imageDataURL}" alt="Imagem do produto" class="w-full h-32 object-contain rounded-lg" />
+        <button type="button" class="absolute top-1 right-1 bg-white rounded-full p-1 delete-image">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
           </svg>
         </button>
       `;
       
-      // Adicionar botão de remover
-      const removeButton = imageElement.querySelector('.remove-image');
-      removeButton.addEventListener('click', () => {
-        imageElement.remove();
-      });
-      
-      imagesContainer.appendChild(imageElement);
+      container.appendChild(imageContainer);
     }
     
     // Evento para seleção de arquivos
@@ -257,8 +251,7 @@
       // Handler para adicionar imagem
       if (e.target.closest('.add-image')) {
         const button = e.target.closest('.add-image');
-        const productIndex = button.dataset.productIndex;
-        const container = document.querySelector(`.product-images[data-product-index="${productIndex}"]`);
+        const container = button.previousElementSibling; // Pega o container de imagens que está antes do botão
         
         const input = document.createElement('input');
         input.type = 'file';
@@ -268,9 +261,18 @@
         input.onchange = (e) => {
           Array.from(e.target.files).forEach(file => {
             const reader = new FileReader();
-            
             reader.onload = (e) => {
-              addImageToProduct(button.closest('.bg-white'), e.target.result);
+              const div = document.createElement('div');
+              div.className = 'relative group';
+              div.innerHTML = `
+                <img src="${e.target.result}" alt="Imagem do produto" class="w-full h-32 object-contain rounded-lg" />
+                <button type="button" class="absolute top-1 right-1 bg-white rounded-full p-1 delete-image">
+                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+              `;
+              container.appendChild(div);
             };
             reader.readAsDataURL(file);
           });
@@ -288,28 +290,35 @@
     
     // Submeter todos os produtos
     bulkSubmit.addEventListener('click', async () => {
-      const formData = new FormData(productForm);
+      const formData = new FormData();
       formData.append('bulk_upload', 'true');
       
-      // Coletar dados de todos os produtos
-      const products = [];
+      // Pegar apenas os produtos que têm imagens
+      const validProducts = Array.from(document.querySelectorAll('.bg-white')).filter(item => 
+        item.querySelector('.product-images img')
+      );
+      
+      formData.append('product_count', validProducts.length.toString());
       let hasErrors = false;
       
-      document.querySelectorAll('.bg-white').forEach((item, productIndex) => {
+      // Coletar todas as promessas de imagens
+      const allImagePromises = [];
+      
+      validProducts.forEach((item, productIndex) => {
         const titleInput = item.querySelector('.bulk-title');
         const priceInput = item.querySelector('.bulk-price');
         const categoryInput = item.querySelector('.bulk-category');
         const descriptionInput = item.querySelector('.bulk-description');
         const images = item.querySelectorAll('.product-images img');
         
-        if (!titleInput || !priceInput || !categoryInput || images.length === 0) {
+        if (!titleInput || !priceInput || !categoryInput) {
           console.error(`Campos não encontrados para o produto ${productIndex}`);
           hasErrors = true;
           return;
         }
         
         // Validar campos obrigatórios
-        if (!titleInput.value || !priceInput.value || !categoryInput.value) {
+        if (!titleInput.value || !priceInput.value || !categoryInput.value || images.length === 0) {
           titleInput.classList.add('border-red-500');
           priceInput.classList.add('border-red-500');
           categoryInput.classList.add('border-red-500');
@@ -335,7 +344,6 @@
         formData.append(`description_${productIndex}`, descriptionInput?.value || '');
         
         // Adicionar cada imagem
-        const imagePromises = [];
         images.forEach((img, imgIndex) => {
           const imagePromise = fetch(img.src)
             .then(res => res.blob())
@@ -343,28 +351,17 @@
               const file = new File([blob], `product_${productIndex}_${imgIndex}.jpg`, { type: 'image/jpeg' });
               formData.append(`image_${productIndex}_${imgIndex}`, file);
             });
-          imagePromises.push(imagePromise);
+          allImagePromises.push(imagePromise);
         });
         
         // Registrar o número de imagens para este produto
         formData.append(`image_count_${productIndex}`, images.length.toString());
-        
-        products.push({
-          title: titleInput.value,
-          images: images.length,
-          promises: imagePromises
-        });
       });
-      
-      formData.append('product_count', products.length.toString());
       
       if (hasErrors) {
         alert('Por favor, preencha todos os campos obrigatórios para cada produto.');
         return;
       }
-      
-      // Aguardar todas as promessas de imagens
-      const allImagePromises = products.flatMap(p => p.promises);
       
       try {
         bulkSubmit.disabled = true;
@@ -399,7 +396,7 @@
             const input = document.createElement('input');
             input.type = 'hidden';
             input.name = key;
-            input.value = value;
+            input.value = String(value);
             tempForm.appendChild(input);
           }
         }

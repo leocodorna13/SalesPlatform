@@ -41,7 +41,7 @@ const {
 
 <script>
   function initImageUploader() {
-    const input = document.querySelector('input[type="file"]');
+    const input = document.querySelector('input[type="file"]') as HTMLInputElement;
     const previewContainer = document.getElementById('preview-container');
     
     if (!input || !previewContainer) return;
@@ -52,12 +52,12 @@ const {
       Array.from(previewContainer.children).forEach(preview => {
         const removeButton = preview.querySelector('.remove-image');
         if (removeButton) {
-          removeButton.onclick = () => preview.remove();
+          (removeButton as HTMLElement).addEventListener('click', () => preview.remove());
         }
       });
     }
     
-    function handleFiles(files) {
+    function handleFiles(files: FileList) {
       // Não limpar o preview para manter imagens existentes
       
       // Processar cada arquivo
@@ -67,6 +67,8 @@ const {
         // Criar preview
         const reader = new FileReader();
         reader.onload = (e) => {
+          if (!e.target || !e.target.result) return;
+          
           const preview = document.createElement('div');
           preview.className = 'relative group';
           preview.innerHTML = `
@@ -80,9 +82,13 @@ const {
           
           // Adicionar botão de remover
           const removeButton = preview.querySelector('.remove-image');
-          removeButton.onclick = () => preview.remove();
+          if (removeButton) {
+            (removeButton as HTMLElement).addEventListener('click', () => preview.remove());
+          }
           
-          previewContainer.appendChild(preview);
+          if (previewContainer) {
+            previewContainer.appendChild(preview);
+          }
         };
         reader.readAsDataURL(file);
       });
@@ -92,32 +98,45 @@ const {
     function updateFileInput() {
       // Esta função é um placeholder - não podemos realmente modificar o input file por segurança
       // Mas podemos usar um campo hidden para rastrear quais imagens foram removidas
-      const removedImages = document.getElementById('removed-images');
-      if (removedImages) {
+      const removedImages = document.getElementById('removed-images') as HTMLInputElement;
+      if (removedImages && previewContainer) {
         const currentImages = previewContainer.querySelectorAll('img');
         removedImages.value = currentImages.length.toString();
       }
     }
     
     // Event Listeners
-    input.addEventListener('change', (e) => handleFiles(e.target.files));
+    input.addEventListener('change', (e) => {
+      const target = e.target as HTMLInputElement;
+      if (target.files) {
+        handleFiles(target.files);
+      }
+    });
     
     // Drag and Drop
     const dropArea = input.parentElement;
-    dropArea.addEventListener('dragover', (e) => {
-      e.preventDefault();
-      dropArea.classList.add('border-primary-500');
-    });
-    
-    dropArea.addEventListener('dragleave', () => {
-      dropArea.classList.remove('border-primary-500');
-    });
-    
-    dropArea.addEventListener('drop', (e) => {
-      e.preventDefault();
-      dropArea.classList.remove('border-primary-500');
-      handleFiles(e.dataTransfer.files);
-    });
+    if (dropArea) {
+      dropArea.addEventListener('dragover', (e) => {
+        e.preventDefault();
+        dropArea.classList.add('border-primary-500');
+      });
+      
+      dropArea.addEventListener('dragleave', () => {
+        if (dropArea) {
+          dropArea.classList.remove('border-primary-500');
+        }
+      });
+      
+      dropArea.addEventListener('drop', (e) => {
+        e.preventDefault();
+        if (dropArea) {
+          dropArea.classList.remove('border-primary-500');
+        }
+        if (e.dataTransfer && e.dataTransfer.files) {
+          handleFiles(e.dataTransfer.files);
+        }
+      });
+    }
   }
   
   document.addEventListener('DOMContentLoaded', initImageUploader);
