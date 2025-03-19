@@ -270,6 +270,9 @@ export async function createProduct(productData, imageFiles) {
   try {
     // Verificar se há arquivos de imagem válidos
     const validFiles = [];
+    const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
+    const MAX_TOTAL_SIZE = 20 * 1024 * 1024; // 20MB
+    let totalSize = 0;
     
     if (imageFiles && imageFiles.length > 0) {
       for (const file of imageFiles) {
@@ -277,6 +280,18 @@ export async function createProduct(productData, imageFiles) {
             typeof file === 'object' && 
             ((file instanceof File && file.size > 0) || 
              (file.name && file.type && file.size > 0))) {
+          
+          if (file.size > MAX_FILE_SIZE) {
+            console.warn(`Arquivo muito grande ignorado (max ${MAX_FILE_SIZE/1024/1024}MB):`, file.name);
+            continue;
+          }
+
+          totalSize += file.size;
+          if (totalSize > MAX_TOTAL_SIZE) {
+            console.warn(`Tamanho total dos arquivos excede ${MAX_TOTAL_SIZE/1024/1024}MB. Ignorando:`, file.name);
+            continue;
+          }
+
           validFiles.push(file);
         } else {
           console.warn('Arquivo inválido ignorado:', file);
@@ -294,76 +309,85 @@ export async function createProduct(productData, imageFiles) {
         title: productData.title,
         description: productData.description,
         price: productData.price,
-        category_id: productData.category_id || null, // Permitir categoria nula
+        category_id: productData.category_id || null,
         status: 'available',
-        visible: true // Produto visível por padrão
+        visible: true
       }])
       .select()
       .single();
     
     if (error) throw error;
     
-    // Fazer upload das imagens
+    // Fazer upload das imagens em paralelo com retry
     if (validFiles.length > 0) {
-      const uploadedImages = [];
-      
-      for (let i = 0; i < validFiles.length; i++) {
-        const file = validFiles[i];
-        
-        try {
-          // Gerar nome de arquivo único
-          const fileExt = file.name.split('.').pop();
-          const timestamp = new Date().getTime();
-          const fileName = `${product.id}/${timestamp}-${i}.${fileExt}`;
-          const filePath = `products/${fileName}`;
-          
-          // Fazer upload do arquivo diretamente
-          const { data: uploadData, error: uploadError } = await supabase.storage
-            .from('product-images')
-            .upload(filePath, file, {
-              cacheControl: '3600',
-              upsert: true,
-              contentType: file.type
-            });
-          
-          if (uploadError) {
-            console.error('Erro ao fazer upload da imagem:', uploadError);
-            continue;
-          }
-          
-          // Obter URL pública
-          const { data: publicURLData } = supabase.storage
-            .from('product-images')
-            .getPublicUrl(filePath);
-          
-          const publicUrl = publicURLData?.publicUrl;
-          
-          if (!publicUrl) {
-            console.error('Falha ao gerar URL pública para a imagem');
-            continue;
-          }
-          
-          // Salvar referência da imagem no banco
-          const { data: imageData, error: imageError } = await supabase
-            .from('product_images')
-            .insert([{
-              product_id: product.id,
-              image_url: publicUrl,
-              is_primary: i === 0 // A primeira imagem é a principal
-            }])
-            .select();
-          
-          if (imageError) {
-            console.error('Erro ao salvar referência da imagem:', imageError);
-          } else {
-            uploadedImages.push({
+      const MAX_RETRIES = 3;
+      const uploadPromises = validFiles.map(async (file, i) => {
+        let retries = 0;
+        while (retries < MAX_RETRIES) {
+          try {
+            // Gerar nome de arquivo único
+            const fileExt = file.name.split('.').pop();
+            const timestamp = new Date().getTime();
+            const fileName = `${product.id}/${timestamp}-${i}.${fileExt}`;
+            const filePath = `products/${fileName}`;
+            
+            // Fazer upload do arquivo
+            const { data: uploadData, error: uploadError } = await supabase.storage
+              .from('product-images')
+              .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: true,
+                contentType: file.type
+              });
+            
+            if (uploadError) throw uploadError;
+            
+            // Obter URL pública
+            const { data: publicURLData } = supabase.storage
+              .from('product-images')
+              .getPublicUrl(filePath);
+            
+            const publicUrl = publicURLData?.publicUrl;
+            if (!publicUrl) throw new Error('Falha ao gerar URL pública');
+            
+            // Salvar referência da imagem
+            const { data: imageData, error: imageError } = await supabase
+              .from('product_images')
+              .insert([{
+                product_id: product.id,
+                image_url: publicUrl,
+                is_primary: i === 0
+              }])
+              .select();
+            
+            if (imageError) throw imageError;
+            
+            return {
+              success: true,
               url: publicUrl,
               isPrimary: i === 0
-            });
+            };
+          } catch (err) {
+            console.error(`Tentativa ${retries + 1}/${MAX_RETRIES} falhou:`, err);
+            retries++;
+            if (retries === MAX_RETRIES) {
+              return {
+                success: false,
+                error: err
+              };
+            }
+            // Esperar um pouco antes de tentar novamente
+            await new Promise(resolve => setTimeout(resolve, 1000 * retries));
           }
-        } catch (uploadErr) {
-          console.error('Exceção durante o upload:', uploadErr);
         }
+      });
+
+      // Aguardar todos os uploads terminarem
+      const results = await Promise.all(uploadPromises);
+      const failures = results.filter(r => !r.success);
+      
+      if (failures.length > 0) {
+        console.error(`${failures.length} imagens falharam ao fazer upload:`, failures);
       }
     }
     

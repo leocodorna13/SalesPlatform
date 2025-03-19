@@ -181,7 +181,8 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
               id="main-image" 
               src={mainImage?.image_url} 
               alt={product.title}
-              class="w-full h-full object-cover"
+              class="w-full h-full object-cover cursor-zoom-in"
+              onclick="openModal(this.src)"
             />
           </div>
           
@@ -293,6 +294,114 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
   />
 </Layout>
 
+<!-- Modal de imagem (no final do arquivo) -->
+<div id="imageModal" class="hidden fixed inset-0 bg-black/95 items-center justify-center" style="z-index: 99999;" onclick="closeModal()">
+  <button class="absolute top-4 right-4 text-white hover:text-gray-300 text-3xl" onclick="event.stopPropagation()">
+    <i class="fas fa-times"></i>
+  </button>
+  
+  <!-- Botões de navegação -->
+  <button class="absolute left-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 text-3xl" onclick="event.stopPropagation(); prevImage()">
+    <i class="fas fa-chevron-left"></i>
+  </button>
+  <button class="absolute right-4 top-1/2 -translate-y-1/2 text-white hover:text-gray-300 text-3xl" onclick="event.stopPropagation(); nextImage()">
+    <i class="fas fa-chevron-right"></i>
+  </button>
+  
+  <img 
+    id="modalImage" 
+    src="" 
+    alt=""
+    class="max-h-[90vh] max-w-[90vw] object-contain cursor-zoom-out"
+    onclick="closeModal()"
+  />
+</div>
+
+<script is:inline>
+  let currentImageIndex = 0;
+  const images = [
+    ...Array.from(document.querySelectorAll('[data-image-url]')).map(el => el.getAttribute('data-image-url'))
+  ];
+
+  function openModal(src) {
+    const modal = document.getElementById('imageModal');
+    const modalImage = document.getElementById('modalImage');
+    if (modal && modalImage) {
+      modalImage.src = src;
+      currentImageIndex = images.indexOf(src);
+      modal.classList.remove('hidden');
+      modal.classList.add('flex');
+      document.body.style.overflow = 'hidden';
+    }
+  }
+
+  function closeModal() {
+    const modal = document.getElementById('imageModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.classList.remove('flex');
+      document.body.style.overflow = '';
+    }
+  }
+
+  function prevImage() {
+    if (currentImageIndex > 0) {
+      currentImageIndex--;
+      document.getElementById('modalImage').src = images[currentImageIndex];
+    }
+  }
+
+  function nextImage() {
+    if (currentImageIndex < images.length - 1) {
+      currentImageIndex++;
+      document.getElementById('modalImage').src = images[currentImageIndex];
+    }
+  }
+
+  // Fechar com ESC
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeModal();
+    if (e.key === 'ArrowLeft') prevImage();
+    if (e.key === 'ArrowRight') nextImage();
+  });
+
+  // Galeria de imagens
+  document.addEventListener('DOMContentLoaded', () => {
+    const thumbnails = document.querySelectorAll('[data-image-url]');
+    thumbnails.forEach((thumbnail) => {
+      thumbnail.addEventListener('click', () => {
+        const imageUrl = thumbnail.getAttribute('data-image-url');
+        if (imageUrl) {
+          document.getElementById('main-image').src = imageUrl;
+        }
+        thumbnails.forEach((thumb) => {
+          thumb.classList.remove('border-primary-500');
+          thumb.classList.add('border-transparent');
+        });
+        thumbnail.classList.remove('border-transparent');
+        thumbnail.classList.add('border-primary-500');
+      });
+    });
+  });
+</script>
+
+<style>
+  #modalImage {
+    -webkit-user-select: none;
+    user-select: none;
+    -webkit-touch-callout: none;
+  }
+
+  @media (max-width: 768px) {
+    #modalImage {
+      -webkit-user-select: auto;
+      user-select: auto;
+      -webkit-touch-callout: default;
+      touch-action: pinch-zoom;
+    }
+  }
+</style>
+
 <style>
   .label {
     @apply block text-sm font-medium text-gray-700 mb-1;
@@ -309,28 +418,28 @@ const mainImage = product.product_images.find(img => img.is_primary) || product.
   .btn-primary {
     @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
   }
-</style>
-
-<script>
-  // Galeria de imagens
-  const mainImage = document.getElementById('main-image') as HTMLImageElement;
-  const thumbnails = document.querySelectorAll('[data-image-url]');
   
-  thumbnails.forEach((thumbnail) => {
-    thumbnail.addEventListener('click', () => {
-      // Atualizar imagem principal
-      const imageUrl = thumbnail.getAttribute('data-image-url');
-      if (mainImage && imageUrl) {
-        mainImage.src = imageUrl;
-      }
-      
-      // Atualizar borda ativa
-      thumbnails.forEach((thumb) => {
-        thumb.classList.remove('border-primary-500');
-        thumb.classList.add('border-transparent');
-      });
-      thumbnail.classList.remove('border-transparent');
-      thumbnail.classList.add('border-primary-500');
-    });
-  });
-</script>
+  .fullscreen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    object-fit: contain;
+    background: rgba(0, 0, 0, 0.95);
+    z-index: 9999;
+    padding: 2rem;
+    cursor: zoom-out;
+    transition: all 0.3s ease-out;
+  }
+
+  #main-image {
+    transition: transform 0.3s ease-out;
+  }
+
+  #main-image:hover {
+    transform: scale(1.02);
+  }
+</style>
