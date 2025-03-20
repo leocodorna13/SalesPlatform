@@ -920,17 +920,33 @@ export async function updateCategory(id, name, slug) {
 export async function deleteBulkCategories(categoryIds) {
   try {
     // Verificar se todas as categorias estão vazias
-    const { data: categoriesWithProducts, error: countError } = await supabase
+    const { data: productsInCategories, error: countError } = await supabase
       .from('products')
       .select('category_id')
       .in('category_id', categoryIds);
 
     if (countError) throw countError;
 
-    if (categoriesWithProducts && categoriesWithProducts.length > 0) {
+    if (productsInCategories && productsInCategories.length > 0) {
+      // Contar produtos por categoria
+      const productCount = productsInCategories.reduce((acc, product) => {
+        acc[product.category_id] = (acc[product.category_id] || 0) + 1;
+        return acc;
+      }, {});
+
+      // Buscar nomes das categorias
+      const { data: categories } = await supabase
+        .from('categories')
+        .select('id, name')
+        .in('id', Object.keys(productCount));
+
+      const categoriesWithCount = categories
+        .map(c => `${c.name} (${productCount[c.id]} produtos)`)
+        .join(', ');
+
       return {
         success: false,
-        message: 'Algumas categorias não podem ser excluídas pois contêm produtos.'
+        message: `As seguintes categorias não podem ser excluídas pois contêm produtos:\n${categoriesWithCount}`
       };
     }
 
@@ -1332,21 +1348,16 @@ export async function findOrCreateCategory(categoryName) {
  */
 export async function createBulkProducts(productsData) {
   try {
-    const createdProducts = [];
-    
     // Verificar se o bucket existe
     await ensureBucketExists('product-images');
     
-    // Processar cada produto
-    for (const productData of productsData) {
-      const { title, price, description, category_id, image, images } = productData;
-      
-      if (!title || !price || !category_id || (!image && (!images || images.length === 0))) {
-        console.error('Dados de produto incompletos:', productData);
-        continue;
+    // Criar todos os produtos primeiro
+    const productPromises = productsData.map(async ({ title, price, description, category_id }) => {
+      if (!title || !price || !category_id) {
+        console.error('Dados de produto incompletos');
+        return null;
       }
       
-      // Criar produto no Supabase
       const { data: product, error: productError } = await supabase
         .from('products')
         .insert([{
@@ -1362,77 +1373,74 @@ export async function createBulkProducts(productsData) {
 
       if (productError) {
         console.error('Erro ao criar produto:', productError);
-        continue;
+        return null;
       }
       
-      // Preparar array de imagens
-      const imagesToUpload = [];
-      if (image) {
-        imagesToUpload.push(image);
-      }
-      if (images && images.length > 0) {
-        imagesToUpload.push(...images);
-      }
-      
-      // Fazer upload das imagens
-      if (imagesToUpload.length > 0 && product) {
-        for (let i = 0; i < imagesToUpload.length; i++) {
-          const currentImage = imagesToUpload[i];
-          try {
-            const fileExt = currentImage.name.split('.').pop();
-            const timestamp = new Date().getTime();
-            const fileName = `${product.id}/${timestamp}-${i}.${fileExt}`;
-            const filePath = `products/${fileName}`;
-            
-            // Fazer upload do arquivo
-            const { data: uploadData, error: uploadError } = await supabase.storage
-              .from('product-images')
-              .upload(filePath, currentImage, {
-                cacheControl: '3600',
-                upsert: true,
-                contentType: currentImage.type
-              });
-            
-            if (uploadError) {
-              console.error('Erro ao fazer upload da imagem:', uploadError);
-              continue;
-            }
-            
-            // Obter URL pública da imagem
-            const { data: publicURLData } = supabase.storage
-              .from('product-images')
-              .getPublicUrl(filePath);
-            
-            if (!publicURLData || !publicURLData.publicUrl) {
-              console.error('Falha ao gerar URL pública para a imagem');
-              continue;
-            }
-            
-            // Salvar referência da imagem no banco
-            const { data: imageData, error: imageError } = await supabase
-              .from('product_images')
-              .insert([{
-                product_id: product.id,
-                image_url: publicURLData.publicUrl,
-                is_primary: i === 0
-              }])
-              .select();
-            
-            if (imageError) {
-              console.error('Erro ao salvar referência da imagem:', imageError);
-            } else {
-              console.log('Imagem salva com sucesso para o produto:', product.id);
-            }
-          } catch (uploadErr) {
-            console.error('Exceção durante o upload da imagem:', uploadErr);
-          }
-        }
-      }
-      
-      createdProducts.push(product);
-    }
+      return product;
+    });
+
+    const createdProducts = (await Promise.all(productPromises)).filter(Boolean);
     
+    // Processar todas as imagens em paralelo
+    const imagePromises = createdProducts.map(async (product, productIndex) => {
+      const { images } = productsData[productIndex];
+      if (!images || images.length === 0) return;
+      
+      const productImagePromises = images.map(async (currentImage, imageIndex) => {
+        try {
+          const fileExt = currentImage.name.split('.').pop();
+          const timestamp = new Date().getTime();
+          const fileName = `${product.id}/${timestamp}-${imageIndex}.${fileExt}`;
+          const filePath = `products/${fileName}`;
+          
+          // Upload do arquivo
+          const { error: uploadError } = await supabase.storage
+            .from('product-images')
+            .upload(filePath, currentImage, {
+              cacheControl: '3600',
+              upsert: true,
+              contentType: currentImage.type
+            });
+          
+          if (uploadError) {
+            console.error('Erro ao fazer upload da imagem:', uploadError);
+            return null;
+          }
+          
+          // Obter URL pública
+          const { data: publicURLData } = supabase.storage
+            .from('product-images')
+            .getPublicUrl(filePath);
+          
+          if (!publicURLData?.publicUrl) return null;
+          
+          // Salvar referência
+          const { error: imageError } = await supabase
+            .from('product_images')
+            .insert([{
+              product_id: product.id,
+              image_url: publicURLData.publicUrl,
+              is_primary: imageIndex === 0
+            }]);
+          
+          if (imageError) {
+            console.error('Erro ao salvar referência da imagem:', imageError);
+            return null;
+          }
+          
+          return publicURLData.publicUrl;
+        } catch (err) {
+          console.error('Erro no upload:', err);
+          return null;
+        }
+      });
+      
+      await Promise.all(productImagePromises);
+    });
+    
+    await Promise.all(imagePromises);
     return createdProducts;
+    
   } catch (error) {
     console.error('Erro ao criar produtos em massa:', error);
     throw error;
@@ -2041,5 +2049,103 @@ export async function incrementProductViews(productId) {
   } catch (error) {
     console.error('Erro ao incrementar visualizações:', error);
     return false;
+  }
+}
+
+/**
+ * Executa uma ação em lote para múltiplos produtos
+ * @param {string[]} productIds - Array de IDs dos produtos
+ * @param {string} action - Ação a ser executada (markHidden, markVisible, delete)
+ * @returns {Promise<{success: boolean, message?: string, error?: string}>}
+ */
+export async function batchProductAction(productIds, action) {
+  try {
+    if (!productIds || productIds.length === 0) {
+      return { success: false, error: 'Nenhum produto selecionado' };
+    }
+
+    switch (action) {
+      case 'markHidden':
+      case 'markVisible': {
+        const visible = action === 'markVisible';
+        const { error } = await supabase
+          .from('products')
+          .update({ visible })
+          .in('id', productIds);
+
+        if (error) throw error;
+        return {
+          success: true,
+          message: `${productIds.length} produto(s) ${visible ? 'exibido(s)' : 'ocultado(s)'} com sucesso`
+        };
+      }
+
+      case 'delete': {
+        // 1. Buscar todas as imagens dos produtos em uma única query
+        const { data: productImages, error: fetchError } = await supabase
+          .from('product_images')
+          .select('image_url, product_id')
+          .in('product_id', productIds);
+
+        if (fetchError) throw fetchError;
+
+        // 2. Organizar imagens por produto e preparar caminhos para deleção
+        const imagesByProduct = new Map();
+        const filesToDelete = [];
+        
+        productImages?.forEach(img => {
+          const parts = img.image_url.split('product-images/');
+          if (parts.length > 1) {
+            filesToDelete.push(parts[1]);
+            if (!imagesByProduct.has(img.product_id)) {
+              imagesByProduct.set(img.product_id, []);
+            }
+            imagesByProduct.get(img.product_id).push(img.image_url);
+          }
+        });
+
+        // 3. Deletar arquivos do storage em paralelo
+        if (filesToDelete.length > 0) {
+          await supabase.storage
+            .from('product-images')
+            .remove(filesToDelete);
+        }
+
+        // 4. Deletar referências de imagens e produtos em paralelo
+        await Promise.all([
+          // Deletar todas as referências de imagens
+          supabase
+            .from('product_images')
+            .delete()
+            .in('product_id', productIds),
+          
+          // Deletar todos os produtos
+          supabase
+            .from('products')
+            .delete()
+            .in('id', productIds),
+            
+          // Deletar todos os interesses
+          supabase
+            .from('interests')
+            .delete()
+            .in('product_id', productIds)
+        ]);
+
+        return {
+          success: true,
+          message: `${productIds.length} produto(s) excluído(s) com sucesso`
+        };
+      }
+
+      default:
+        return { success: false, error: 'Ação inválida' };
+    }
+  } catch (error) {
+    console.error('Erro na ação em lote:', error);
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Erro desconhecido'
+    };
   }
 }

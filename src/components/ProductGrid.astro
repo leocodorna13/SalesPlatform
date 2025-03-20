@@ -20,6 +20,7 @@ interface Product {
   product_images: ProductImage[];
   views_count: number;
   interest_count: number;
+  created_at: string;
 }
 
 interface Props {
@@ -60,23 +61,34 @@ const interestCounts = await Promise.all(
 
 console.log('Contagens de interesse:', interestCounts);
 
+// Ordenar produtos por interesse
+filteredProducts.sort((a, b) => {
+  const interestA = a.interest_count || 0;
+  const interestB = b.interest_count || 0;
+  return interestB - interestA;
+});
+
 ---
 
 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 product-grid">
   {filteredProducts.length > 0 ? (
     filteredProducts.map((product, index) => (
-      <div class="product-card-wrapper">
+      <div class="w-full">
         <ProductCard
           product={{
             ...product,
-            interest_count: interestCounts[index] || 0
-          }}
+            interestCount: interestCounts[index] || 0,
+            created_at: product.created_at || new Date().toISOString(),
+            categories: product.categories || null,
+            category: product.category || null,
+            status: product.status || 'available'
+          } as Product}
         />
       </div>
     ))
   ) : (
-    <div class="col-span-full text-center py-12">
-      <p class="text-gray-500 text-lg">Nenhum produto encontrado.</p>
+    <div class="col-span-full text-center py-8 text-neutral-500">
+      Nenhum produto encontrado
     </div>
   )}
 </div>

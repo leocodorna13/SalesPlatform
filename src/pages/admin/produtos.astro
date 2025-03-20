@@ -67,15 +67,9 @@ if (Astro.request.method === 'POST') {
         : 'Falha ao marcar produtos como disponíveis. Verifique o console para mais detalhes.';
       messageType = successCount > 0 ? 'success' : 'error';
     } else if (action === 'batch-delete' && productIds.length > 0) {
-      let successCount = 0;
-      for (const id of productIds) {
-        const result = await deleteProduct(id);
-        if (result) successCount++;
-      }
-      flashMessage = successCount > 0 
-        ? `${successCount} produto(s) excluído(s) com sucesso!` 
-        : 'Falha ao excluir produtos. Verifique o console para mais detalhes.';
-      messageType = successCount > 0 ? 'success' : 'error';
+      const result = await batchProductAction(productIds, 'delete');
+      messageType = result.success ? 'success' : 'error';
+      flashMessage = result.message || result.error || 'Operação concluída';
     } else if (action === 'batch-markHidden' && productIds.length > 0) {
       const result = await batchProductAction(productIds, 'markHidden');
       messageType = result && typeof result === 'object' && 'success' in result && result.success ? 'success' : 'error';

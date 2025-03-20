@@ -29,10 +29,11 @@ if (Astro.request.method === 'POST') {
       // Processar upload em massa
       const productCount = parseInt(formData.get('product_count')?.toString() || '0');
       console.log(`Recebido upload em massa com ${productCount} produtos`);
-      const productsData = [];
       
       // Processar todos os produtos de uma vez
-      const productPromises = [];
+      const categoryPromises = new Map();
+      const productsData = [];
+      
       for (let i = 0; i < productCount; i++) {
         const productTitle = formData.get(`title_${i}`)?.toString() || '';
         const productPrice = parseFloat(formData.get(`price_${i}`)?.toString() || '0');
@@ -42,40 +43,31 @@ if (Astro.request.method === 'POST') {
         
         // Obter o número de imagens para este produto
         const imageCount = parseInt(formData.get(`image_count_${i}`)?.toString() || '0');
-        console.log(`Produto ${i}: ${productTitle}, imagens: ${imageCount}`);
-        
-        // Coletar todas as imagens para este produto
         const productImages: File[] = [];
+        
         for (let j = 0; j < imageCount; j++) {
           const productImage = formData.get(`image_${i}_${j}`);
           if (productImage && productImage instanceof File) {
             productImages.push(productImage);
-            console.log(`  Imagem ${j} encontrada: ${productImage.name}`);
           }
         }
         
-        // Verificar se tem pelo menos uma imagem
-        if (productImages.length === 0) {
-          console.log(`  Produto ${i} não tem imagens, pulando...`);
-          continue;
-        }
+        if (productImages.length === 0) continue;
         
-        // Adicionar à lista de promessas
+        // Se não tem ID da categoria mas tem nome, criar/encontrar categoria
         if ((!productCategoryId || productCategoryId === '') && productCategoryName) {
-          productPromises.push(
-            findOrCreateCategory(productCategoryName).then(newCategory => {
-              if (newCategory && typeof newCategory === 'object' && 'id' in newCategory) {
-                productsData.push({
-                  title: productTitle,
-                  price: productPrice,
-                  description: productDescription,
-                  category_id: String(newCategory.id),
-                  images: productImages
-                });
-              }
-            })
-          );
-        } else {
+          if (!categoryPromises.has(productCategoryName)) {
+            categoryPromises.set(productCategoryName, findOrCreateCategory(productCategoryName));
+          }
+          
+          productsData.push({
+            title: productTitle,
+            price: productPrice,
+            description: productDescription,
+            categoryName: productCategoryName,
+            images: productImages
+          });
+        } else if (productCategoryId) {
           productsData.push({
             title: productTitle,
             price: productPrice,
@@ -86,12 +78,34 @@ if (Astro.request.method === 'POST') {
         }
       }
       
-      // Aguardar todas as categorias serem criadas/encontradas
-      await Promise.all(productPromises);
+      // Resolver todas as categorias primeiro
+      const categoryResults = await Promise.all(Array.from(categoryPromises.entries()).map(async ([name, promise]) => {
+        const category = await promise;
+        return { name, category };
+      }));
+      
+      // Mapear nomes de categorias para IDs
+      const categoryMap = new Map(categoryResults.map(({ name, category }) => [name, category?.id]));
+      
+      // Atualizar produtos com os IDs das categorias
+      const finalProductsData = productsData.map(product => {
+        if (product.categoryName) {
+          const categoryId = categoryMap.get(product.categoryName);
+          if (categoryId) {
+            return {
+              ...product,
+              category_id: categoryId,
+              categoryName: undefined
+            };
+          }
+          return null;
+        }
+        return product;
+      }).filter(Boolean);
       
       // Criar produtos em massa
-      if (productsData.length > 0) {
-        await createBulkProducts(productsData);
+      if (finalProductsData.length > 0) {
+        await createBulkProducts(finalProductsData);
         bulkSuccess = true;
         return Astro.redirect('/admin/produtos?bulk_success=true');
       }
