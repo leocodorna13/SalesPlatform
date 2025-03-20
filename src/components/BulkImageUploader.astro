@@ -293,10 +293,8 @@
       const formData = new FormData();
       formData.append('bulk_upload', 'true');
       
-      // Pegar apenas os produtos que têm imagens
-      const validProducts = Array.from(document.querySelectorAll('.bg-white')).filter(item => 
-        item.querySelector('.product-images img:not([style*="display: none"])')
-      );
+      // Pegar apenas os produtos que têm título (evita duplicação)
+      const validProducts = Array.from(document.querySelectorAll('.bulk-title')).map(input => input.closest('.bg-white'));
       
       console.log(`Produtos válidos encontrados: ${validProducts.length}`);
       formData.append('product_count', validProducts.length.toString());
