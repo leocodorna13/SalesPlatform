@@ -22,13 +22,12 @@ const mainImage = product.product_images?.find(img => img.is_primary)?.image_url
                  'https://via.placeholder.com/300x300?text=Sem+Imagem';
 
 // Extrair propriedades do produto
-const { title, price, description } = product;
-// Usar category se disponível, caso contrário tentar categories
-const category = product.category || product.categories || { 
+const category = product.category || (Array.isArray(product.categories) ? product.categories[0] : product.categories) || { 
   id: '0', 
   name: 'Sem categoria', 
   slug: 'sem-categoria' 
 };
+const { title, price, description } = product;
 
 // Formatar preço
 const formattedPrice = new Intl.NumberFormat('pt-BR', {

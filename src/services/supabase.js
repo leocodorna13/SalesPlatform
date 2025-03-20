@@ -15,7 +15,9 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   auth: {
     persistSession: true,
     autoRefreshToken: true,
-    detectSessionInUrl: true
+    detectSessionInUrl: true,
+    storage: typeof localStorage !== 'undefined' ? localStorage : null,
+    storageKey: 'sb-auth-token'
   }
 });
 
@@ -919,6 +921,13 @@ export async function updateCategory(id, name, slug) {
  */
 export async function deleteBulkCategories(categoryIds) {
   try {
+    if (!categoryIds || categoryIds.length === 0) {
+      return {
+        success: false,
+        message: 'Nenhuma categoria selecionada para exclusão.'
+      };
+    }
+
     // Verificar se todas as categorias estão vazias
     const { data: productsInCategories, error: countError } = await supabase
       .from('products')
@@ -927,36 +936,71 @@ export async function deleteBulkCategories(categoryIds) {
 
     if (countError) throw countError;
 
+    // Categorias com produtos
+    const categoriesWithProducts = new Set();
     if (productsInCategories && productsInCategories.length > 0) {
-      // Contar produtos por categoria
-      const productCount = productsInCategories.reduce((acc, product) => {
-        acc[product.category_id] = (acc[product.category_id] || 0) + 1;
-        return acc;
-      }, {});
+      productsInCategories.forEach(product => {
+        if (product.category_id) {
+          categoriesWithProducts.add(product.category_id);
+        }
+      });
+    }
 
-      // Buscar nomes das categorias
+    // Se houver categorias com produtos, não podemos excluí-las
+    if (categoriesWithProducts.size > 0) {
+      // Buscar nomes das categorias com produtos
       const { data: categories } = await supabase
         .from('categories')
         .select('id, name')
-        .in('id', Object.keys(productCount));
+        .in('id', Array.from(categoriesWithProducts));
 
-      const categoriesWithCount = categories
-        .map(c => `${c.name} (${productCount[c.id]} produtos)`)
+      const categoriesWithProductsNames = categories
+        .map(c => c.name)
         .join(', ');
+
+      // Identificar categorias que podem ser excluídas
+      const categoriesToDelete = categoryIds.filter(id => !categoriesWithProducts.has(id));
+      
+      // Se houver categorias que podem ser excluídas, excluí-las
+      if (categoriesToDelete.length > 0) {
+        const { error } = await supabase
+          .from('categories')
+          .delete()
+          .in('id', categoriesToDelete);
+
+        if (error) throw error;
+
+        // Limpar o cache de categorias
+        cache.categories = {
+          data: null,
+          timestamp: 0
+        };
+
+        return {
+          success: true,
+          message: `${categoriesToDelete.length} categorias foram excluídas com sucesso. As seguintes categorias não puderam ser excluídas pois contêm produtos: ${categoriesWithProductsNames}`
+        };
+      }
 
       return {
         success: false,
-        message: `As seguintes categorias não podem ser excluídas pois contêm produtos:\n${categoriesWithCount}`
+        message: `As seguintes categorias não podem ser excluídas pois contêm produtos: ${categoriesWithProductsNames}`
       };
     }
 
-    // Excluir as categorias
+    // Todas as categorias estão vazias, podemos excluí-las
     const { error } = await supabase
       .from('categories')
       .delete()
       .in('id', categoryIds);
 
     if (error) throw error;
+
+    // Limpar o cache de categorias
+    cache.categories = {
+      data: null,
+      timestamp: 0
+    };
 
     return {
       success: true,
@@ -1449,7 +1493,7 @@ export async function createBulkProducts(productsData) {
 
 /**
  * Executa ações em lote para múltiplos produtos
- * @param {Array<string>} productIds - IDs dos produtos
+ * @param {string[]} productIds - IDs dos produtos
  * @param {string} action - Ação a ser executada ('markSold', 'markAvailable', 'markHidden', 'markVisible', 'delete')
  * @returns {Promise<object>} - Resultado da operação
  */
@@ -2058,7 +2102,7 @@ export async function incrementProductViews(productId) {
  * @param {string} action - Ação a ser executada (markHidden, markVisible, delete)
  * @returns {Promise<{success: boolean, message?: string, error?: string}>}
  */
-export async function batchProductAction(productIds, action) {
+export async function batchProductAction2(productIds, action) {
   try {
     if (!productIds || productIds.length === 0) {
       return { success: false, error: 'Nenhum produto selecionado' };
@@ -2074,6 +2118,7 @@ export async function batchProductAction(productIds, action) {
           .in('id', productIds);
 
         if (error) throw error;
+
         return {
           success: true,
           message: `${productIds.length} produto(s) ${visible ? 'exibido(s)' : 'ocultado(s)'} com sucesso`

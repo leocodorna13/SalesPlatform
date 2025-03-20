@@ -17,7 +17,7 @@ export interface Product {
   title: string;
   price: number;
   category?: Category;
-  categories?: Category;
+  categories?: Category | Category[] | null;
   created_at: string;
   image_url?: string;
   description?: string;
@@ -29,4 +29,5 @@ export interface Product {
   interest_count?: number;
   visible?: boolean;
   category_id?: string;
+  views?: number; // Adicionado para compatibilidade
 }

@@ -4,6 +4,15 @@ import ImageUploader from '../../../components/ImageUploader.astro';
 import BulkImageUploader from '../../../components/BulkImageUploader.astro';
 import { getCategories, createProduct, findOrCreateCategory, createBulkProducts } from '../../../services/supabase';
 
+interface NewProduct {
+  title: string;
+  price: number;
+  description: string;
+  category_id?: string;
+  categoryName?: string;
+  images: File[];
+}
+
 // Buscar categorias
 const categories = await getCategories();
 
@@ -32,7 +41,7 @@ if (Astro.request.method === 'POST') {
       
       // Processar todos os produtos de uma vez
       const categoryPromises = new Map();
-      const productsData = [];
+      const productsData: NewProduct[] = [];
       
       for (let i = 0; i < productCount; i++) {
         const productTitle = formData.get(`title_${i}`)?.toString() || '';
@@ -105,7 +114,7 @@ if (Astro.request.method === 'POST') {
       
       // Criar produtos em massa
       if (finalProductsData.length > 0) {
-        await createBulkProducts(finalProductsData);
+        await createBulkProducts(finalProductsData.filter(Boolean) as NewProduct[]);
         bulkSuccess = true;
         return Astro.redirect('/admin/produtos?bulk_success=true');
       }

@@ -1,27 +1,7 @@
 ---
 import ProductCard from './ProductCard.astro';
 import { supabase } from '../services/supabase';
-
-interface ProductImage {
-  id: string;
-  image_url: string;
-  is_primary: boolean;
-}
-
-interface Product {
-  id: string;
-  title: string;
-  price: number;
-  status: 'available' | 'sold';
-  categories: {
-    name: string;
-    slug: string;
-  } | null;
-  product_images: ProductImage[];
-  views_count: number;
-  interest_count: number;
-  created_at: string;
-}
+import type { Product, ProductImage } from '../types';
 
 interface Props {
   products: Product[];
@@ -31,7 +11,7 @@ interface Props {
 const { products, showSold = true } = Astro.props;
 
 // Filtrar produtos vendidos se necessário
-const filteredProducts = showSold ? products : products.filter(p => p.status === 'available');
+const filteredProducts = showSold ? products : products.filter(p => p.status !== 'sold');
 
 // Encontrar a imagem principal para cada produto
 const getMainImage = (images: ProductImage[]) => {
@@ -40,31 +20,21 @@ const getMainImage = (images: ProductImage[]) => {
   return primary ? primary.image_url : images[0].image_url;
 };
 
-// Obter contagem de interesses para cada produto
-const interestCounts = await Promise.all(
-  filteredProducts.map(async (product) => {
-    const productId = typeof product.id === 'string' ? parseInt(product.id, 10) : product.id;
-    console.log('Buscando interesses para produto:', productId, 'tipo:', typeof productId, 'original:', product.id);
-    
-    // Teste direto com o ID
-    const { data, error } = await supabase
-      .from('interests')
-      .select('id')
-      .eq('product_id', productId);
-    
-    const count = data?.length || 0;
-    console.log(`Produto ${productId}: ${count} interesses`);
-    
-    return count;
-  })
-);
+// Buscar contagem de interesses para cada produto
+const { data: interests } = await supabase
+  .from('interests')
+  .select('product_id, count')
+  .in('product_id', products.map(p => p.id));
 
-console.log('Contagens de interesse:', interestCounts);
+const interestCounts = interests?.reduce((acc: Record<string, number>, curr: { product_id: string, count: number }) => {
+  acc[curr.product_id] = curr.count;
+  return acc;
+}, {}) || {};
 
 // Ordenar produtos por interesse
 filteredProducts.sort((a, b) => {
-  const interestA = a.interest_count || 0;
-  const interestB = b.interest_count || 0;
+  const interestA = interestCounts[a.id] || 0;
+  const interestB = interestCounts[b.id] || 0;
   return interestB - interestA;
 });
 
@@ -72,17 +42,17 @@ filteredProducts.sort((a, b) => {
 
 <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-6 product-grid">
   {filteredProducts.length > 0 ? (
-    filteredProducts.map((product, index) => (
+    filteredProducts.map((product) => (
       <div class="w-full">
         <ProductCard
           product={{
             ...product,
-            interestCount: interestCounts[index] || 0,
+            interestCount: interestCounts[product.id] || 0,
             created_at: product.created_at || new Date().toISOString(),
-            categories: product.categories || null,
-            category: product.category || null,
+            categories: product.categories || undefined,
+            category: product.category || undefined,
             status: product.status || 'available'
-          } as Product}
+          }}
         />
       </div>
     ))

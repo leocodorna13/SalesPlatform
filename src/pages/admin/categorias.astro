@@ -2,20 +2,24 @@
 import AdminLayout from '../../layouts/AdminLayout.astro';
 import { getCategories, createCategory, deleteCategory, moveProductsBetweenCategories, getProductCountByCategory, updateCategory, deleteBulkCategories, getCurrentUser } from '../../services/supabase';
 
-// Verificar autenticação primeiro
-const user = await getCurrentUser();
-if (!user) {
-  return Astro.redirect('/admin/login');
+interface ApiResponse {
+  success: boolean;
+  message: string;
 }
 
-// Definir interfaces para os resultados das operações
 interface OperationResult {
   success: boolean;
   message: string;
   [key: string]: any;
 }
 
-// Buscar categorias
+// Verificar autenticação primeiro
+const user = await getCurrentUser();
+if (!user) {
+  return Astro.redirect('/admin/login');
+}
+
+// Buscar categorias - forçar ignorar o cache para garantir dados atualizados
 const categories = await getCategories();
 
 // Processar formulário de criação
@@ -43,7 +47,7 @@ if (Astro.request.method === 'POST') {
           .replace(/[^\w\s]/g, '')
           .replace(/\s+/g, '-');
         
-        const result = await createCategory(name, slug) as OperationResult;
+        const result = await createCategory(name, slug) as ApiResponse;
         
         if (result) {
           message = result.message;
@@ -58,7 +62,7 @@ if (Astro.request.method === 'POST') {
       const categoryId = formData.get('categoryId');
       
       if (categoryId && typeof categoryId === 'string') {
-        const result = await deleteCategory(categoryId);
+        const result = await deleteCategory(categoryId) as ApiResponse;
         
         message = result.message;
         messageType = result.success ? 'success' : 'error';
@@ -70,7 +74,7 @@ if (Astro.request.method === 'POST') {
         .map(id => id.toString()); // Converter para string
       
       if (selectedCategories && selectedCategories.length > 0) {
-        const result = await deleteBulkCategories(selectedCategories);
+        const result = await deleteBulkCategories(selectedCategories) as ApiResponse;
         message = result.message;
         messageType = result.success ? 'success' : 'error';
       }
@@ -380,21 +384,21 @@ const categoriesWithCount = await Promise.all(
   </div>
   
   <script>
-    // Manipulação do modal e elementos da página
+    // Elementos do DOM
     const deleteModal = document.getElementById('delete-modal');
     const categoryNameToDelete = document.getElementById('category-name-to-delete');
-    const categoryIdToDelete = document.getElementById('category-id-to-delete') as HTMLInputElement;
-    const bulkDeleteBtn = document.getElementById('bulk-delete-btn') as HTMLButtonElement;
-    const selectAllBtn = document.getElementById('select-all-btn') as HTMLButtonElement;
-    const checkboxes = document.querySelectorAll<HTMLInputElement>('.category-checkbox');
-    const cancelDelete = document.getElementById('cancel-delete');
-    const deleteButtons = document.querySelectorAll('.delete-category');
+    const categoryIdToDelete = document.getElementById('category-id-to-delete');
+    const deleteForm = document.getElementById('delete-form');
     const bulkDeleteForm = document.getElementById('bulk-delete-form');
+    const selectAllBtn = document.getElementById('select-all-btn');
+    const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
+    const checkboxes = document.querySelectorAll('.category-checkbox');
+    const cancelDelete = document.getElementById('cancel-delete');
     
     // Atualizar visibilidade do botão de exclusão em lote
     function updateBulkDeleteButton() {
       if (!bulkDeleteBtn) return;
-      const checkedCount = document.querySelectorAll<HTMLInputElement>('.category-checkbox:checked').length;
+      const checkedCount = document.querySelectorAll('.category-checkbox:checked').length;
       bulkDeleteBtn.classList.toggle('hidden', checkedCount === 0);
       if (checkedCount > 0) {
         bulkDeleteBtn.textContent = `Excluir Selecionadas (${checkedCount})`;
@@ -407,10 +411,8 @@ const categoriesWithCount = await Promise.all(
         const firstChecked = document.querySelector<HTMLInputElement>('.category-checkbox:checked');
         const shouldCheck = !firstChecked;
         
-        checkboxes.forEach(checkbox => {
-          if (checkbox instanceof HTMLInputElement) {
-            checkbox.checked = shouldCheck;
-          }
+        document.querySelectorAll<HTMLInputElement>('.category-checkbox').forEach(checkbox => {
+          checkbox.checked = shouldCheck;
         });
         
         updateBulkDeleteButton();
@@ -423,15 +425,15 @@ const categoriesWithCount = await Promise.all(
     });
     
     // Manipulação do modal de exclusão
-    deleteButtons.forEach(button => {
+    document.querySelectorAll('.delete-category').forEach(button => {
       button.addEventListener('click', (e) => {
         e.preventDefault();
         const categoryId = button.getAttribute('data-category-id');
         const categoryName = button.getAttribute('data-category-name');
         
-        if (deleteModal && categoryNameToDelete && categoryIdToDelete) {
+        if (categoryId && categoryName && deleteModal && categoryNameToDelete) {
           categoryNameToDelete.textContent = categoryName;
-          categoryIdToDelete.value = categoryId || '';
+          (categoryIdToDelete as HTMLInputElement).value = categoryId;
           deleteModal.classList.remove('hidden');
         }
       });
@@ -446,49 +448,59 @@ const categoriesWithCount = await Promise.all(
       });
     }
     
+    // Garantir que o formulário de exclusão seja enviado
+    if (deleteForm) {
+      deleteForm.addEventListener('submit', (e) => {
+        // Permitir envio normal do formulário
+        // Nenhuma ação especial necessária
+      });
+    }
+    
     // Confirmação de exclusão em lote
     if (bulkDeleteForm) {
       bulkDeleteForm.addEventListener('submit', (e) => {
-        const selectedCount = document.querySelectorAll<HTMLInputElement>('.category-checkbox:checked').length;
-        if (selectedCount > 0) {
-          if (!confirm(`Tem certeza que deseja excluir ${selectedCount} categorias?`)) {
-            e.preventDefault();
-          }
+        const selectedCount = document.querySelectorAll('.category-checkbox:checked').length;
+        
+        if (selectedCount === 0) {
+          e.preventDefault();
+          alert('Selecione pelo menos uma categoria para excluir.');
+        } else if (!confirm(`Tem certeza que deseja excluir ${selectedCount} categorias?`)) {
+          e.preventDefault();
         }
       });
     }
   </script>
-
-<style>
-  /* Estilos para arrastar e soltar */
-  [draggable="true"] {
-    cursor: grab;
-  }
   
-  [draggable="true"]:active {
-    cursor: grabbing;
-  }
-  
-  #drop-area {
-    transition: all 0.2s ease;
-    z-index: 40;
-  }
-  
-  /* Estilos para formulários */
-  .label {
-    @apply block text-sm font-medium text-gray-700 mb-1;
-  }
-  
-  .input {
-    @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm;
-  }
-  
-  .btn {
-    @apply inline-flex justify-center rounded-md border border-transparent px-4 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2;
-  }
-  
-  .btn-primary {
-    @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
-  }
-</style>
+  <style>
+    /* Estilos para arrastar e soltar */
+    [draggable="true"] {
+      cursor: grab;
+    }
+    
+    [draggable="true"]:active {
+      cursor: grabbing;
+    }
+    
+    #drop-area {
+      transition: all 0.2s ease;
+      z-index: 40;
+    }
+    
+    /* Estilos para formulários */
+    .label {
+      @apply block text-sm font-medium text-gray-700 mb-1;
+    }
+    
+    .input {
+      @apply block w-full rounded-md border-gray-300 shadow-sm focus:border-primary-500 focus:ring-primary-500 sm:text-sm;
+    }
+    
+    .btn {
+      @apply inline-flex justify-center rounded-md border border-transparent px-4 py-2 text-sm font-medium shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2;
+    }
+    
+    .btn-primary {
+      @apply bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500;
+    }
+  </style>
 </AdminLayout>
