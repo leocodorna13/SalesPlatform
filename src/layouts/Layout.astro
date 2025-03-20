@@ -29,10 +29,13 @@ const projectName = siteSettings.projectName || 'Desapego dos Martins';
 <html lang="pt-BR">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="manifest" href="/site.webmanifest">
     <meta name="theme-color" content="#b37847">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="generator" content={Astro.generator} />
     <title>{title} | {projectName}</title>
     
@@ -53,45 +56,45 @@ const projectName = siteSettings.projectName || 'Desapego dos Martins';
     <meta property="og:type" content="website" />
     <meta name="twitter:card" content="summary_large_image" />
   </head>
-  <body class="bg-neutral-50 min-h-screen flex flex-col font-sans relative">
+  <body class="bg-neutral-50 min-h-screen flex flex-col font-sans relative text-base">
     <!-- Padrão de fundo com textura de bolinhas estilo brocado -->
     <div class="fixed inset-0 bg-pattern-dots opacity-50 pointer-events-none z-0"></div>
     
-    <header class="bg-white shadow-soft sticky top-0 z-40 border-b border-neutral-200">
+    <header class="bg-white shadow-soft sticky top-0 z-40 border-b border-neutral-200 safe-top">
       <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div class="flex justify-between h-16">
           <!-- Logo -->
           <div class="flex items-center">
             <a href="/" class="flex items-center">
-              <span class="text-2xl md:text-2xl font-bold font-heading text-primary-600 group-hover:text-primary-700 transition-colors">
-                <i class="fas fa-store-alt mr-2"></i>
-                <span class="hidden md:inline">{projectName}</span>
-                <span class="inline md:hidden">Desapego</span>
+              <span class="text-2xl font-bold font-heading text-primary-600 group-hover:text-primary-700 transition-colors">
+                <i class="fas fa-store-alt mr-2 text-2xl"></i>
+                <span class="hidden md:inline text-xl">{projectName}</span>
+                <span class="inline md:hidden text-xl">Desapego</span>
               </span>
             </a>
           </div>
 
           <!-- Links desktop -->
           <nav class="hidden md:flex items-center space-x-4">
-            <a href="/" class="text-neutral-700 hover:text-primary-600 px-3 py-2 text-sm font-medium flex items-center">
-              <i class="fas fa-home mr-1.5"></i>Início
+            <a href="/" class="text-neutral-700 hover:text-primary-600 px-3 py-2 text-base font-medium flex items-center">
+              <i class="fas fa-home mr-1.5 text-xl"></i>Início
             </a>
-            <a href="/#categorias" class="text-neutral-700 hover:text-primary-600 px-3 py-2 text-sm font-medium flex items-center">
-              <i class="fas fa-tags mr-1.5"></i>Categorias
+            <a href="/#categorias" class="text-neutral-700 hover:text-primary-600 px-3 py-2 text-base font-medium flex items-center">
+              <i class="fas fa-tags mr-1.5 text-xl"></i>Categorias
             </a>
-            <a href="/admin" class="text-neutral-700 hover:text-primary-600 px-3 py-2 text-sm font-medium flex items-center">
-              <i class="fas fa-user-cog mr-1.5"></i>Admin
+            <a href="/admin" class="text-neutral-700 hover:text-primary-600 px-3 py-2 text-base font-medium flex items-center">
+              <i class="fas fa-user-cog mr-1.5 text-xl"></i>Admin
             </a>
           </nav>
 
           <!-- Menu mobile (apenas ícones) -->
-          <nav class="flex md:hidden items-center space-x-3">
-            <a href="/" class="text-neutral-700 hover:text-primary-600 p-2 text-xl">
-              <i class="fas fa-home"></i>
+          <nav class="flex md:hidden items-center space-x-4">
+            <a href="/" class="text-neutral-700 hover:text-primary-600 p-2">
+              <i class="fas fa-home text-2xl"></i>
               <span class="sr-only">Início</span>
             </a>
-            <a href="/#categorias" class="text-neutral-700 hover:text-primary-600 p-2 text-xl">
-              <i class="fas fa-tags"></i>
+            <a href="/#categorias" class="text-neutral-700 hover:text-primary-600 p-2">
+              <i class="fas fa-tags text-2xl"></i>
               <span class="sr-only">Categorias</span>
             </a>
           </nav>
@@ -325,5 +328,38 @@ const projectName = siteSettings.projectName || 'Desapego dos Martins';
   /* Animação de hover para links e botões */
   a, button {
     transition: all 0.2s ease;
+  }
+  
+  /* Ajustes para PWA */
+  @media (display-mode: standalone) {
+    body {
+      /* Ajusta para a barra de status do iOS */
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+
+    .safe-top {
+      padding-top: max(16px, env(safe-area-inset-top));
+    }
+
+    /* Aumenta tamanho base do texto em modo app */
+    html {
+      font-size: 18px;
+    }
+
+    /* Ajusta espaçamentos para toque */
+    a, button {
+      min-height: 44px;
+      min-width: 44px;
+    }
+  }
+
+  /* Previne zoom em inputs no iOS */
+  @supports (-webkit-touch-callout: none) {
+    input, select, textarea {
+      font-size: 16px !important;
+    }
   }
 </style>
