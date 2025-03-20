@@ -2072,22 +2072,22 @@ export async function updateHeroImageOrder(images) {
  */
 export async function incrementProductViews(productId) {
   try {
-    // Primeiro, buscar o produto atual
+    // Buscar produto
     const { data: product, error: fetchError } = await supabase
       .from('products')
       .select('views')
       .eq('id', productId)
       .single();
-    
+
     if (fetchError) throw fetchError;
-    
+
     // Incrementar visualizações
     const currentViews = product?.views || 0;
     const { error: updateError } = await supabase
       .from('products')
       .update({ views: currentViews + 1 })
       .eq('id', productId);
-    
+
     if (updateError) throw updateError;
     return true;
   } catch (error) {
