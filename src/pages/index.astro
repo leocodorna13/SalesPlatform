@@ -15,8 +15,8 @@ const heroImages = await getHeroImages();
 const whatsappMessage = encodeURIComponent(siteSettings.whatsappMessage || 'Olá, gostaria de mais informações sobre os produtos.');
 const whatsappNumber = siteSettings.contactWhatsapp?.replace(/\D/g, '') || '';
 
-// Produtos em destaque (os 4 mais recentes)
-const featuredProducts = (products || []).slice(0, 4).map(product => {
+// Produtos em destaque (os 8 mais recentes)
+const featuredProducts = (products || []).slice(0, 8).map(product => {
   if (product.product_images && product.product_images.length > 0) {
     const primaryImage = product.product_images.find((img: { is_primary: boolean, image_url: string }) => img.is_primary);
     product.image_url = primaryImage ? primaryImage.image_url : product.product_images[0].image_url;
@@ -80,7 +80,7 @@ if (heroImages.length === 0) {
           <i class="fas fa-star mr-1"></i> Produtos Seminovos
         </span> -->
         <h1 class="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 font-heading text-primary-600 drop-shadow-[0_2px_2px_rgba(0,0,0,1)]" style="color: #b37847;">
-          Desapego 3.0.1
+          {siteSettings.heroTitle}
         </h1>
         <p class="text-xl md:text-2xl mb-8 opacity-90 max-w-2xl">
           {siteSettings.heroDescription}
@@ -102,49 +102,6 @@ if (heroImages.length === 0) {
         <path d="M0,0V46.29c47.79,22.2,103.59,32.17,158,28,70.36-5.37,136.33-33.31,206.8-37.5C438.64,32.43,512.34,53.67,583,72.05c69.27,18,138.3,24.88,209.4,13.08,36.15-6,69.85-17.84,104.45-29.34C989.49,25,1113-14.29,1200,52.47V0Z" fill="currentColor"></path>
       </svg>
     </div>
-  </section>
-
-  <!-- Categorias com design de cards modernos -->
-  <section id="categorias" class="py-20 bg-neutral-50 relative">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-      <div class="text-center mb-12">
-        <span class="inline-block px-3 py-1 bg-primary-100 text-primary-700 text-sm font-medium rounded-full mb-2">
-          <i class="fas fa-tags mr-1"></i> Navegue por categorias
-        </span>
-        <h2 class="text-3xl font-bold text-neutral-900 font-heading mb-2">Categorias</h2>
-        <p class="mt-4 text-lg text-neutral-600 max-w-3xl mx-auto">
-          Explore nossos produtos por categoria e encontre exatamente o que você está procurando.
-        </p>
-      </div>
-      
-      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
-        {(categories || []).map((category, index) => (
-          <div class="w-full h-full">
-            <a 
-              href={`/categoria/todos?categoria=${category.slug}`} 
-              class="category-card group bg-white rounded-xl shadow-soft overflow-hidden transform transition-all duration-300 hover:shadow-xl hover:-translate-y-2 flex flex-col items-center justify-center h-40 w-full"
-              data-delay={0.1 + index * 0.05}
-            >
-              <div class="p-6 text-center w-full h-full flex flex-col items-center justify-center">
-                <div class="w-14 h-14 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-primary-600 group-hover:text-white transition-all duration-300 transform group-hover:scale-110">
-                  <i class="fas fa-tag text-lg"></i>
-                </div>
-                <h3 class="text-lg font-medium text-neutral-800 group-hover:text-primary-600 transition-colors">
-                  {category.name}
-                </h3>
-                <p class="mt-2 text-sm text-neutral-500">
-                  {category.product_count || 0} produtos
-                </p>
-              </div>
-            </a>
-          </div>
-        ))}
-      </div>
-    </div>
-    
-    <!-- Decoração de fundo -->
-    <div class="absolute top-0 right-0 w-64 h-64 bg-primary-100 rounded-full opacity-30 -translate-y-1/2 translate-x-1/3"></div>
-    <div class="absolute bottom-0 left-0 w-48 h-48 bg-accent-100 rounded-full opacity-30 translate-y-1/3 -translate-x-1/4"></div>
   </section>
 
   <!-- Produtos em Destaque com design moderno -->
@@ -188,6 +145,50 @@ if (heroImages.length === 0) {
     <div class="absolute bottom-1/4 left-0 w-56 h-56 bg-accent-100 rounded-full opacity-30 -translate-x-1/2"></div>
   </section>
   
+  <!-- Categorias com design de cards modernos -->
+  <section id="categorias" class="py-20 bg-neutral-50 relative">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="text-center mb-12">
+        <span class="inline-block px-3 py-1 bg-primary-100 text-primary-700 text-sm font-medium rounded-full mb-2">
+          <i class="fas fa-tags mr-1"></i> Navegue por categorias
+        </span>
+        <h2 class="text-3xl font-bold text-neutral-900 font-heading mb-2">Categorias</h2>
+        <p class="mt-4 text-lg text-neutral-600 max-w-3xl mx-auto">
+          Explore nossos produtos por categoria e encontre exatamente o que você está procurando.
+        </p>
+      </div>
+      
+      <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-5">
+        {(categories || []).map((category, index) => (
+          <div class="w-full h-full">
+            <a 
+              href={`/categoria/todos?categoria=${category.slug}`} 
+              class="category-card group bg-white rounded-xl shadow-soft overflow-hidden transform transition-all duration-300 hover:shadow-xl hover:-translate-y-2 flex flex-col items-center justify-center h-40 w-full"
+              data-delay={0.1 + index * 0.05}
+            >
+              <div class="p-6 text-center w-full h-full flex flex-col items-center justify-center">
+                <div class="w-14 h-14 bg-primary-100 text-primary-600 rounded-full flex items-center justify-center mx-auto mb-4 group-hover:bg-primary-600 group-hover:text-white transition-all duration-300 transform group-hover:scale-110">
+                  <i class="fas fa-tag text-lg"></i>
+                </div>
+                <h3 class="text-lg font-medium text-neutral-800 group-hover:text-primary-600 transition-colors">
+                  {category.name}
+                </h3>
+                <p class="mt-2 text-sm text-neutral-500">
+                  {category.product_count || 0} produtos
+                </p>
+              </div>
+            </a>
+          </div>
+        ))}
+      </div>
+    </div>
+    
+    <!-- Decoração de fundo -->
+    <div class="absolute top-0 right-0 w-64 h-64 bg-primary-100 rounded-full opacity-30 -translate-y-1/2 translate-x-1/3"></div>
+    <div class="absolute bottom-0 left-0 w-48 h-48 bg-accent-100 rounded-full opacity-30 translate-y-1/3 -translate-x-1/4"></div>
+  </section>
+
+
   <!-- Seção de benefícios -->
   <section class="py-16 bg-primary-900 text-white relative overflow-hidden">
     <div class="absolute inset-0 opacity-10">
