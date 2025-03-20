@@ -104,18 +104,18 @@ if (Astro.request.method === 'POST') {
           <h3 class="text-md font-medium text-gray-700 mb-3">Imagens Atuais</h3>
           <div class="space-y-4">
             {heroImages.map((image) => (
-              <div class="block md:flex items-center p-3 border rounded-lg" data-image-id={image.id}>
+              <div class="block md:flex items-center p-3 border rounded-lg" data-image-id={image.id} data-url={image.url}>
                 <div class="flex items-center mb-3 md:mb-0 md:flex-1">
                   <img src={image.url} alt="Hero image" class="w-24 h-16 object-cover rounded-md"/>
                   <p class="ml-4 text-sm text-gray-500 truncate">{image.filename || 'Imagem do Hero'}</p>
                 </div>
                 <div class="flex gap-2">
-                  <button type="button" class="p-2 text-gray-500 hover:text-gray-700" title="Mover para cima">
+                  <button type="button" class="move-up-btn p-2 text-gray-500 hover:text-gray-700" title="Mover para cima">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M5.293 9.707a1 1 0 010-1.414l4-4a1 1 0 011.414 0l4 4a1 1 0 01-1.414 1.414L11 7.414V15a1 1 0 11-2 0V7.414L6.707 9.707a1 1 0 01-1.414 0z" clip-rule="evenodd" />
                     </svg>
                   </button>
-                  <button type="button" class="p-2 text-gray-500 hover:text-gray-700" title="Mover para baixo">
+                  <button type="button" class="move-down-btn p-2 text-gray-500 hover:text-gray-700" title="Mover para baixo">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" viewBox="0 0 20 20" fill="currentColor">
                       <path fill-rule="evenodd" d="M14.707 10.293a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 111.414-1.414L9 12.586V5a1 1 0 012 0v7.586l2.293-2.293a1 1 0 011.414 0z" clip-rule="evenodd" />
                     </svg>
@@ -340,7 +340,10 @@ if (Astro.request.method === 'POST') {
         formData.append('X-Form-Type', 'update-hero-order');
         formData.append('order', JSON.stringify(
           Array.from(document.querySelectorAll('[data-image-id]'))
-            .map(el => ({ id: el.dataset.imageId }))
+            .map((el, index) => ({ 
+              id: el.dataset.imageId,
+              order: index
+            }))
         ));
         
         fetch(window.location.href, { method: 'POST', body: formData })

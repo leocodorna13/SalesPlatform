@@ -2046,22 +2046,27 @@ export async function deleteHeroImage(imageId) {
 
 export async function updateHeroImageOrder(images) {
   try {
-    const { error } = await supabase
-      .from('hero_images')
-      .upsert(
-        images.map(img => ({
-          id: img.id,
-          order: img.order
-        })),
-        { onConflict: 'id' }
-      );
-
-    if (error) throw error;
-
-    return { success: true, message: 'Ordem das imagens atualizada com sucesso' };
+    // Usar Promise.all para atualizar cada imagem individualmente
+    const updates = images.map(img => 
+      supabase
+        .from('hero_images')
+        .update({ order: img.order })
+        .eq('id', img.id)
+    );
+    
+    await Promise.all(updates);
+    
+    return { 
+      success: true, 
+      message: 'Ordem das imagens atualizada com sucesso' 
+    };
   } catch (error) {
     console.error('Erro ao atualizar ordem das imagens:', error);
-    return { success: false, message: 'Erro ao atualizar ordem das imagens' };
+    return { 
+      success: false, 
+      message: 'Erro ao atualizar ordem das imagens',
+      error 
+    };
   }
 }
 
