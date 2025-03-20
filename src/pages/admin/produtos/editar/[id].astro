@@ -38,6 +38,30 @@ if (Astro.request.method === 'POST') {
     console.log(`[${new Date().toISOString()}] Iniciando processamento de formulário para produto ID: ${id}`);
     const formData = await Astro.request.formData();
     
+    // Verificar se é uma ação para definir imagem principal
+    const action = formData.get('action');
+    if (action === 'set_primary_image') {
+      const imageUrl = formData.get('image_url');
+      const productId = formData.get('product_id');
+      
+      // Remover flag is_primary de todas as imagens do produto
+      await supabase
+        .from('product_images')
+        .update({ is_primary: false })
+        .eq('product_id', productId);
+      
+      // Definir a imagem selecionada como principal
+      await supabase
+        .from('product_images')
+        .update({ is_primary: true })
+        .eq('image_url', imageUrl);
+      
+      return new Response(JSON.stringify({ success: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' }
+      });
+    }
+    
     // Extrair dados do formulário
     const title = formData.get('title') as string;
     const description = formData.get('description') as string;
@@ -319,15 +343,28 @@ const formattedPrice = product.price.toString();
                   alt={`${product.title} - Imagem ${index + 1}`}
                   class="w-full h-32 object-cover rounded-lg"
                 />
-                <button 
-                  type="button" 
-                  class="remove-image absolute top-1 right-1 bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
-                  data-image-url={image.image_url}
-                >
-                  <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                  </svg>
-                </button>
+                <div class="absolute top-1 right-1 flex gap-1">
+                  <button 
+                    type="button" 
+                    class="set-primary bg-blue-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    data-image-url={image.image_url}
+                    data-product-id={product.id}
+                    title="Definir como principal"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                  </button>
+                  <button 
+                    type="button" 
+                    class="remove-image bg-red-500 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                    data-image-url={image.image_url}
+                  >
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                    </svg>
+                  </button>
+                </div>
                 {image.is_primary && (
                   <div class="absolute bottom-2 right-2 bg-green-500 text-white rounded-full p-1">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -443,6 +480,41 @@ const formattedPrice = product.price.toString();
       .then(() => {
         window.location.reload();
       });
+    });
+  });
+
+  // Adicionar handlers para botões de imagem principal
+  document.querySelectorAll('.set-primary').forEach(btn => {
+    btn.addEventListener('click', async function() {
+      const url = this.dataset.imageUrl;
+      const productId = this.dataset.productId;
+      
+      try {
+        // Enviar requisição para atualizar
+        const formData = new FormData();
+        formData.append('action', 'set_primary_image');
+        formData.append('image_url', url);
+        formData.append('product_id', productId);
+        
+        const response = await fetch(window.location.href, {
+          method: 'POST',
+          body: formData
+        });
+        
+        if (response.ok) {
+          // Atualizar UI
+          document.querySelectorAll('.absolute.bottom-2.right-2').forEach(el => el.remove());
+          const container = this.closest('.relative');
+          if (container) {
+            const badge = document.createElement('div');
+            badge.className = 'absolute bottom-2 right-2 bg-green-500 text-white rounded-full p-1';
+            badge.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>';
+            container.appendChild(badge);
+          }
+        }
+      } catch (error) {
+        console.error('Erro ao definir imagem principal:', error);
+      }
     });
   });
 
