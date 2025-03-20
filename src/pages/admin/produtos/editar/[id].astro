@@ -35,6 +35,7 @@ let error = null;
 
 if (Astro.request.method === 'POST') {
   try {
+    console.log(`[${new Date().toISOString()}] Iniciando processamento de formulário para produto ID: ${id}`);
     const formData = await Astro.request.formData();
     
     // Extrair dados do formulário
@@ -42,6 +43,8 @@ if (Astro.request.method === 'POST') {
     const description = formData.get('description') as string;
     const price = parseFloat(formData.get('price') as string);
     const category_id = formData.get('category_id') as string;
+    
+    console.log(`Atualizando produto: ${title}`);
     
     // Atualizar o produto
     const { error: updateError } = await supabase
@@ -59,41 +62,95 @@ if (Astro.request.method === 'POST') {
     
     // Processar imagens
     const imageFiles = formData.getAll('images') as File[];
-    // Verificar se há arquivos válidos
-    const validFiles = imageFiles.filter(file => file instanceof File && file.size > 0);
+    console.log(`Processando ${imageFiles.length} imagens`);
+    
+    // Verificar se há arquivos válidos e eliminar duplicatas
+    const uniqueFiles = new Map();
+    const validFiles = [];
+    
+    // Primeiro passo: identificar arquivos únicos pelo nome e tamanho
+    imageFiles.forEach(file => {
+      if (file instanceof File && file.size > 0) {
+        const fileKey = `${file.name}-${file.size}`;
+        if (!uniqueFiles.has(fileKey)) {
+          uniqueFiles.set(fileKey, file);
+          validFiles.push(file);
+        } else {
+          console.log(`Arquivo duplicado ignorado: ${file.name} (${file.size} bytes)`);
+        }
+      }
+    });
+    
+    console.log(`${validFiles.length} arquivos únicos válidos encontrados`);
     
     if (validFiles.length > 0) {
+      // Obter imagens existentes para verificar duplicatas
+      const { data: existingImages } = await supabase
+        .from('product_images')
+        .select('image_url')
+        .eq('product_id', id);
+      
+      const existingUrls = existingImages ? existingImages.map(img => img.image_url) : [];
+      console.log(`${existingUrls.length} imagens existentes encontradas: ${JSON.stringify(existingUrls)}`);
+      
+      // Criar um conjunto para rastrear URLs já processadas nesta sessão
+      const processedUrls = new Set();
+      
       // Upload das novas imagens
       for (let i = 0; i < validFiles.length; i++) {
         const file = validFiles[i];
+        console.log(`Processando arquivo ${i+1}/${validFiles.length}: ${file.name} (${file.size} bytes)`);
+        
         const fileExt = file.name.split('.').pop();
-        const fileName = `${id}/${Date.now()}-${i}.${fileExt}`;
+        const timestamp = Date.now();
+        // Usar o mesmo formato de caminho que na criação de produtos
+        const fileName = `${id}/${timestamp}-${i}.${fileExt}`;
         const filePath = `products/${fileName}`;
         
+        console.log(`Fazendo upload para ${filePath}`);
         const { error: uploadError } = await supabase.storage
           .from('product-images')
-          .upload(filePath, file);
+          .upload(filePath, file, { upsert: true });
         
-        if (uploadError) continue;
+        if (uploadError) {
+          console.error(`Erro no upload: ${JSON.stringify(uploadError)}`);
+          continue;
+        }
         
         const { data: publicURL } = supabase.storage
           .from('product-images')
           .getPublicUrl(filePath);
         
-        // Verificar se já existem imagens para este produto
-        const { data: existingImages } = await supabase
-          .from('product_images')
-          .select('*')
-          .eq('product_id', id);
+        const imageUrl = publicURL.publicUrl;
+        console.log(`URL gerada: ${imageUrl}`);
         
+        // Verificar se a URL já existe ou já foi processada
+        if (existingUrls.includes(imageUrl)) {
+          console.log(`Imagem duplicada (existente no banco): ${imageUrl}`);
+          continue;
+        }
+        
+        if (processedUrls.has(imageUrl)) {
+          console.log(`Imagem duplicada (processada nesta sessão): ${imageUrl}`);
+          continue;
+        }
+        
+        // Adicionar à lista de URLs processadas
+        processedUrls.add(imageUrl);
+        
+        console.log(`Salvando referência da imagem: ${imageUrl}`);
         // Salvar referência da imagem
-        await supabase
+        const { error: insertError } = await supabase
           .from('product_images')
           .insert([{
             product_id: id,
-            image_url: publicURL.publicUrl,
+            image_url: imageUrl,
             is_primary: existingImages && existingImages.length === 0 && i === 0 // Só é primária se for a primeira e não existirem outras
           }]);
+          
+        if (insertError) {
+          console.error(`Erro ao inserir imagem: ${JSON.stringify(insertError)}`);
+        }
       }
     }
     
@@ -299,6 +356,37 @@ const formattedPrice = product.price.toString();
 </AdminLayout>
 
 <script>
+  // Script para prevenir submissões duplicadas
+  document.addEventListener('DOMContentLoaded', function() {
+    const form = document.getElementById('product-form');
+    if (form) {
+      let isSubmitting = false;
+      
+      form.addEventListener('submit', function(e) {
+        if (isSubmitting) {
+          e.preventDefault();
+          return;
+        }
+        
+        isSubmitting = true;
+        const submitButton = document.querySelector('button[type="submit"]');
+        if (submitButton) {
+          submitButton.disabled = true;
+          submitButton.textContent = 'Salvando...';
+        }
+      });
+    }
+    
+    // Esconder notificação de sucesso
+    const successNotification = document.querySelector('.bg-green-500.fixed');
+    if (successNotification) {
+      setTimeout(() => {
+        successNotification.classList.add('opacity-0');
+        setTimeout(() => successNotification.remove(), 500);
+      }, 3000);
+    }
+  });
+
   // Script para o botão de salvar alterações
   document.addEventListener('DOMContentLoaded', function() {
     const form = document.getElementById('product-form') as HTMLFormElement;
