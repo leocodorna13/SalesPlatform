@@ -5,35 +5,18 @@
     {
       "src": "/android-chrome-192x192.png",
       "sizes": "192x192",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     },
     {
       "src": "/android-chrome-512x512.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ],
   "theme_color": "#b37847",
   "background_color": "#ffffff",
   "display": "standalone",
-  "orientation": "natural",
-  "start_url": "/?source=pwa",
+  "start_url": "/",
   "scope": "/",
-  "prefer_related_applications": false,
-  "categories": ["shopping"],
-  "description": "Produtos seminovos em ótimo estado",
-  "screenshots": [
-    {
-      "src": "/screenshot-540x720.jpg",
-      "type": "image/jpeg",
-      "sizes": "540x720",
-      "form_factor": "narrow"
-    }
-  ],
-  "display_override": ["standalone", "minimal-ui"],
-  "lang": "pt-BR",
-  "dir": "ltr",
-  "id": "desapego-dos-martins-pwa-1.0"
+  "description": "Produtos seminovos em ótimo estado"
 }
