@@ -19,6 +19,14 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
   }
 });
 
+// Cache em memória para dados frequentes
+const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+const cache = {
+  siteSettings: { data: null, timestamp: 0 },
+  categories: { data: null, timestamp: 0 },
+  products: { data: null, timestamp: 0 }
+};
+
 // ======= Funções de Autenticação =======
 
 /**
@@ -102,6 +110,13 @@ export async function logout() {
  */
 export async function getProducts(status = 'all') {
   try {
+    const cacheKey = `products_${status}`;
+    const cached = cache[cacheKey];
+    
+    if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
+      return cached.data;
+    }
+    
     let query = supabase
       .from('products')
       .select(`
@@ -132,6 +147,13 @@ export async function getProducts(status = 'all') {
     const { data, error } = await query;
     
     if (error) throw error;
+    
+    // Atualizar cache
+    cache[cacheKey] = {
+      data: data || [],
+      timestamp: Date.now()
+    };
+    
     return data || [];
   } catch (error) {
     console.error('Erro ao buscar produtos:', error);
@@ -598,12 +620,16 @@ export async function deleteProduct(id) {
  */
 export async function getCategories() {
   try {
+    if (cache.categories.data && Date.now() - cache.categories.timestamp < CACHE_DURATION) {
+      return cache.categories.data;
+    }
+    
     // Buscar categorias
     const { data: categories, error } = await supabase
       .from('categories')
       .select('*')
-      .order('name', { ascending: true });
-    
+      .order('name');
+      
     if (error) throw error;
     
     // Para cada categoria, buscar a contagem de produtos
@@ -624,6 +650,11 @@ export async function getCategories() {
         return { ...category, product_count: count || 0 };
       })
     );
+    
+    cache.categories = {
+      data: categoriesWithCount || [],
+      timestamp: Date.now()
+    };
     
     return categoriesWithCount || [];
   } catch (error) {
@@ -1556,6 +1587,10 @@ export async function toggleProductVisibility(productId) {
  */
 export async function getSiteSettings() {
   try {
+    if (cache.siteSettings.data && Date.now() - cache.siteSettings.timestamp < CACHE_DURATION) {
+      return cache.siteSettings.data;
+    }
+    
     const { data, error } = await supabase
       .from('site_settings')
       .select('*')
@@ -1579,6 +1614,11 @@ export async function getSiteSettings() {
       console.error('Erro ao buscar configurações do site:', error);
       return null;
     }
+    
+    cache.siteSettings = {
+      data: data || {},
+      timestamp: Date.now()
+    };
     
     return data;
   } catch (error) {
