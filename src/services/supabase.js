@@ -519,77 +519,60 @@ export async function deleteProduct(id) {
       return false;
     }
     
-    // Buscar as imagens do produto antes de excluí-las
+    // 1. Primeiro, buscar todas as imagens do produto
     const { data: productImages, error: fetchError } = await supabase
       .from('product_images')
-      .select('*')
+      .select('image_url')
       .eq('product_id', id);
     
     if (fetchError) {
       console.error('Erro ao buscar imagens do produto:', fetchError);
-    } else {
-      // Excluir os arquivos do storage
-      if (productImages && productImages.length > 0) {
-        try {
-          // Excluir a pasta inteira do produto no storage
-          const { data: storageData, error: storageError } = await supabase.storage
-            .from('product-images')
-            .remove([`products/${id}`]);
-          
-          if (storageError) {
-            console.error('Erro ao excluir arquivos do storage:', storageError);
-            
-            // Tentar excluir arquivos individuais se a exclusão da pasta falhar
-            for (const image of productImages) {
-              // Extrair o caminho do arquivo da URL
-              const imageUrl = image.image_url;
-              const urlParts = imageUrl.split('/');
-              const fileName = urlParts[urlParts.length - 1];
-              const filePath = `products/${id}/${fileName}`;
-              
-              console.log(`Tentando excluir arquivo individual: ${filePath}`);
-              
-              const { error: individualError } = await supabase.storage
-                .from('product-images')
-                .remove([filePath]);
-              
-              if (individualError) {
-                console.error(`Erro ao excluir arquivo ${filePath}:`, individualError);
-              } else {
-                console.log(`Arquivo ${filePath} excluído com sucesso`);
-              }
-            }
-          } else {
-            console.log('Arquivos excluídos do storage:', storageData);
-          }
-        } catch (storageExcError) {
-          console.error('Exceção ao excluir arquivos do storage:', storageExcError);
+      return false;
+    }
+
+    // 2. Excluir os arquivos do storage
+    if (productImages && productImages.length > 0) {
+      const filesToDelete = productImages.map(img => {
+        // Extrair o caminho do arquivo da URL do Supabase
+        // A URL tem o formato: https://.../storage/v1/object/public/product-images/products/ID/filename
+        const parts = img.image_url.split('product-images/');
+        if (parts.length > 1) {
+          return parts[1]; // Retorna 'products/ID/filename'
+        }
+        return null;
+      }).filter(Boolean); // Remove nulls
+
+      if (filesToDelete.length > 0) {
+        const { error: storageError } = await supabase.storage
+          .from('product-images')
+          .remove(filesToDelete);
+
+        if (storageError) {
+          console.error('Erro ao excluir arquivos do storage:', storageError);
         }
       }
     }
-    
-    // Excluir as referências das imagens no banco
-    const { data: imageData, error: imagesError } = await supabase
+
+    // 3. Excluir as referências das imagens no banco
+    const { error: imagesError } = await supabase
       .from('product_images')
       .delete()
-      .eq('product_id', id)
-      .select();
+      .eq('product_id', id);
     
     if (imagesError) {
-      console.error('Erro detalhado ao excluir imagens:', imagesError);
-      throw imagesError;
+      console.error('Erro ao excluir referências das imagens:', imagesError);
+      return false;
     }
     
-    // Depois excluir o produto
-    const { data, error } = await supabase
+    // 4. Por fim, excluir o produto
+    const { error: productError } = await supabase
       .from('products')
       .delete()
-      .eq('id', id)
-      .select();
+      .eq('id', id);
     
-    if (error) {
-      console.error('Erro detalhado ao excluir produto:', error);
-      throw error;
+    if (productError) {
+      console.error('Erro ao excluir produto:', productError);
+      return false;
     }
     
     return true;
@@ -1605,34 +1588,50 @@ export async function getSiteSettings() {
  */
 export async function uploadImage(file, bucketName = 'site-images', folder = 'hero') {
   try {
-    // Garantir que o bucket existe
     const bucketExists = await createBucketIfNotExists(bucketName);
     if (!bucketExists) {
       throw new Error('Não foi possível criar o bucket para armazenamento de imagens');
     }
 
-    // Gerar um nome de arquivo único
-    const fileExt = file.name.split('.').pop();
-    const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 15)}.${fileExt}`;
+    // Converter o File para um formato que o Astro possa processar
+    const arrayBuffer = await file.arrayBuffer();
+    const buffer = Buffer.from(arrayBuffer);
+
+    // Otimizar a imagem usando o Astro
+    const optimizedImage = await getImage({
+      src: buffer,
+      width: 1920,
+      height: 1080,
+      format: 'webp',
+      quality: 80
+    });
+
+    // Criar um novo File com a imagem otimizada
+    const response = await fetch(optimizedImage.src);
+    const optimizedBuffer = await response.arrayBuffer();
+    const optimizedFile = new File([optimizedBuffer], `${file.name.split('.')[0]}.webp`, {
+      type: 'image/webp'
+    });
+
+    // Upload para o Supabase
+    const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 15)}.webp`;
     
-    // Fazer upload do arquivo
     const { data, error } = await supabase.storage
       .from(bucketName)
-      .upload(fileName, file, {
+      .upload(fileName, optimizedFile, {
         cacheControl: '3600',
         upsert: false
       });
-    
+
     if (error) throw error;
-    
-    // Obter URL pública da imagem
-    const { data: urlData } = supabase.storage
+
+    const { data: publicURL } = supabase.storage
       .from(bucketName)
       .getPublicUrl(fileName);
-    
+
     return {
       success: true,
-      url: urlData.publicUrl,
+      url: publicURL.publicUrl,
       error: null
     };
   } catch (error) {
@@ -1640,7 +1639,7 @@ export async function uploadImage(file, bucketName = 'site-images', folder = 'he
     return {
       success: false,
       url: null,
-      error: error.message
+      error
     };
   }
 }
@@ -1668,30 +1667,25 @@ export async function uploadHeroCarouselImages(files, bucketName = 'site-images'
       const fileName = `${Math.random().toString(36).substring(2, 15)}_${Date.now()}.${fileExt}`;
       const filePath = `${folder}/${fileName}`;
 
-      // Fazer upload do arquivo
+      // Upload da imagem
       const uploadPromise = supabase.storage
         .from(bucketName)
-        .upload(filePath, file, {
-          cacheControl: '3600',
-          upsert: false
-        })
-        .then(({ data, error }) => {
-          if (error) throw error;
-          
-          // Obter URL pública da imagem
-          const { data: urlData } = supabase.storage
-            .from(bucketName)
-            .getPublicUrl(filePath);
-          
-          return urlData.publicUrl;
-        });
-      
+        .upload(filePath, file);
+
       uploadPromises.push(uploadPromise);
     }
     
     // Esperar todos os uploads terminarem
-    const urls = await Promise.all(uploadPromises);
+    const results = await Promise.all(uploadPromises);
     
+    // Obter URLs públicas das imagens
+    const urls = await Promise.all(results.map(async (result) => {
+      const { data: publicURL } = supabase.storage
+        .from(bucketName)
+        .getPublicUrl(result.data.Key);
+      return publicURL.publicUrl;
+    }));
+
     return {
       success: true,
       urls,
