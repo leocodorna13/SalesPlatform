@@ -15,5 +15,20 @@
   ],
   "theme_color": "#b37847",
   "background_color": "#ffffff",
-  "display": "standalone"
+  "display": "standalone",
+  "orientation": "portrait",
+  "start_url": "/?source=pwa",
+  "scope": "/",
+  "prefer_related_applications": false,
+  "categories": ["shopping"],
+  "description": "Produtos seminovos em ótimo estado",
+  "screenshots": [
+    {
+      "src": "/screenshot-540x720.jpg",
+      "type": "image/jpeg",
+      "sizes": "540x720",
+      "form_factor": "narrow"
+    }
+  ],
+  "display_override": ["standalone", "minimal-ui", "fullscreen"]
 }

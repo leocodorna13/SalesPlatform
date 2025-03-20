@@ -362,4 +362,60 @@ const projectName = siteSettings.projectName || 'Desapego dos Martins';
       font-size: 16px !important;
     }
   }
+
+  /* Força modo mobile em PWA */
+  @media (display-mode: standalone) {
+    /* Força largura máxima do container */
+    .max-w-7xl {
+      max-width: 100% !important;
+    }
+
+    /* Esconde elementos desktop */
+    .hidden.md\:flex,
+    .hidden.md\:inline,
+    .hidden.md\:block {
+      display: none !important;
+    }
+
+    /* Mostra elementos mobile */
+    .md\:hidden {
+      display: flex !important;
+    }
+
+    /* Ajusta grid para uma coluna */
+    .md\:grid-cols-2,
+    .md\:grid-cols-3,
+    .md\:grid-cols-4 {
+      grid-template-columns: 1fr !important;
+    }
+
+    /* Ajusta padding */
+    .px-4.sm\:px-6.lg\:px-8 {
+      padding-left: 1rem !important;
+      padding-right: 1rem !important;
+    }
+
+    /* Aumenta fonte base */
+    html {
+      font-size: 18px;
+    }
+
+    /* Ajusta espaçamentos para toque */
+    a, button {
+      min-height: 44px;
+      min-width: 44px;
+    }
+
+    /* Ajusta para notch e bordas */
+    body {
+      padding-top: env(safe-area-inset-top);
+      padding-bottom: env(safe-area-inset-bottom);
+      padding-left: env(safe-area-inset-left);
+      padding-right: env(safe-area-inset-right);
+    }
+
+    .safe-top {
+      padding-top: max(16px, env(safe-area-inset-top));
+    }
+  }
 </style>
