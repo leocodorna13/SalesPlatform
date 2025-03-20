@@ -2012,3 +2012,34 @@ export async function updateHeroImageOrder(images) {
     return { success: false, message: 'Erro ao atualizar ordem das imagens' };
   }
 }
+
+/**
+ * Função para incrementar visualizações
+ * @param {string} productId - ID do produto
+ * @returns {Promise<boolean>} - true se a atualização foi bem-sucedida
+ */
+export async function incrementProductViews(productId) {
+  try {
+    // Primeiro, buscar o produto atual
+    const { data: product, error: fetchError } = await supabase
+      .from('products')
+      .select('views')
+      .eq('id', productId)
+      .single();
+    
+    if (fetchError) throw fetchError;
+    
+    // Incrementar visualizações
+    const currentViews = product?.views || 0;
+    const { error: updateError } = await supabase
+      .from('products')
+      .update({ views: currentViews + 1 })
+      .eq('id', productId);
+    
+    if (updateError) throw updateError;
+    return true;
+  } catch (error) {
+    console.error('Erro ao incrementar visualizações:', error);
+    return false;
+  }
+}

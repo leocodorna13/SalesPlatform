@@ -2,7 +2,7 @@
 import Layout from '../../layouts/Layout.astro';
 import ProductGrid from '../../components/ProductGrid.astro';
 import WhatsAppButton from '../../components/WhatsAppButton.astro';
-import { getProductById, registerInterest, getRelatedProducts, getSiteSettings, getProductInterestCount, getRecommendedProducts, supabase, getProducts } from '../../services/supabase';
+import { getProductById, registerInterest, getRelatedProducts, getSiteSettings, getProductInterestCount, getRecommendedProducts, supabase, getProducts, incrementProductViews } from '../../services/supabase';
 
 // Definir interface para o produto
 interface ProductImage {
@@ -44,6 +44,9 @@ const product = await getProductById(id) as Product | null;
 if (!product || !product.visible) {
   return Astro.redirect('/');
 }
+
+// Incrementar visualizações
+await incrementProductViews(id);
 
 // Buscar produtos relacionados (mesma categoria)
 const relatedProducts = await getRelatedProducts(product.categories.id, id);
