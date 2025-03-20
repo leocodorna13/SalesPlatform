@@ -320,58 +320,45 @@ if (Astro.request.method === 'POST') {
 </AdminLayout>
 
 <script>
-  interface HeroImage {
-    id: string;
-    url: string;
-    filename: string;
-    order: number;
-  }
-
-  // Ordenação de imagens
-  const imageList = document.querySelector('.space-y-4');
-  const moveUpBtns = document.querySelectorAll('.move-up-btn');
-  const moveDownBtns = document.querySelectorAll('.move-down-btn');
-  
-  function updateOrder(newImages: HeroImage[]) {
-    // Enviar nova ordem para o servidor
-    const formData = new FormData();
-    formData.append('X-Form-Type', 'update-hero-order');
-    formData.append('order', JSON.stringify(newImages));
-    
-    fetch(window.location.href, {
-      method: 'POST',
-      body: formData
-    });
-  }
-  
-  moveUpBtns.forEach(btn => {
-    btn.addEventListener('click', () => {
-      const item = btn.closest('[data-image-id]');
-      const prev = item?.previousElementSibling;
-      if (item && prev) {
-        item.parentNode?.insertBefore(item, prev);
-        updateOrder(Array.from(document.querySelectorAll<HTMLElement>('[data-image-id]')).map(el => ({
-          id: el.dataset.imageId || '',
-          order: parseInt(el.dataset.order || '0'),
-          url: el.dataset.url || '',
-          filename: el.dataset.filename || ''
-        })));
-      }
+  // Recarregar após qualquer submissão de formulário
+  document.querySelectorAll('form').forEach(form => {
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const formData = new FormData(form);
+      
+      await fetch(window.location.href, {
+        method: 'POST',
+        body: formData
+      });
+      
+      window.location.reload();
     });
   });
-  
-  moveDownBtns.forEach(btn => {
+
+  // Ordenação de imagens
+  document.querySelectorAll('.move-up-btn, .move-down-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       const item = btn.closest('[data-image-id]');
-      const next = item?.nextElementSibling;
-      if (item && next) {
-        item.parentNode?.insertBefore(next, item);
-        updateOrder(Array.from(document.querySelectorAll<HTMLElement>('[data-image-id]')).map(el => ({
-          id: el.dataset.imageId || '',
-          order: parseInt(el.dataset.order || '0'),
-          url: el.dataset.url || '',
-          filename: el.dataset.filename || ''
-        })));
+      const sibling = btn.classList.contains('move-up-btn') 
+        ? item?.previousElementSibling 
+        : item?.nextElementSibling;
+
+      if (item && sibling) {
+        item.parentNode?.insertBefore(
+          btn.classList.contains('move-up-btn') ? item : sibling,
+          btn.classList.contains('move-up-btn') ? sibling : item
+        );
+
+        // Atualizar ordem
+        const formData = new FormData();
+        formData.append('X-Form-Type', 'update-hero-order');
+        formData.append('order', JSON.stringify(
+          Array.from(document.querySelectorAll('[data-image-id]'))
+            .map(el => ({ id: el.dataset.imageId }))
+        ));
+        
+        fetch(window.location.href, { method: 'POST', body: formData })
+          .then(() => window.location.reload());
       }
     });
   });

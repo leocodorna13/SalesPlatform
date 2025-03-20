@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { getImage } from 'astro:assets';
 
 // Inicializar o cliente Supabase
 const supabaseUrl = import.meta.env.PUBLIC_SUPABASE_URL || 'https://seu-projeto.supabase.co';
@@ -9,7 +10,14 @@ if (supabaseUrl === 'https://seu-projeto.supabase.co' || supabaseAnonKey === 'su
   console.warn('⚠️ Variáveis de ambiente do Supabase não configuradas. Usando valores padrão para desenvolvimento.');
 }
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Criar cliente com autenticação persistente
+export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+  auth: {
+    persistSession: true,
+    autoRefreshToken: true,
+    detectSessionInUrl: true
+  }
+});
 
 // ======= Funções de Autenticação =======
 
@@ -1905,21 +1913,24 @@ export async function addHeroImage(file) {
 
 export async function deleteHeroImage(imageId) {
   try {
-    // Buscar dados da imagem
-    const { data } = await supabase
+    // Primeiro buscar os dados da imagem
+    const { data, error } = await supabase
       .from('hero_images')
-      .select('url, filename')
+      .select('*')
       .eq('id', imageId)
       .single();
 
+    if (error) throw error;
+
     if (data?.filename) {
-      // Deletar arquivo do storage
+      // Deletar arquivo do storage usando o caminho correto
       const { error: storageError } = await supabase.storage
         .from('siteimages')
         .remove([`hero/${data.filename}`]);
 
       if (storageError) {
         console.error('Erro ao deletar arquivo:', storageError);
+        return { success: false, message: 'Erro ao deletar arquivo do storage' };
       }
     }
 
@@ -1929,7 +1940,10 @@ export async function deleteHeroImage(imageId) {
       .delete()
       .eq('id', imageId);
 
-    if (dbError) throw dbError;
+    if (dbError) {
+      console.error('Erro ao deletar registro:', dbError);
+      return { success: false, message: 'Erro ao deletar registro do banco' };
+    }
 
     return { success: true, message: 'Imagem removida com sucesso' };
   } catch (error) {

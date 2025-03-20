@@ -99,28 +99,28 @@ if (Astro.request.method === 'POST') {
       // Upload de produto único
       const imageFiles = formData.getAll('images');
       
-      // Criar categoria e produto em paralelo
-      const [categoryResult, product] = await Promise.all([
-        // Criar categoria se necessário
-        (!categoryId && categoryName) ? findOrCreateCategory(categoryName) : Promise.resolve(null),
-        
-        // Criar produto
-        createProduct({
-          title,
-          price,
-          description,
-          category_id: categoryId || '' // Não enviar null, enviar o categoryId atual
-        }, imageFiles)
-      ]);
-      
-      // Atualizar categoria do produto se uma nova foi criada
-      if (categoryResult && typeof categoryResult === 'object' && 'id' in categoryResult) {
-        categoryId = String(categoryResult.id);
-        // Atualizar categoria do produto aqui se necessário
+      // Primeiro criar/encontrar a categoria se necessário
+      if (!categoryId && categoryName) {
+        const newCategory = await findOrCreateCategory(categoryName);
+        if (newCategory && typeof newCategory === 'object' && 'id' in newCategory) {
+          categoryId = String(newCategory.id);
+        }
       }
-      
+
+      // Agora criar o produto com a categoria já definida
+      if (!categoryId) {
+        throw new Error('É necessário selecionar ou criar uma categoria');
+      }
+
+      const product = await createProduct({
+        title,
+        price,
+        description,
+        category_id: categoryId
+      }, imageFiles);
+
       success = true;
-      // Não redirecionar para a página do produto, apenas marcar como sucesso
+      return Astro.redirect('/admin/produtos?success=true');
     }
     
     // Redirecionar para a página de produtos
