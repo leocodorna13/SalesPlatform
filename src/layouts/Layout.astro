@@ -1,6 +1,7 @@
 ---
 import '../styles/global.css';
 import { getSiteSettings } from '../services/supabase';
+import InstallAppBanner from '../components/InstallAppBanner.astro';
 
 interface Props {
   title: string;
@@ -194,6 +195,9 @@ const projectName = siteSettings.projectName || 'Desapego dos Martins';
         }
       });
     </script>
+    
+    <!-- Banner de instalação do app -->
+    <InstallAppBanner />
   </body>
 </html>
 

@@ -1,0 +1,156 @@
+---
+// InstallAppBanner.astro
+// Banner para instalação do PWA
+---
+
+<div id="installBanner" class="fixed bottom-0 left-0 right-0 bg-primary-600 text-white p-4 flex items-center justify-between transform translate-y-full transition-transform duration-300 ease-in-out z-50 shadow-lg">
+  <div class="flex items-center">
+    <i class="fas fa-mobile-alt text-2xl mr-3"></i>
+    <div>
+      <p class="font-medium">Instale nosso aplicativo</p>
+      <p class="text-sm opacity-90">Acesse mais rápido da próxima vez</p>
+    </div>
+  </div>
+  <div class="flex items-center">
+    <button id="installApp" class="bg-white text-primary-600 px-4 py-2 rounded-lg font-medium mr-2 hover:bg-primary-50 transition-colors">
+      Instalar
+    </button>
+    <button id="dismissBanner" class="text-white opacity-80 hover:opacity-100 transition-opacity">
+      <i class="fas fa-times text-lg"></i>
+    </button>
+  </div>
+</div>
+
+<script>
+  // Definindo o tipo para o evento beforeinstallprompt
+  interface BeforeInstallPromptEvent extends Event {
+    readonly platforms: string[];
+    readonly userChoice: Promise<{
+      outcome: 'accepted' | 'dismissed';
+      platform: string;
+    }>;
+    prompt(): Promise<void>;
+  }
+
+  // Variável para armazenar o evento de instalação
+  let deferredPrompt: BeforeInstallPromptEvent | null = null;
+  const installBanner = document.getElementById('installBanner');
+  const installButton = document.getElementById('installApp');
+  const dismissButton = document.getElementById('dismissBanner');
+
+  // Função para verificar se o app já está instalado
+  function isAppInstalled(): boolean {
+    // Verifica se está em modo standalone (já instalado)
+    if (window.matchMedia('(display-mode: standalone)').matches) {
+      return true;
+    }
+    // Verifica se está no iOS e foi adicionado à tela inicial
+    // @ts-ignore - Propriedade standalone existe no Safari iOS mas não está no tipo Navigator
+    if (navigator.standalone === true) {
+      return true;
+    }
+    return false;
+  }
+
+  // Função para verificar se o banner foi dispensado
+  function isBannerDismissed(): boolean {
+    return localStorage.getItem('installBannerDismissed') === 'true';
+  }
+
+  // Função para verificar se o usuário já visitou o site antes
+  function checkVisitCount(): number {
+    let visitCount = parseInt(localStorage.getItem('visitCount') || '0');
+    visitCount++;
+    localStorage.setItem('visitCount', visitCount.toString());
+    return visitCount;
+  }
+
+  // Função para mostrar o banner
+  function showInstallBanner(): void {
+    if (installBanner) {
+      installBanner.classList.remove('translate-y-full');
+      installBanner.classList.add('translate-y-0');
+    }
+  }
+
+  // Função para esconder o banner
+  function hideInstallBanner(): void {
+    if (installBanner) {
+      installBanner.classList.remove('translate-y-0');
+      installBanner.classList.add('translate-y-full');
+    }
+  }
+
+  // Escuta o evento beforeinstallprompt
+  window.addEventListener('beforeinstallprompt', (e) => {
+    // Previne o comportamento padrão
+    e.preventDefault();
+    // Armazena o evento para uso posterior
+    deferredPrompt = e as BeforeInstallPromptEvent;
+    
+    // Verifica as condições para mostrar o banner
+    const visitCount = checkVisitCount();
+    const shouldShowBanner = !isAppInstalled() && !isBannerDismissed() && visitCount >= 2;
+    
+    if (shouldShowBanner) {
+      // Mostra o banner após 3 segundos
+      setTimeout(() => {
+        showInstallBanner();
+      }, 3000);
+    }
+  });
+
+  // Adiciona evento de clique ao botão de instalação
+  if (installButton) {
+    installButton.addEventListener('click', async () => {
+      if (!deferredPrompt) {
+        // Fallback para navegadores que não suportam o evento beforeinstallprompt
+        alert('Para instalar o app, adicione esta página à tela inicial através do menu do seu navegador.');
+        return;
+      }
+
+      // Mostra o prompt de instalação
+      deferredPrompt.prompt();
+      
+      // Espera pela resposta do usuário
+      const { outcome } = await deferredPrompt.userChoice;
+      
+      // Limpa a variável deferredPrompt
+      deferredPrompt = null;
+      
+      // Esconde o banner
+      hideInstallBanner();
+    });
+  }
+
+  // Adiciona evento de clique ao botão de dispensar
+  if (dismissButton) {
+    dismissButton.addEventListener('click', () => {
+      // Marca o banner como dispensado
+      localStorage.setItem('installBannerDismissed', 'true');
+      
+      // Esconde o banner
+      hideInstallBanner();
+    });
+  }
+
+  // Verifica se o app foi instalado
+  window.addEventListener('appinstalled', () => {
+    // Limpa a variável deferredPrompt
+    deferredPrompt = null;
+    
+    // Esconde o banner
+    hideInstallBanner();
+    
+    // Registra que o app foi instalado
+    localStorage.setItem('appInstalled', 'true');
+  });
+
+  // Verifica se o app já está instalado ao carregar a página
+  document.addEventListener('DOMContentLoaded', () => {
+    if (isAppInstalled()) {
+      // Esconde o banner se o app já estiver instalado
+      hideInstallBanner();
+    }
+  });
+</script>
