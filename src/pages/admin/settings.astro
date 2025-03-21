@@ -341,7 +341,7 @@ if (Astro.request.method === 'POST') {
         formData.append('order', JSON.stringify(
           Array.from(document.querySelectorAll('[data-image-id]'))
             .map((el, index) => ({ 
-              id: el.dataset.imageId,
+              id: (el as HTMLElement).dataset.imageId,
               order: index
             }))
         ));

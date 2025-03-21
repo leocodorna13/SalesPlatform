@@ -2077,23 +2077,49 @@ export async function updateHeroImageOrder(images) {
  */
 export async function incrementProductViews(productId) {
   try {
+    console.log(`[DEBUG] Incrementando visualizações para o produto ID: ${productId}`);
+    
     // Buscar produto
     const { data: product, error: fetchError } = await supabase
       .from('products')
       .select('views')
       .eq('id', productId)
       .single();
-
-    if (fetchError) throw fetchError;
-
+    
+    if (fetchError) {
+      console.error('[DEBUG] Erro ao buscar produto para incrementar views:', fetchError);
+      throw fetchError;
+    }
+    
+    console.log('[DEBUG] Produto encontrado:', product);
+    console.log('[DEBUG] Visualizações atuais:', product?.views);
+    
     // Incrementar visualizações
     const currentViews = product?.views || 0;
-    const { error: updateError } = await supabase
-      .from('products')
-      .update({ views: currentViews + 1 })
-      .eq('id', productId);
-
-    if (updateError) throw updateError;
+    console.log(`[DEBUG] Atualizando views de ${currentViews} para ${currentViews + 1}`);
+    
+    // Usar SQL direto para atualizar
+    const { data, error: updateError } = await supabase.rpc(
+      'increment_views',
+      { product_id: productId }
+    );
+    
+    if (updateError) {
+      console.error('[DEBUG] Erro ao atualizar visualizações com RPC:', updateError);
+      
+      // Fallback para o método tradicional
+      const { error: directUpdateError } = await supabase
+        .from('products')
+        .update({ views: currentViews + 1 })
+        .eq('id', productId);
+      
+      if (directUpdateError) {
+        console.error('[DEBUG] Erro no método alternativo:', directUpdateError);
+        throw directUpdateError;
+      }
+    }
+    
+    console.log('[DEBUG] Atualização de views concluída com sucesso');
     return true;
   } catch (error) {
     console.error('Erro ao incrementar visualizações:', error);
@@ -2102,7 +2128,7 @@ export async function incrementProductViews(productId) {
 }
 
 /**
- * Executa uma ação em lote para múltiplos produtos
+ * Executa ações em lote para múltiplos produtos
  * @param {string[]} productIds - Array de IDs dos produtos
  * @param {string} action - Ação a ser executada (markHidden, markVisible, delete)
  * @returns {Promise<{success: boolean, message?: string, error?: string}>}
@@ -2197,5 +2223,33 @@ export async function batchProductAction2(productIds, action) {
       success: false, 
       error: error instanceof Error ? error.message : 'Erro desconhecido'
     };
+  }
+}
+
+/**
+ * Verifica o valor atual das visualizações de um produto
+ * @param {string} productId - ID do produto
+ * @returns {Promise<number|null>} - Número de visualizações ou null se ocorrer um erro
+ */
+export async function checkProductViews(productId) {
+  try {
+    console.log(`[DEBUG] Verificando visualizações para o produto ID: ${productId}`);
+    
+    const { data, error } = await supabase
+      .from('products')
+      .select('views')
+      .eq('id', productId)
+      .single();
+    
+    if (error) {
+      console.error('[DEBUG] Erro ao verificar visualizações:', error);
+      return null;
+    }
+    
+    console.log('[DEBUG] Visualizações atuais:', data?.views);
+    return data?.views || 0;
+  } catch (error) {
+    console.error('Erro ao verificar visualizações:', error);
+    return null;
   }
 }
