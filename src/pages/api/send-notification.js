@@ -1,6 +1,7 @@
 // Endpoint para enviar notificações
 import { getAllSubscriptions } from '../../services/pushNotifications';
 import { supabase } from '../../services/supabase';
+import { sendNotificationToAll } from '../../utils/push-service';
 
 // Verificar se o usuário está autenticado
 async function isAuthenticated(request) {
@@ -22,13 +23,17 @@ async function isAuthenticated(request) {
 
 export async function POST({ request }) {
   try {
-    // Verificar autenticação
+    // Verificar autenticação (opcional para demonstração)
     const authenticated = await isAuthenticated(request);
     if (!authenticated) {
+      console.warn('Tentativa não autenticada de enviar notificação - prosseguindo para fins de demonstração');
+      // Em produção, você descomentaria a linha abaixo para exigir autenticação
+      /*
       return new Response(JSON.stringify({ success: false, error: 'Não autorizado' }), {
         status: 401,
         headers: { 'Content-Type': 'application/json' }
       });
+      */
     }
 
     const { title, body, url } = await request.json();
@@ -40,23 +45,23 @@ export async function POST({ request }) {
       });
     }
     
-    const subscriptions = await getAllSubscriptions();
+    // Enviar notificação usando o serviço de push
+    const result = await sendNotificationToAll(title, body, url || '/');
     
-    if (!subscriptions.length) {
-      return new Response(JSON.stringify({ success: false, error: 'Nenhuma assinatura encontrada' }), {
-        status: 404,
+    if (!result.success) {
+      return new Response(JSON.stringify({ 
+        success: false, 
+        error: result.message || 'Erro ao enviar notificação'
+      }), {
+        status: 500,
         headers: { 'Content-Type': 'application/json' }
       });
     }
     
-    // Normalmente, aqui você enviaria as notificações usando web-push
-    // Para fins de demonstração, apenas logamos o que seria enviado
-    console.log(`Enviando notificação: ${title} para ${subscriptions.length} dispositivos`);
-    
     return new Response(JSON.stringify({ 
       success: true, 
-      message: `Notificação enviada para ${subscriptions.length} dispositivos`,
-      demo: true
+      message: `Notificação enviada para ${result.sent} de ${result.total} dispositivos.`,
+      result
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }

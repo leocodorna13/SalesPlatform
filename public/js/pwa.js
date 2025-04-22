@@ -56,9 +56,8 @@ async function requestNotificationPermission() {
 async function subscribeToPushNotifications(registration) {
   try {
     console.log('Tentando inscrever para notificações push...');
-    // Esta é uma chave pública gerada para demonstração
-    // Em produção, você deve usar uma chave VAPID real
-    const vapidPublicKey = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U';
+    // Utiliza a chave pública VAPID gerada
+    const vapidPublicKey = 'BAG0zdDLenMECfMFnl8gfQo2YHhdzE_BHS5rUHc8YdL2NWLXoLR43MkS4aDaKzL9R44FBQrKRG4R_sc-iX_BLvA';
     
     const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
     
