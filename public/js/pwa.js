@@ -37,8 +37,8 @@ async function requestNotificationPermission() {
 // Função para inscrever o usuário para receber notificações push
 async function subscribeToPushNotifications(registration) {
   try {
-    // Chave pública do VAPID (deve ser gerada no servidor)
-    // Esta é apenas uma chave de exemplo - deve ser substituída por uma chave real
+    // Esta é uma chave pública gerada para demonstração
+    // Em produção, você deve usar uma chave VAPID real
     const vapidPublicKey = 'BEl62iUYgUivxIkv69yViEuiBIa-Ib9-SkvMeAtA3LFgDzkrxZJjSgSnfckjBJuBkr3qBUYIHBQFLXYp5Nksh8U';
     
     const convertedVapidKey = urlBase64ToUint8Array(vapidPublicKey);
@@ -50,13 +50,36 @@ async function subscribeToPushNotifications(registration) {
     
     console.log('Inscrição de notificação bem-sucedida:', subscription);
     
-    // Aqui você enviaria a subscription para o seu servidor
-    // await sendSubscriptionToServer(subscription);
+    // Enviar a inscrição para o servidor
+    await saveSubscriptionToServer(subscription);
     
     return subscription;
   } catch (error) {
     console.error('Falha ao se inscrever para notificações push:', error);
     return null;
+  }
+}
+
+// Enviar a inscrição para o servidor
+async function saveSubscriptionToServer(subscription) {
+  try {
+    const response = await fetch('/api/save-subscription', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(subscription)
+    });
+    
+    if (!response.ok) {
+      throw new Error('Falha ao salvar assinatura no servidor');
+    }
+    
+    const data = await response.json();
+    return data.success;
+  } catch (error) {
+    console.error('Erro ao salvar assinatura no servidor:', error);
+    return false;
   }
 }
 
@@ -90,22 +113,31 @@ window.addEventListener('load', async () => {
           const permission = await requestNotificationPermission();
           
           if (permission) {
-            await subscribeToPushNotifications(registration);
-            notificationButton.textContent = 'Notificações ativadas!';
-            notificationButton.disabled = true;
+            const subscription = await subscribeToPushNotifications(registration);
             
-            // Mostrar notificação de teste
-            new Notification('Notificações Ativadas', {
-              body: 'Você receberá alertas quando novos produtos forem adicionados!',
-              icon: '/android-chrome-192x192.png'
-            });
+            if (subscription) {
+              notificationButton.textContent = 'Notificações ativadas!';
+              notificationButton.disabled = true;
+              
+              // Mostrar notificação de confirmação
+              new Notification('Notificações Ativadas', {
+                body: 'Você receberá alertas quando novos produtos forem adicionados!',
+                icon: '/android-chrome-192x192.png'
+              });
+            }
           }
         });
         
         // Verificar status atual
         if (Notification.permission === 'granted') {
-          notificationButton.textContent = 'Notificações ativadas!';
-          notificationButton.disabled = true;
+          navigator.serviceWorker.ready.then(registration => {
+            registration.pushManager.getSubscription().then(subscription => {
+              if (subscription) {
+                notificationButton.textContent = 'Notificações ativadas!';
+                notificationButton.disabled = true;
+              }
+            });
+          });
         }
       }
     }

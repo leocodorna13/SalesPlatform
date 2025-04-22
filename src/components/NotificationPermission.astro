@@ -35,11 +35,40 @@
 </div>
 
 <script>
+  // Função para esconder o container de notificação
+  function hideNotificationContainer() {
+    const container = document.getElementById('notification-container');
+    if (container) {
+      container.classList.add('translate-y-full', 'opacity-0');
+      setTimeout(() => {
+        container.classList.add('hidden');
+      }, 300);
+    }
+  }
+
+  // Verificar se o Service Worker já está registrado e tem uma inscrição ativa
+  async function checkExistingSubscription() {
+    if ('serviceWorker' in navigator && 'PushManager' in window) {
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const subscription = await registration.pushManager.getSubscription();
+        return !!subscription;
+      } catch (error) {
+        console.error('Erro ao verificar assinatura existente:', error);
+        return false;
+      }
+    }
+    return false;
+  }
+
   // Mostrar o prompt após um tempo
-  document.addEventListener('DOMContentLoaded', () => {
+  document.addEventListener('DOMContentLoaded', async () => {
     // Verificar se as notificações já estão habilitadas
     if (Notification.permission === 'granted') {
-      return;
+      const hasSubscription = await checkExistingSubscription();
+      if (hasSubscription) {
+        return; // Já tem permissão e assinatura, não mostrar o prompt
+      }
     }
     
     // Não mostrar o prompt se o usuário já recusou
@@ -58,15 +87,34 @@
     // Botão de dispensar
     const dismissButton = document.getElementById('dismiss-notification');
     if (dismissButton) {
-      dismissButton.addEventListener('click', () => {
-        const container = document.getElementById('notification-container');
-        if (container) {
-          container.classList.add('translate-y-full', 'opacity-0');
-          setTimeout(() => {
-            container.classList.add('hidden');
-          }, 300);
-        }
+      dismissButton.addEventListener('click', hideNotificationContainer);
+    }
+
+    // Botão de habilitar notificações - escutar evento de clique
+    const enableButton = document.getElementById('enable-notifications');
+    if (enableButton) {
+      enableButton.addEventListener('click', () => {
+        // O pwa.js vai lidar com o registro, mas precisamos esconder o container quando concluído
+        // Ouvir eventos de alteração de permissão
+        const checkPermissionInterval = setInterval(() => {
+          if (Notification.permission === 'granted') {
+            clearInterval(checkPermissionInterval);
+            hideNotificationContainer();
+          }
+        }, 500);
+        
+        // Definir um timeout para o intervalo (10 segundos)
+        setTimeout(() => {
+          clearInterval(checkPermissionInterval);
+        }, 10000);
       });
+    }
+  });
+
+  // Ouvir mensagens do service worker (para quando a inscrição for concluída)
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'PUSH_SUBSCRIBED') {
+      hideNotificationContainer();
     }
   });
 </script>

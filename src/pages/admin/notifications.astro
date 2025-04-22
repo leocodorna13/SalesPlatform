@@ -1,5 +1,5 @@
 ---
-import Layout from '../../layouts/Layout.astro';
+import AdminLayout from '../../layouts/AdminLayout.astro';
 import { supabase } from '../../services/supabase';
 
 // Verificar autenticação (método seguro)
@@ -24,7 +24,7 @@ const { data: products } = await supabase
   .limit(5);
 ---
 
-<Layout title="Gerenciar Notificações">
+<AdminLayout title="Gerenciar Notificações">
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <h1 class="text-3xl font-bold text-neutral-900 mb-6">
       <i class="fas fa-bell mr-2 text-accent-500"></i>
@@ -98,10 +98,10 @@ const { data: products } = await supabase
       </div>
     </div>
   </div>
-</Layout>
+</AdminLayout>
 
 <script>
-  // Função para simular o envio de notificações para fins de demonstração
+  // Função para enviar notificações através da API
   document.addEventListener('DOMContentLoaded', () => {
     const sendBtn = document.getElementById('send-notification-btn');
     
@@ -112,30 +112,53 @@ const { data: products } = await supabase
         const productSelect = document.getElementById('product-select');
         
         const title = titleInput.value || 'Novo produto adicionado!';
-        const message = messageInput.value || 'Venha conferir nosso novo produto!';
+        const body = messageInput.value || 'Venha conferir nosso novo produto!';
         const url = productSelect.value || '/';
         
         try {
-          // Em uma implementação real, você enviaria estes dados para um endpoint no servidor
-          // que processaria o envio das notificações para todos os usuários inscritos
-          // Aqui, vamos simular isso mostrando uma notificação local
+          // Obter o token de autenticação atual
+          const getToken = async () => {
+            try {
+              const response = await fetch('/api/auth/get-session', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+              });
+              
+              if (!response.ok) return null;
+              
+              const data = await response.json();
+              return data.session?.access_token || null;
+            } catch (error) {
+              console.error('Erro ao obter token:', error);
+              return null;
+            }
+          };
           
-          if ('Notification' in window && Notification.permission === 'granted') {
-            // Notificação local para fins de demonstração
-            new Notification(title, {
-              body: message,
-              icon: '/android-chrome-192x192.png',
-              data: { url: url }
-            });
-            
-            // Exibir mensagem de sucesso
-            alert('Notificação enviada com sucesso!');
+          const token = await getToken();
+          
+          // Enviar notificação via API
+          const response = await fetch('/api/send-notification', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': token ? `Bearer ${token}` : ''
+            },
+            body: JSON.stringify({ title, body, url })
+          });
+          
+          const data = await response.json();
+          
+          if (data.success) {
+            alert(data.demo 
+              ? 'Notificação simulada enviada com sucesso! Em produção, as notificações seriam enviadas para todos os dispositivos inscritos.' 
+              : 'Notificação enviada com sucesso!'
+            );
           } else {
-            alert('Esta página não tem permissão para enviar notificações. Em um ambiente de produção, as notificações seriam enviadas pelo servidor.');
+            alert(`Erro: ${data.error || 'Falha ao enviar notificação'}`);
           }
         } catch (error) {
           console.error('Erro ao enviar notificação:', error);
-          alert('Erro ao enviar notificação.');
+          alert('Erro ao enviar notificação. Verifique o console para mais detalhes.');
         }
       });
     }
