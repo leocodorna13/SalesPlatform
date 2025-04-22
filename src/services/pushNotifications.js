@@ -4,7 +4,29 @@ import { supabase } from './supabase';
 // Salvar assinatura no banco de dados
 export async function saveSubscription(subscription) {
   try {
+    console.log('Tentando salvar subscription:', JSON.stringify(subscription));
+    
+    if (!subscription || !subscription.endpoint) {
+      console.error('Subscription inválida:', subscription);
+      return false;
+    }
+    
     const { endpoint, keys } = subscription;
+    
+    // Verificar se a tabela existe
+    const { data: tableExists } = await supabase
+      .from('push_subscriptions')
+      .select('count')
+      .limit(1)
+      .catch(err => {
+        console.error('Erro ao verificar tabela:', err);
+        return { data: null };
+      });
+    
+    if (tableExists === null) {
+      console.error('Tabela push_subscriptions não existe ou não está acessível');
+      return false;
+    }
     
     const { data, error } = await supabase
       .from('push_subscriptions')
@@ -12,7 +34,8 @@ export async function saveSubscription(subscription) {
         {
           endpoint,
           p256dh: keys.p256dh,
-          auth: keys.auth
+          auth: keys.auth,
+          created_at: new Date().toISOString()
         },
         { onConflict: 'endpoint' }
       );
@@ -22,6 +45,7 @@ export async function saveSubscription(subscription) {
       return false;
     }
     
+    console.log('Assinatura salva com sucesso:', endpoint);
     return true;
   } catch (error) {
     console.error('Erro ao salvar assinatura:', error);

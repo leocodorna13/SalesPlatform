@@ -5,6 +5,10 @@ function isMobileDevice() {
   return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 }
 
+// Variável para armazenar o evento de instalação
+let deferredPrompt;
+let installButton;
+
 // Registra o service worker
 async function registerServiceWorker() {
   if ('serviceWorker' in navigator) {
@@ -67,6 +71,8 @@ async function subscribeToPushNotifications(registration) {
     // Se já existe uma assinatura, retorne-a
     if (subscription) {
       console.log('Assinatura existente encontrada:', subscription);
+      // Garantir que a assinatura existente seja salva no servidor
+      await saveSubscriptionToServer(subscription);
       return subscription;
     }
     
@@ -112,7 +118,8 @@ async function saveSubscriptionToServer(subscription) {
     });
     
     if (!response.ok) {
-      throw new Error('Falha ao salvar assinatura no servidor');
+      const errorText = await response.text();
+      throw new Error(`Falha ao salvar assinatura no servidor: ${response.status} - ${errorText}`);
     }
     
     const data = await response.json();
@@ -140,12 +147,44 @@ function urlBase64ToUint8Array(base64String) {
   return outputArray;
 }
 
+// Verifica se o app já está instalado
+function checkIfAppIsInstalled() {
+  // Método 1: Verificar se está em modo standalone (já instalado)
+  if (window.matchMedia('(display-mode: standalone)').matches || 
+      window.navigator.standalone === true) {
+    console.log('Aplicativo já está instalado (modo standalone)');
+    return true;
+  }
+  
+  // Método 2: Verificar se está sendo executado como PWA
+  if (document.referrer.startsWith('android-app://')) {
+    console.log('Aplicativo já está instalado (android app)');
+    return true;
+  }
+  
+  return false;
+}
+
 // Inicializar quando a página carregar
 window.addEventListener('load', async () => {
   try {
     console.log('Inicializando PWA...');
     const isMobile = isMobileDevice();
     console.log('Dispositivo móvel detectado:', isMobile);
+    
+    // Verificar se o app já está instalado
+    const isInstalled = checkIfAppIsInstalled();
+    
+    // Obter botão de instalação
+    const installAppButton = document.getElementById('install-app');
+    if (installAppButton) {
+      // Se já estiver instalado, esconder o botão
+      if (isInstalled) {
+        installAppButton.style.display = 'none';
+      } else {
+        installAppButton.style.display = 'block';
+      }
+    }
     
     // Garantir que esteja registrado antes de continuar
     let registration = null;
@@ -163,6 +202,45 @@ window.addEventListener('load', async () => {
     } else {
       registration = await registerServiceWorker();
     }
+    
+    // Lidar com o evento beforeinstallprompt
+    window.addEventListener('beforeinstallprompt', (e) => {
+      // Prevenir o comportamento padrão
+      e.preventDefault();
+      // Armazenar o evento para uso posterior
+      deferredPrompt = e;
+      
+      // Atualizar a UI para mostrar o botão de instalação
+      if (installAppButton) {
+        installAppButton.style.display = 'block';
+        
+        // Adicionar evento de clique para instalar o app
+        installAppButton.addEventListener('click', async () => {
+          // Mostrar o prompt de instalação
+          deferredPrompt.prompt();
+          // Aguardar a escolha do usuário
+          const { outcome } = await deferredPrompt.userChoice;
+          console.log(`Usuário ${outcome === 'accepted' ? 'aceitou' : 'recusou'} a instalação`);
+          // Limpar a referência
+          deferredPrompt = null;
+          
+          // Se aceitou, esconder o botão
+          if (outcome === 'accepted') {
+            installAppButton.style.display = 'none';
+          }
+        });
+      }
+    });
+    
+    // Quando o app é instalado, esconder o botão
+    window.addEventListener('appinstalled', (e) => {
+      console.log('Aplicativo instalado com sucesso!');
+      if (installAppButton) {
+        installAppButton.style.display = 'none';
+      }
+      // Limpar a referência ao prompt
+      deferredPrompt = null;
+    });
     
     if (registration) {
       // Adicionar botão para habilitar notificações
@@ -200,20 +278,6 @@ window.addEventListener('load', async () => {
             }
           }
         });
-        
-        // Verificar status atual
-        if (Notification.permission === 'granted') {
-          navigator.serviceWorker.ready.then(registration => {
-            registration.pushManager.getSubscription().then(subscription => {
-              if (subscription) {
-                notificationButton.textContent = 'Notificações ativadas!';
-                notificationButton.disabled = true;
-                // Esconder o container se existir uma assinatura
-                document.dispatchEvent(new CustomEvent('notificationsEnabled'));
-              }
-            });
-          });
-        }
       }
     }
   } catch (error) {
