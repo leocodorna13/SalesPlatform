@@ -2,6 +2,7 @@
 import '../styles/global.css';
 import { getSiteSettings } from '../services/supabase';
 import InstallAppBanner from '../components/InstallAppBanner.astro';
+import NotificationPermission from '../components/NotificationPermission.astro';
 
 interface Props {
   title: string;
@@ -294,6 +295,10 @@ const projectName = siteSettings.projectName || 'Desapego dos Martins';
     
     <!-- Banner de instalação do app -->
     <InstallAppBanner />
+    <NotificationPermission />
+    
+    <!-- Scripts para PWA e notificações -->
+    <script is:inline src="/js/pwa.js"></script>
     
     <!-- WhatsApp flutuante -->
     <script>

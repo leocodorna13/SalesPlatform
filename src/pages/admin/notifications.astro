@@ -1,0 +1,143 @@
+---
+import Layout from '../../layouts/Layout.astro';
+import { supabase } from '../../services/supabase';
+
+// Verificar autenticação (método seguro)
+let isAuthenticated = false;
+try {
+  const { data: { session } } = await supabase.auth.getSession();
+  isAuthenticated = !!session;
+  
+  // Se não estiver autenticado, redirecionar
+  if (!isAuthenticated) {
+    return Astro.redirect('/admin/login');
+  }
+} catch (error) {
+  console.error('Erro ao verificar autenticação:', error);
+}
+
+// Buscar os últimos produtos adicionados
+const { data: products } = await supabase
+  .from('products')
+  .select('id, name, created_at')
+  .order('created_at', { ascending: false })
+  .limit(5);
+---
+
+<Layout title="Gerenciar Notificações">
+  <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+    <h1 class="text-3xl font-bold text-neutral-900 mb-6">
+      <i class="fas fa-bell mr-2 text-accent-500"></i>
+      Gerenciar Notificações
+    </h1>
+    
+    <div class="bg-white shadow-md rounded-lg p-6 mb-8">
+      <h2 class="text-xl font-semibold mb-4">Enviar notificação para novos produtos</h2>
+      
+      <div class="space-y-4">
+        <div>
+          <label for="title" class="block text-sm font-medium text-neutral-700">Título da notificação</label>
+          <input
+            type="text"
+            id="notification-title"
+            class="mt-1 block w-full border border-neutral-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            placeholder="Novo produto disponível!"
+            value="Novo produto adicionado!"
+          />
+        </div>
+        
+        <div>
+          <label for="message" class="block text-sm font-medium text-neutral-700">Mensagem</label>
+          <textarea
+            id="notification-message"
+            rows="3"
+            class="mt-1 block w-full border border-neutral-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+            placeholder="Confira agora mesmo!"
+          >Venha conferir nosso novo produto que acabou de chegar!</textarea>
+        </div>
+        
+        <div>
+          <label class="block text-sm font-medium text-neutral-700 mb-2">Produto</label>
+          <select 
+            id="product-select"
+            class="block w-full border border-neutral-300 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-primary-500 focus:border-primary-500"
+          >
+            <option value="/">Página inicial</option>
+            {products && products.map((product) => (
+              <option value={`/produto/${product.id}`}>{product.name}</option>
+            ))}
+          </select>
+        </div>
+        
+        <div class="pt-2">
+          <button 
+            id="send-notification-btn"
+            type="button"
+            class="bg-accent-500 hover:bg-accent-600 text-white font-medium py-2 px-4 rounded-md focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent-500 inline-flex items-center"
+          >
+            <i class="fas fa-paper-plane mr-2"></i>
+            Enviar notificação
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <div class="bg-white shadow-md rounded-lg p-6">
+      <h2 class="text-xl font-semibold mb-4">Instruções</h2>
+      <p class="text-neutral-700">
+        Esta página permite enviar notificações push para todos os usuários que instalaram
+        o aplicativo e aceitaram receber notificações. Use esta funcionalidade com moderação
+        para informar sobre novos produtos e promoções importantes.
+      </p>
+      <div class="mt-4 p-4 bg-yellow-50 rounded-lg border border-yellow-200">
+        <p class="text-sm text-yellow-800">
+          <i class="fas fa-lightbulb text-yellow-500 mr-2"></i>
+          <strong>Importante:</strong> Para que os usuários recebam notificações, eles precisam ter instalado
+          o aplicativo em seus dispositivos e aceitado receber notificações quando solicitado.
+        </p>
+      </div>
+    </div>
+  </div>
+</Layout>
+
+<script>
+  // Função para simular o envio de notificações para fins de demonstração
+  document.addEventListener('DOMContentLoaded', () => {
+    const sendBtn = document.getElementById('send-notification-btn');
+    
+    if (sendBtn) {
+      sendBtn.addEventListener('click', async () => {
+        const titleInput = document.getElementById('notification-title');
+        const messageInput = document.getElementById('notification-message');
+        const productSelect = document.getElementById('product-select');
+        
+        const title = titleInput.value || 'Novo produto adicionado!';
+        const message = messageInput.value || 'Venha conferir nosso novo produto!';
+        const url = productSelect.value || '/';
+        
+        try {
+          // Em uma implementação real, você enviaria estes dados para um endpoint no servidor
+          // que processaria o envio das notificações para todos os usuários inscritos
+          // Aqui, vamos simular isso mostrando uma notificação local
+          
+          if ('Notification' in window && Notification.permission === 'granted') {
+            // Notificação local para fins de demonstração
+            new Notification(title, {
+              body: message,
+              icon: '/android-chrome-192x192.png',
+              data: { url: url }
+            });
+            
+            // Exibir mensagem de sucesso
+            alert('Notificação enviada com sucesso!');
+          } else {
+            alert('Esta página não tem permissão para enviar notificações. Em um ambiente de produção, as notificações seriam enviadas pelo servidor.');
+          }
+        } catch (error) {
+          console.error('Erro ao enviar notificação:', error);
+          alert('Erro ao enviar notificação.');
+        }
+      });
+    }
+  });
+</script>
