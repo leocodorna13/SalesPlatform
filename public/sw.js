@@ -47,6 +47,35 @@ self.addEventListener('fetch', (event) => {
   );
 });
 
+// Quando a assinatura for concluída, notificar a página
+self.addEventListener('pushsubscriptionchange', (event) => {
+  event.waitUntil(
+    self.registration.pushManager.subscribe(event.oldSubscription.options)
+      .then((subscription) => {
+        console.log('Assinatura renovada:', subscription);
+        
+        // Notificar todas as janelas abertas de que a assinatura foi renovada
+        self.clients.matchAll().then((clients) => {
+          clients.forEach((client) => {
+            client.postMessage({
+              type: 'PUSH_SUBSCRIBED',
+              subscription: subscription
+            });
+          });
+        });
+        
+        // Aqui você enviaria a nova assinatura para o servidor
+        return fetch('/api/save-subscription', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(subscription)
+        });
+      })
+  );
+});
+
 // Gerenciamento de notificações push
 self.addEventListener('push', (event) => {
   const data = event.data.json();

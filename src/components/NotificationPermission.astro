@@ -61,11 +61,20 @@
     return false;
   }
 
+  // Detectar se é um dispositivo móvel
+  function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+  }
+
   // Mostrar o prompt após um tempo
   document.addEventListener('DOMContentLoaded', async () => {
+    const isMobile = isMobileDevice();
+    console.log('Dispositivo móvel detectado:', isMobile);
+
     // Verificar se as notificações já estão habilitadas
     if (Notification.permission === 'granted') {
       const hasSubscription = await checkExistingSubscription();
+      console.log('Permissão já concedida, tem assinatura:', hasSubscription);
       if (hasSubscription) {
         return; // Já tem permissão e assinatura, não mostrar o prompt
       }
@@ -73,6 +82,7 @@
     
     // Não mostrar o prompt se o usuário já recusou
     if (Notification.permission === 'denied') {
+      console.log('Permissão de notificação negada anteriormente');
       return;
     }
     
@@ -80,6 +90,7 @@
     setTimeout(() => {
       const container = document.getElementById('notification-container');
       if (container) {
+        console.log('Mostrando container de notificação');
         container.classList.remove('hidden');
       }
     }, 3000);
@@ -87,13 +98,28 @@
     // Botão de dispensar
     const dismissButton = document.getElementById('dismiss-notification');
     if (dismissButton) {
-      dismissButton.addEventListener('click', hideNotificationContainer);
+      // Usar touchstart para dispositivos móveis
+      const eventType = isMobile ? 'touchstart' : 'click';
+      dismissButton.addEventListener(eventType, (e) => {
+        e.preventDefault();
+        console.log('Botão dispensar clicado');
+        hideNotificationContainer();
+      });
     }
 
     // Botão de habilitar notificações - escutar evento de clique
     const enableButton = document.getElementById('enable-notifications');
     if (enableButton) {
-      enableButton.addEventListener('click', () => {
+      // Usar touchstart para dispositivos móveis
+      const eventType = isMobile ? 'touchstart' : 'click';
+      enableButton.addEventListener(eventType, (e) => {
+        e.preventDefault();
+        console.log('Botão habilitar notificações clicado');
+        
+        // Adicionar classe de carregamento
+        enableButton.classList.add('opacity-75');
+        enableButton.innerHTML = '<i class="fas fa-spinner fa-spin mr-2"></i> Ativando...';
+        
         // O pwa.js vai lidar com o registro, mas precisamos esconder o container quando concluído
         // Ouvir eventos de alteração de permissão
         const checkPermissionInterval = setInterval(() => {
@@ -103,12 +129,23 @@
           }
         }, 500);
         
-        // Definir um timeout para o intervalo (10 segundos)
+        // Definir um timeout para o intervalo (15 segundos para dispositivos móveis que podem ser mais lentos)
         setTimeout(() => {
           clearInterval(checkPermissionInterval);
-        }, 10000);
+          // Se ainda está visível após o timeout, resetar o botão
+          if (!document.getElementById('notification-container').classList.contains('hidden')) {
+            enableButton.classList.remove('opacity-75');
+            enableButton.innerHTML = 'Ativar notificações';
+          }
+        }, isMobile ? 15000 : 10000);
       });
     }
+  });
+
+  // Ouvir o evento personalizado que indica que as notificações foram ativadas
+  document.addEventListener('notificationsEnabled', () => {
+    console.log('Evento notificationsEnabled recebido, escondendo container');
+    hideNotificationContainer();
   });
 
   // Ouvir mensagens do service worker (para quando a inscrição for concluída)
