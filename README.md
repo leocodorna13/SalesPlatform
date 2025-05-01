@@ -1,6 +1,30 @@
-# Site de Vendas
+# Site de Vendas - Plataforma de Desapego
 
-Site para venda de produtos pessoais com gerenciamento administrativo. Construído com Astro 5, Tailwind CSS 4 e Supabase.
+Site para venda de produtos pessoais de desapego com gerenciamento administrativo. Construído com Astro 5, Tailwind CSS 4 e Supabase.
+
+## O Que é Este Projeto
+
+Esta é uma plataforma simples para venda de produtos de desapego pessoal. O fluxo de funcionamento é:
+
+1. O administrador configura as informações da loja (contato, WhatsApp)
+2. Cadastra produtos com preços, descrições e fotos
+3. Compartilha o link da loja com pessoas interessadas
+4. Os visitantes navegam pelos produtos e clicam em "tenho interesse"
+5. O administrador recebe mensagens no WhatsApp com o link do produto
+6. A negociação acontece diretamente via WhatsApp
+
+O objetivo é facilitar a venda de itens pessoais de forma simples e direta, sem intermediários ou comissões.
+
+## Planos Futuros - Sistema Multi-Tenant
+
+Estamos planejando evoluir esta plataforma para um sistema multi-tenant, onde:
+
+- Qualquer pessoa poderá criar sua própria loja de desapego
+- Cada loja terá seu próprio URL, produtos e configurações
+- O sistema será monetizado via assinaturas com Stripe
+- Diferentes planos oferecerão limites variados de produtos e recursos
+
+Esta evolução permitirá que a plataforma atual se torne um SaaS (Software as a Service) para criação de lojas de desapego.
 
 ## Funcionalidades
 
