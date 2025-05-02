@@ -449,7 +449,8 @@ if (Astro.request.method === 'POST') {
             return response;
           })
           .then(() => {
-            window.location.reload();
+            // Redirecionar para a página de produtos com mensagem de sucesso
+            window.location.href = '/admin/produtos?success=true';
           })
           .catch(error => {
             console.error('Erro ao salvar produto:', error);

@@ -44,22 +44,54 @@ if (Astro.request.method === 'POST') {
       const imageUrl = formData.get('image_url');
       const productId = formData.get('product_id');
       
-      // Remover flag is_primary de todas as imagens do produto
-      await supabase
-        .from('product_images')
-        .update({ is_primary: false })
-        .eq('product_id', productId);
+      console.log(`Definindo imagem principal: URL=${imageUrl}, ProductID=${productId}`);
       
-      // Definir a imagem selecionada como principal
-      await supabase
-        .from('product_images')
-        .update({ is_primary: true })
-        .eq('image_url', imageUrl);
-      
-      return new Response(JSON.stringify({ success: true }), {
-        status: 200,
-        headers: { 'Content-Type': 'application/json' }
-      });
+      try {
+        // Remover flag is_primary de todas as imagens do produto
+        const { data: resetData, error: resetError } = await supabase
+          .from('product_images')
+          .update({ is_primary: false })
+          .eq('product_id', productId)
+          .select();
+        
+        if (resetError) {
+          console.error('Erro ao resetar imagens principais:', resetError);
+          return new Response(JSON.stringify({ success: false, error: resetError.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        
+        console.log(`Todas as imagens resetadas com sucesso. Afetadas: ${resetData ? resetData.length : 0}`);
+        
+        // Definir a imagem selecionada como principal
+        const { data: updateData, error: updateError } = await supabase
+          .from('product_images')
+          .update({ is_primary: true })
+          .eq('image_url', imageUrl)
+          .select();
+        
+        if (updateError) {
+          console.error('Erro ao definir imagem principal:', updateError);
+          return new Response(JSON.stringify({ success: false, error: updateError.message }), {
+            status: 500,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        
+        console.log(`Imagem principal definida com sucesso. Afetadas: ${updateData ? updateData.length : 0}. Dados:`, updateData);
+        
+        return new Response(JSON.stringify({ success: true }), {
+          status: 200,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      } catch (error) {
+        console.error('Erro inesperado ao definir imagem principal:', error);
+        return new Response(JSON.stringify({ success: false, error: 'Erro interno do servidor' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
     }
     
     // Extrair dados do formulário
@@ -89,11 +121,11 @@ if (Astro.request.method === 'POST') {
     console.log(`Processando ${imageFiles.length} imagens`);
     
     // Verificar se há arquivos válidos e eliminar duplicatas
-    const uniqueFiles = new Map();
-    const validFiles = [];
+    const uniqueFiles = new Map<string, File>();
+    const validFiles: File[] = [];
     
     // Primeiro passo: identificar arquivos únicos pelo nome e tamanho
-    imageFiles.forEach(file => {
+    imageFiles.forEach((file: File) => {
       if (file instanceof File && file.size > 0) {
         const fileKey = `${file.name}-${file.size}`;
         if (!uniqueFiles.has(fileKey)) {
@@ -118,10 +150,10 @@ if (Astro.request.method === 'POST') {
       console.log(`${existingUrls.length} imagens existentes encontradas: ${JSON.stringify(existingUrls)}`);
       
       // Criar um conjunto para rastrear URLs já processadas nesta sessão
-      const processedUrls = new Set();
+      const processedUrls = new Set<string>();
       
       // Criar um conjunto para rastrear nomes de arquivos já processados
-      const processedFileNames = new Set();
+      const processedFileNames = new Set<string>();
       
       // Upload das novas imagens
       for (let i = 0; i < validFiles.length; i++) {
@@ -374,7 +406,7 @@ const formattedPrice = product.price.toString();
                     data-image-url={image.image_url}
                   >
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
                     </svg>
                   </button>
                 </div>
@@ -419,7 +451,7 @@ const formattedPrice = product.price.toString();
         }
         
         isSubmitting = true;
-        const submitButton = document.querySelector('button[type="submit"]');
+        const submitButton = document.querySelector('button[type="submit"]') as HTMLButtonElement;
         if (submitButton) {
           submitButton.disabled = true;
           submitButton.textContent = 'Salvando...';
@@ -468,9 +500,9 @@ const formattedPrice = product.price.toString();
       e.preventDefault();
       
       // Desabilitar o botão de submit para prevenir múltiplos cliques
-      const submitButton = form.querySelector('button[type="submit"]');
+      const submitButton = form.querySelector('button[type="submit"]') as HTMLButtonElement;
       if (submitButton) {
-        submitButton.setAttribute('disabled', 'true');
+        submitButton.disabled = true;
         submitButton.textContent = 'Salvando...';
       }
       
@@ -486,7 +518,7 @@ const formattedPrice = product.price.toString();
         const files = (window as any).getUploadedFiles();
         if (files && files.length > 0) {
           // Criar um Set para rastrear arquivos já adicionados
-          const addedFiles = new Set();
+          const addedFiles = new Set<string>();
           
           // Adicionar cada arquivo ao FormData, evitando duplicatas
           files.forEach((file: File) => {
@@ -506,7 +538,9 @@ const formattedPrice = product.price.toString();
         <div class="bg-white p-6 rounded-lg shadow-lg text-center">
           <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600 mx-auto mb-4"></div>
           <p class="text-lg">Salvando produto...</p>
-          <p class="text-sm text-gray-500 mt-2">Isso pode levar alguns segundos.</p>
+          <p class="text-sm text-gray-500 mt-2">
+            Isso pode levar alguns segundos.
+          </p>
         </div>
       `;
       document.body.appendChild(loadingIndicator);
@@ -523,7 +557,40 @@ const formattedPrice = product.price.toString();
         return response;
       })
       .then(() => {
-        window.location.reload();
+        // Mostrar mensagem de sucesso sem redirecionar
+        const successMessage = document.createElement('div');
+        successMessage.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+        successMessage.innerHTML = `
+          <div class="flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414-1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+            <span>Produto salvo com sucesso!</span>
+          </div>
+        `;
+        document.body.appendChild(successMessage);
+        
+        // Remover o indicador de carregamento
+        loadingIndicator.remove();
+        
+        // Reativar o botão de submit
+        if (submitButton) {
+          submitButton.disabled = false;
+          submitButton.textContent = 'Salvar Alterações';
+        }
+        
+        // Remover a mensagem após 3 segundos
+        setTimeout(() => {
+          successMessage.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+          setTimeout(() => {
+            successMessage.remove();
+          }, 500);
+        }, 3000);
+        
+        // Recarregar a página para mostrar as alterações
+        setTimeout(() => {
+          window.location.reload();
+        }, 1000);
       })
       .catch(error => {
         console.error('Erro ao salvar produto:', error);
@@ -532,7 +599,7 @@ const formattedPrice = product.price.toString();
         
         // Reativar o botão de submit
         if (submitButton) {
-          submitButton.removeAttribute('disabled');
+          submitButton.disabled = false;
           submitButton.textContent = 'Salvar Alterações';
         }
         
@@ -544,9 +611,24 @@ const formattedPrice = product.price.toString();
 
   // Adicionar handlers para botões de imagem principal
   document.querySelectorAll('.set-primary').forEach(btn => {
-    btn.addEventListener('click', async function() {
+    btn.addEventListener('click', async function(this: HTMLElement) {
       const url = this.dataset.imageUrl;
       const productId = this.dataset.productId;
+      
+      // Desabilitar todos os botões de definir como principal para evitar cliques múltiplos
+      document.querySelectorAll('.set-primary').forEach(b => {
+        (b as HTMLButtonElement).disabled = true;
+      });
+      
+      // Mostrar indicador de carregamento
+      const loadingIndicator = document.createElement('div');
+      loadingIndicator.className = 'fixed inset-0 bg-black bg-opacity-30 flex items-center justify-center z-50';
+      loadingIndicator.innerHTML = `
+        <div class="bg-white p-4 rounded-lg shadow-lg">
+          <div class="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary-600 mx-auto"></div>
+        </div>
+      `;
+      document.body.appendChild(loadingIndicator);
       
       try {
         // Enviar requisição para atualizar
@@ -560,19 +642,84 @@ const formattedPrice = product.price.toString();
           body: formData
         });
         
-        if (response.ok) {
-          // Atualizar UI
-          document.querySelectorAll('.absolute.bottom-2.right-2').forEach(el => el.remove());
-          const container = this.closest('.relative');
+        if (!response.ok) {
+          throw new Error('Falha ao definir imagem principal');
+        }
+        
+        const result = await response.json();
+        
+        if (result.success) {
+          // Remover todos os indicadores de imagem principal existentes
+          document.querySelectorAll('.primary-badge').forEach(el => el.remove());
+          
+          // Adicionar o indicador à imagem selecionada
+          const container = this.closest('.relative') as HTMLElement;
           if (container) {
+            // Remover qualquer badge existente
+            const existingBadge = container.querySelector('.primary-badge');
+            if (existingBadge) {
+              existingBadge.remove();
+            }
+            
+            // Adicionar novo badge
             const badge = document.createElement('div');
-            badge.className = 'absolute bottom-2 right-2 bg-green-500 text-white rounded-full p-1';
+            badge.className = 'absolute bottom-2 right-2 bg-green-500 text-white rounded-full p-1 primary-badge';
             badge.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" /></svg>';
             container.appendChild(badge);
+            
+            // Mostrar mensagem de sucesso
+            const successMessage = document.createElement('div');
+            successMessage.className = 'fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50';
+            successMessage.innerHTML = `
+              <div class="flex items-center">
+                <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                  <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path>
+                </svg>
+                <span>Imagem principal definida com sucesso!</span>
+              </div>
+            `;
+            document.body.appendChild(successMessage);
+            
+            // Remover a mensagem após 3 segundos
+            setTimeout(() => {
+              successMessage.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+              setTimeout(() => {
+                successMessage.remove();
+              }, 500);
+            }, 3000);
           }
         }
       } catch (error) {
         console.error('Erro ao definir imagem principal:', error);
+        
+        // Mostrar mensagem de erro
+        const errorMessage = document.createElement('div');
+        errorMessage.className = 'fixed top-4 right-4 bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded z-50';
+        errorMessage.innerHTML = `
+          <div class="flex items-center">
+            <svg class="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+              <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414-1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path>
+            </svg>
+            <span>Erro ao definir imagem principal. Tente novamente.</span>
+          </div>
+        `;
+        document.body.appendChild(errorMessage);
+        
+        // Remover a mensagem após 3 segundos
+        setTimeout(() => {
+          errorMessage.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+          setTimeout(() => {
+            errorMessage.remove();
+          }, 500);
+        }, 3000);
+      } finally {
+        // Remover indicador de carregamento
+        loadingIndicator.remove();
+        
+        // Reativar os botões
+        document.querySelectorAll('.set-primary').forEach(b => {
+          (b as HTMLButtonElement).disabled = false;
+        });
       }
     });
   });
