@@ -383,6 +383,86 @@ if (Astro.request.method === 'POST') {
         if (!value) {
           e.preventDefault();
           alert('Por favor, selecione ou digite uma categoria');
+          return;
+        }
+        
+        // Prevenir submissões múltiplas
+        const form = e.target;
+        const submitButton = form.querySelector('button[type="submit"]');
+        
+        if (submitButton && !submitButton.hasAttribute('disabled')) {
+          e.preventDefault();
+          
+          // Desabilitar o botão para prevenir múltiplos cliques
+          submitButton.setAttribute('disabled', 'true');
+          submitButton.textContent = 'Salvando...';
+          
+          // Mostrar indicador de carregamento
+          const loadingIndicator = document.createElement('div');
+          loadingIndicator.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+          loadingIndicator.innerHTML = `
+            <div class="bg-white p-6 rounded-lg shadow-lg text-center">
+              <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary-600 mx-auto mb-4"></div>
+              <p class="text-lg">Salvando produto...</p>
+              <p class="text-sm text-gray-500 mt-2">Isso pode levar alguns segundos.</p>
+            </div>
+          `;
+          document.body.appendChild(loadingIndicator);
+          
+          // Criar um Set para rastrear arquivos já adicionados
+          const addedFiles = new Set();
+          const formData = new FormData(form);
+          
+          // Se estiver usando o uploader de imagens
+          if (window.getUploadedFiles && typeof window.getUploadedFiles === 'function') {
+            const files = window.getUploadedFiles();
+            
+            // Limpar imagens existentes no FormData
+            const entries = Array.from(formData.entries());
+            for (const [key] of entries) {
+              if (key === 'images') {
+                formData.delete(key);
+              }
+            }
+            
+            // Adicionar cada arquivo ao FormData, evitando duplicatas
+            if (files && files.length > 0) {
+              files.forEach(file => {
+                const fileKey = `${file.name}-${file.size}`;
+                if (!addedFiles.has(fileKey)) {
+                  formData.append('images', file);
+                  addedFiles.add(fileKey);
+                }
+              });
+            }
+          }
+          
+          // Enviar o formulário via fetch
+          fetch(window.location.href, {
+            method: 'POST',
+            body: formData
+          })
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Erro ao salvar produto');
+            }
+            return response;
+          })
+          .then(() => {
+            window.location.reload();
+          })
+          .catch(error => {
+            console.error('Erro ao salvar produto:', error);
+            // Remover indicador de carregamento
+            loadingIndicator.remove();
+            
+            // Reativar o botão de submit
+            submitButton.removeAttribute('disabled');
+            submitButton.textContent = 'Salvar Produto';
+            
+            // Mostrar mensagem de erro
+            alert('Erro ao salvar produto. Por favor, tente novamente.');
+          });
         }
       });
     }
