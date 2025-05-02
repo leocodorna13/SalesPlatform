@@ -31,6 +31,16 @@ if (!user) {
 const settings = await getSiteSettings();
 const heroImages: HeroImage[] = await getHeroImages();
 
+// Adicionar timestamp nas URLs das imagens para evitar cache
+const timestamp = Date.now();
+heroImages.forEach(image => {
+  if (image.url && image.url.startsWith('http')) {
+    // Garantir que não adicionamos múltiplos parâmetros de timestamp
+    const baseUrl = image.url.split('?')[0];
+    image.url = `${baseUrl}?t=${timestamp}`;
+  }
+});
+
 // Processar formulários
 let message = '';
 let messageType = '';
@@ -106,7 +116,12 @@ if (Astro.request.method === 'POST') {
             {heroImages.map((image) => (
               <div class="block md:flex items-center p-3 border rounded-lg" data-image-id={image.id} data-url={image.url}>
                 <div class="flex items-center mb-3 md:mb-0 md:flex-1">
-                  <img src={image.url} alt="Hero image" class="w-24 h-16 object-cover rounded-md"/>
+                  <img 
+                    src={image.url} 
+                    alt="Hero image" 
+                    class="w-24 h-16 object-cover rounded-md"
+                    onerror="this.onerror=null; this.src='/images/default-hero-bg.jpg';"
+                  />
                   <p class="ml-4 text-sm text-gray-500 truncate">{image.filename || 'Imagem do Hero'}</p>
                 </div>
                 <div class="flex gap-2">
@@ -319,6 +334,31 @@ if (Astro.request.method === 'POST') {
       
       window.location.reload();
     });
+  });
+
+  // Função para forçar recarregamento das imagens
+  function forceReloadImages() {
+    const timestamp = Date.now();
+    document.querySelectorAll('img[src*="http"]').forEach((img) => {
+      if (img instanceof HTMLImageElement && img.src && img.src.includes('http')) {
+        const baseUrl = img.src.split('?')[0];
+        img.src = `${baseUrl}?t=${timestamp}`;
+      }
+    });
+  }
+
+  // Recarregar imagens quando a página se torna visível
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      forceReloadImages();
+    }
+  });
+
+  // Também recarregar quando a página é carregada do cache
+  window.addEventListener('pageshow', (event) => {
+    if (event.persisted) {
+      forceReloadImages();
+    }
   });
 
   // Ordenação de imagens

@@ -33,6 +33,17 @@ if (heroImages.length === 0) {
     order: 0
   });
 }
+
+// Adicionar timestamp nas URLs das imagens para evitar cache
+const timestamp = Date.now();
+heroImages.forEach((image: any) => {
+  if (image.url && image.url.startsWith('http')) {
+    // Garantir que não adicionamos múltiplos parâmetros de timestamp
+    const baseUrl = image.url.split('?')[0];
+    image.url = `${baseUrl}?t=${timestamp}`;
+  }
+});
+
 ---
 
 <Layout title={siteSettings.projectName || "Desapego dos Martins"}>
@@ -45,19 +56,20 @@ if (heroImages.length === 0) {
     <div class="absolute inset-0 overflow-hidden">
       {heroImages.length > 0 ? (
         <div class="w-full h-full" id="hero-carousel">
-          {heroImages.map((image, index) => (
+          {heroImages.map((image: any, index: number) => (
             <img 
               src={image.url}
               alt={`Hero image ${index + 1}`}
               class={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${index === 0 ? 'opacity-100' : 'opacity-0'}`}
               data-slide={index}
               loading={index === 0 ? "eager" : "lazy"}
+              onerror="this.onerror=null; this.src='/images/default-hero-bg.jpg';"
             />
           ))}
           
           {heroImages.length > 1 && (
             <div class="absolute bottom-4 left-0 right-0 z-30 flex justify-center space-x-2">
-              {heroImages.map((_, index) => (
+              {heroImages.map((_: any, index: number) => (
                 <button
                   type="button"
                   class="w-3 h-3 rounded-full bg-white/50 hover:bg-white/80 transition-colors"
@@ -252,7 +264,7 @@ if (heroImages.length === 0) {
   let currentSlide = 0;
   
   function showSlide(index: number) {
-    slides.forEach((slide: Element, i) => {
+    slides.forEach((slide, i) => {
       slide.classList.toggle('opacity-0', i !== index);
       slide.classList.toggle('opacity-100', i === index);
     });
@@ -268,8 +280,37 @@ if (heroImages.length === 0) {
   // Autoplay e controles
   if (slides.length > 1) {
     setInterval(() => showSlide((currentSlide + 1) % slides.length), 5000);
-    buttons.forEach((button, index) => button.addEventListener('click', () => showSlide(index)));
+    buttons.forEach((button, index: number) => button.addEventListener('click', () => showSlide(index)));
   }
+
+  // Função para forçar o recarregamento das imagens do carrossel
+  function forceReloadHeroImages() {
+    const timestamp = Date.now();
+    document.querySelectorAll('#hero-carousel img').forEach((img) => {
+      if (img instanceof HTMLImageElement && img.src && img.src.includes('http')) {
+        const baseUrl = img.src.split('?')[0];
+        img.src = `${baseUrl}?t=${timestamp}`;
+      }
+    });
+  }
+
+  // Verificar se há novas imagens a cada 2 minutos
+  setInterval(forceReloadHeroImages, 120000);
+
+  // Também recarregar quando a página se torna visível novamente
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      forceReloadHeroImages();
+    }
+  });
+
+  // Adicionar listener para recarregar imagens quando o usuário volta para a página
+  window.addEventListener('pageshow', (event) => {
+    // Se o evento pageshow é acionado com persisted=true, significa que a página foi restaurada do cache
+    if (event.persisted) {
+      forceReloadHeroImages();
+    }
+  });
 </script>
 
 <style>

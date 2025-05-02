@@ -1944,37 +1944,69 @@ export async function removeCarouselImage(imageUrl) {
 
 // Funções para gerenciar imagens do hero
 export async function getHeroImages() {
-  const { data, error } = await supabase
-    .from('hero_images')
-    .select('*')
-    .order('order');
+  try {
+    console.log('Buscando imagens do hero...');
     
-  if (error) {
-    console.error('Erro ao buscar imagens do hero:', error);
+    // Forçar revalidação dos dados do Supabase
+    const { data, error } = await supabase
+      .from('hero_images')
+      .select('*')
+      .order('order');
+      
+    if (error) {
+      console.error('Erro ao buscar imagens do hero:', error);
+      return [];
+    }
+    
+    if (!data || data.length === 0) {
+      console.log('Nenhuma imagem do hero encontrada');
+      return [];
+    }
+    
+    console.log(`${data.length} imagens do hero encontradas:`, data);
+    return data;
+  } catch (error) {
+    console.error('Erro inesperado ao buscar imagens do hero:', error);
     return [];
   }
-  
-  // Retorna as imagens encontradas ou array vazio
-  return data || [];
 }
 
 export async function addHeroImage(file) {
   try {
-    const timestamp = Date.now();
+    console.log('Iniciando upload de imagem do hero...');
+    const timestamp = new Date().getTime();
     const fileName = `${timestamp}-${file.name}`;
     const filePath = `hero/${fileName}`;
+    const bucketName = 'siteimages'; // Usar o mesmo bucket em toda a aplicação
 
+    // Verificar se o bucket existe
+    const { data: buckets } = await supabase.storage.listBuckets();
+    if (!buckets.find(b => b.name === bucketName)) {
+      console.log(`Bucket ${bucketName} não encontrado, criando...`);
+      const { error: createError } = await supabase.storage.createBucket(bucketName, {
+        public: true
+      });
+      if (createError) throw createError;
+    }
+
+    console.log(`Fazendo upload para ${bucketName}/${filePath}`);
     // Upload da imagem
     const { error: uploadError } = await supabase.storage
-      .from('siteimages')
-      .upload(filePath, file);
+      .from(bucketName)
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: false
+      });
 
     if (uploadError) throw uploadError;
 
+    console.log('Upload concluído, gerando URL pública...');
     // Gerar URL pública
     const { data: { publicUrl } } = supabase.storage
-      .from('siteimages')
+      .from(bucketName)
       .getPublicUrl(filePath);
+
+    console.log('URL pública gerada:', publicUrl);
 
     // Buscar a ordem mais alta atual
     const { data: currentImages } = await supabase
@@ -1985,6 +2017,7 @@ export async function addHeroImage(file) {
     
     const nextOrder = currentImages && currentImages.length > 0 ? currentImages[0].order + 1 : 0;
 
+    console.log('Salvando referência no banco de dados...');
     // Inserir nova imagem na tabela hero_images
     const { error: dbError } = await supabase
       .from('hero_images')
@@ -1996,10 +2029,11 @@ export async function addHeroImage(file) {
 
     if (dbError) throw dbError;
 
+    console.log('Imagem adicionada com sucesso!');
     return { success: true, message: 'Imagem adicionada com sucesso' };
   } catch (error) {
     console.error('Erro ao adicionar imagem:', error);
-    return { success: false, message: 'Erro ao adicionar imagem' };
+    return { success: false, message: `Erro ao adicionar imagem: ${error.message}` };
   }
 }
 
@@ -2071,7 +2105,7 @@ export async function updateHeroImageOrder(images) {
 }
 
 /**
- * Função para incrementar visualizações
+ * Incrementa o contador de visualizações de um produto
  * @param {string} productId - ID do produto
  * @returns {Promise<boolean>} - true se a atualização foi bem-sucedida
  */
@@ -2099,13 +2133,13 @@ export async function incrementProductViews(productId) {
     console.log(`[DEBUG] Atualizando views de ${currentViews} para ${currentViews + 1}`);
     
     // Usar SQL direto para atualizar
-    const { data, error: updateError } = await supabase.rpc(
+    const { data, error } = await supabase.rpc(
       'increment_views',
       { product_id: productId }
     );
     
-    if (updateError) {
-      console.error('[DEBUG] Erro ao atualizar visualizações com RPC:', updateError);
+    if (error) {
+      console.error('[DEBUG] Erro ao atualizar visualizações com RPC:', error);
       
       // Fallback para o método tradicional
       const { error: directUpdateError } = await supabase

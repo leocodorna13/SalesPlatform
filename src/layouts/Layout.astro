@@ -32,6 +32,9 @@ const projectName = siteSettings.projectName || 'Desapego dos Martins';
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+    <meta http-equiv="Pragma" content="no-cache" />
+    <meta http-equiv="Expires" content="0" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg">
     <link rel="manifest" href="/site.webmanifest">
     <meta name="theme-color" content="#b37847">
@@ -244,14 +247,14 @@ const projectName = siteSettings.projectName || 'Desapego dos Martins';
             e.stopPropagation();
             
             // Obter dados do produto
-            const productId = btn.dataset.productId;
-            currentProductTitle = btn.dataset.productTitle || '';
-            currentProductUrl = btn.dataset.productUrl || `${window.location.origin}/produto/${productId}`;
+            const productId = (btn as HTMLElement).dataset.productId;
+            currentProductTitle = (btn as HTMLElement).dataset.productTitle || '';
+            currentProductUrl = (btn as HTMLElement).dataset.productUrl || `${window.location.origin}/produto/${productId}`;
             
             // Configurar links
             if (modalWhatsapp) {
               const message = `Confira este produto: ${currentProductTitle} - ${currentProductUrl}`;
-              modalWhatsapp.href = `https://wa.me/?text=${encodeURIComponent(message)}`;
+              (modalWhatsapp as HTMLAnchorElement).href = `https://wa.me/?text=${encodeURIComponent(message)}`;
             }
             
             // Mostrar modal
@@ -265,7 +268,7 @@ const projectName = siteSettings.projectName || 'Desapego dos Martins';
         // Fechar modal
         if (closeShareModal) {
           closeShareModal.addEventListener('click', () => {
-            shareModal.classList.add('hidden');
+            shareModal?.classList.add('hidden');
             document.body.style.overflow = ''; // Restaurar rolagem
           });
         }
@@ -274,7 +277,7 @@ const projectName = siteSettings.projectName || 'Desapego dos Martins';
         if (shareModal) {
           shareModal.addEventListener('click', (e) => {
             if (e.target === shareModal) {
-              shareModal.classList.add('hidden');
+              shareModal?.classList.add('hidden');
               document.body.style.overflow = '';
             }
           });
@@ -284,9 +287,9 @@ const projectName = siteSettings.projectName || 'Desapego dos Martins';
         if (modalCopyLink) {
           modalCopyLink.addEventListener('click', () => {
             navigator.clipboard.writeText(currentProductUrl);
-            modalCopyFeedback.classList.remove('hidden');
+            modalCopyFeedback?.classList.remove('hidden');
             setTimeout(() => {
-              modalCopyFeedback.classList.add('hidden');
+              modalCopyFeedback?.classList.add('hidden');
             }, 2000);
           });
         }
@@ -309,7 +312,9 @@ const projectName = siteSettings.projectName || 'Desapego dos Martins';
         if (whatsappButton) {
           whatsappButton.addEventListener('click', function() {
             const whatsappMessage = `Olá, gostaria de saber mais sobre os produtos.`;
-            const whatsappUrl = `https://wa.me/${siteSettings.contactWhatsapp}?text=${encodeURIComponent(whatsappMessage)}`;
+            // Obter o número do WhatsApp do elemento de dados
+            const whatsappNumber = (whatsappButton as HTMLElement).dataset.whatsapp || '';
+            const whatsappUrl = `https://wa.me/${whatsappNumber}?text=${encodeURIComponent(whatsappMessage)}`;
             
             window.open(whatsappUrl, '_blank');
           });
