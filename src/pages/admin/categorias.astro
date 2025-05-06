@@ -394,6 +394,11 @@ const categoriesWithCount = await Promise.all(
     const bulkDeleteBtn = document.getElementById('bulk-delete-btn');
     const checkboxes = document.querySelectorAll('.category-checkbox');
     const cancelDelete = document.getElementById('cancel-delete');
+    const editModal = document.getElementById('edit-modal');
+    const categoryIdToEdit = document.getElementById('category-id-to-edit');
+    const editNameInput = document.getElementById('edit-name');
+    const cancelEdit = document.getElementById('cancel-edit');
+    const editForm = document.getElementById('edit-form');
     
     // Atualizar visibilidade do botão de exclusão em lote
     function updateBulkDeleteButton() {
@@ -439,11 +444,35 @@ const categoriesWithCount = await Promise.all(
       });
     });
     
+    // Manipulação do modal de edição
+    document.querySelectorAll('.edit-category').forEach(button => {
+      button.addEventListener('click', (e) => {
+        e.preventDefault();
+        const categoryId = button.getAttribute('data-category-id');
+        const categoryName = button.getAttribute('data-category-name');
+        
+        if (categoryId && categoryName && editModal && editNameInput) {
+          (categoryIdToEdit as HTMLInputElement).value = categoryId;
+          (editNameInput as HTMLInputElement).value = categoryName;
+          editModal.classList.remove('hidden');
+        }
+      });
+    });
+    
     if (cancelDelete) {
       cancelDelete.addEventListener('click', (e) => {
         e.preventDefault();
         if (deleteModal) {
           deleteModal.classList.add('hidden');
+        }
+      });
+    }
+    
+    if (cancelEdit) {
+      cancelEdit.addEventListener('click', (e) => {
+        e.preventDefault();
+        if (editModal) {
+          editModal.classList.add('hidden');
         }
       });
     }

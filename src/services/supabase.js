@@ -29,6 +29,58 @@ const cache = {
   products: { data: null, timestamp: 0 }
 };
 
+/**
+ * Limpa o cache de um tipo específico
+ * @param {string} cacheType - Tipo de cache a ser limpo ('products', 'categories', 'siteSettings')
+ * @returns {Promise<void>}
+ */
+async function clearCache(cacheType) {
+  if (cacheType === 'products') {
+    // Limpa todos os caches relacionados a produtos
+    Object.keys(cache).forEach(key => {
+      if (key.startsWith('products_') || key.startsWith('featured_products_')) {
+        delete cache[key];
+      }
+    });
+    // Reinicia o cache principal de produtos
+    cache.products = { data: null, timestamp: 0 };
+    console.log(`Cache de ${cacheType} limpo com sucesso`);
+  } else if (cache[cacheType]) {
+    cache[cacheType] = { data: null, timestamp: 0 };
+    console.log(`Cache de ${cacheType} limpo com sucesso`);
+  } else {
+    console.log(`Tipo de cache ${cacheType} não encontrado`);
+  }
+}
+
+/**
+ * Obtém dados do cache
+ * @param {string} key - Chave do cache
+ * @returns {Promise<any>} - Dados do cache ou null se não encontrado ou expirado
+ */
+async function getFromCache(key) {
+  if (cache[key] && Date.now() - cache[key].timestamp < CACHE_DURATION) {
+    return cache[key].data;
+  }
+  return null;
+}
+
+/**
+ * Armazena dados no cache
+ * @param {string} key - Chave do cache
+ * @param {any} data - Dados a serem armazenados
+ * @param {number} duration - Duração em segundos (opcional, padrão: CACHE_DURATION)
+ * @returns {Promise<void>}
+ */
+async function setInCache(key, data, duration = CACHE_DURATION / 1000) {
+  cache[key] = {
+    data,
+    timestamp: Date.now(),
+    duration: duration * 1000
+  };
+  console.log(`Dados armazenados no cache com chave ${key}`);
+}
+
 // ======= Funções de Autenticação =======
 
 /**
@@ -721,6 +773,12 @@ export async function createCategory(name, slug) {
     
     if (error) throw error;
     
+    // Limpar o cache de categorias
+    cache.categories = {
+      data: null,
+      timestamp: 0
+    };
+    
     return { 
       success: true, 
       message: 'Categoria criada com sucesso.',
@@ -762,6 +820,13 @@ export async function deleteCategory(id) {
       .eq('id', id);
     
     if (error) throw error;
+    
+    // Limpar o cache de categorias
+    cache.categories = {
+      data: null,
+      timestamp: 0
+    };
+    
     return { success: true, message: 'Categoria excluída com sucesso.' };
   } catch (error) {
     console.error('Erro ao excluir categoria:', error);
@@ -1494,7 +1559,7 @@ export async function createBulkProducts(productsData) {
 /**
  * Executa ações em lote para múltiplos produtos
  * @param {string[]} productIds - IDs dos produtos
- * @param {string} action - Ação a ser executada ('markSold', 'markAvailable', 'markHidden', 'markVisible', 'delete')
+ * @param {string} action - Ação a ser executada ('markSold', 'markAvailable', 'markHidden', 'markVisible', 'markFeatured', 'unmarkFeatured', 'delete')
  * @returns {Promise<object>} - Resultado da operação
  */
 export async function batchProductAction(productIds, action) {
@@ -1536,22 +1601,75 @@ export async function batchProductAction(productIds, action) {
           .in('id', productIds);
         break;
         
-      case 'delete':
-        // Primeiro excluímos as imagens relacionadas
-        const { error: imagesError } = await supabase
-          .from('product_images')
-          .delete()
-          .in('product_id', productIds);
-          
-        if (imagesError) throw imagesError;
-        
-        // Depois excluímos os produtos
+      case 'markFeatured':
         result = await supabase
           .from('products')
-          .delete()
+          .update({ featured: true, updated_at: new Date().toISOString() })
           .in('id', productIds);
         break;
         
+      case 'unmarkFeatured':
+        result = await supabase
+          .from('products')
+          .update({ featured: false, updated_at: new Date().toISOString() })
+          .in('id', productIds);
+        break;
+        
+      case 'delete':
+        // 1. Buscar todas as imagens dos produtos em uma única query
+        const { data: productImages, error: fetchError } = await supabase
+          .from('product_images')
+          .select('image_url, product_id')
+          .in('product_id', productIds);
+
+        if (fetchError) throw fetchError;
+
+        // 2. Organizar imagens por produto e preparar caminhos para deleção
+        const imagesByProduct = new Map();
+        const filesToDelete = [];
+        
+        productImages?.forEach(img => {
+          const parts = img.image_url.split('product-images/');
+          if (parts.length > 1) {
+            filesToDelete.push(parts[1]);
+            if (!imagesByProduct.has(img.product_id)) {
+              imagesByProduct.set(img.product_id, []);
+            }
+            imagesByProduct.get(img.product_id).push(img.image_url);
+          }
+        });
+
+        // 3. Deletar arquivos do storage em paralelo
+        if (filesToDelete.length > 0) {
+          await supabase.storage
+            .from('product-images')
+            .remove(filesToDelete);
+        }
+
+        // 4. Deletar referências de imagens e produtos em paralelo
+        await Promise.all([
+          // Deletar todas as referências de imagens
+          supabase
+            .from('product_images')
+            .delete()
+            .in('product_id', productIds),
+          
+          // Deletar todos os produtos
+          supabase
+            .from('products')
+            .delete()
+            .in('id', productIds),
+            
+          // Deletar todos os interesses
+          supabase
+            .from('interests')
+            .delete()
+            .in('product_id', productIds)
+        ]);
+
+        result = { success: true };
+        break;
+
       default:
         return { success: false, error: 'Ação inválida' };
     }
@@ -1563,12 +1681,13 @@ export async function batchProductAction(productIds, action) {
     
     return { 
       success: true, 
-      message: `${productIds.length} produtos foram ${
-        action === 'markSold' ? 'marcados como vendidos' : 
-        action === 'markAvailable' ? 'disponibilizados' : 
-        action === 'markHidden' ? 'ocultados' : 
-        action === 'markVisible' ? 'tornados visíveis' : 
-        'excluídos'} com sucesso.` 
+      message: `${productIds.length} produto(s) ${action === 'markSold' ? 'marcado(s) como vendido(s)' : 
+        action === 'markAvailable' ? 'disponibilizado(s)' : 
+        action === 'markHidden' ? 'ocultado(s)' : 
+        action === 'markVisible' ? 'tornado(s) visível(is)' : 
+        action === 'markFeatured' ? 'adicionado(s) aos destaques' : 
+        action === 'unmarkFeatured' ? 'removido(s) dos destaques' : 
+        'excluído(s)'} com sucesso.` 
     };
   } catch (error) {
     console.error('Erro ao executar ação em lote:', error);
@@ -1583,7 +1702,7 @@ export async function batchProductAction(productIds, action) {
  */
 export async function toggleProductVisibility(productId) {
   try {
-    // Primeiro, obter o estado atual do produto
+    // Primeiro, obtemos o estado atual do produto
     const { data: product, error: getError } = await supabase
       .from('products')
       .select('visible')
@@ -1592,11 +1711,11 @@ export async function toggleProductVisibility(productId) {
     
     if (getError) throw getError;
     
-    // Alternar a visibilidade
+    // Inverte o estado de visibilidade
     const newVisibility = !product.visible;
     
-    // Atualizar o produto
-    const { error } = await supabase
+    // Atualiza o produto
+    const { data, error } = await supabase
       .from('products')
       .update({ 
         visible: newVisibility,
@@ -1606,10 +1725,13 @@ export async function toggleProductVisibility(productId) {
     
     if (error) throw error;
     
+    // Limpa o cache para garantir que as mudanças sejam refletidas imediatamente
+    await clearCache('products');
+    
     return { 
       success: true, 
-      visible: newVisibility,
-      message: `Produto ${newVisibility ? 'visível' : 'oculto'} com sucesso!`
+      message: `Produto ${newVisibility ? 'exibido' : 'ocultado'} com sucesso.`,
+      data
     };
   } catch (error) {
     console.error('Erro ao alternar visibilidade do produto:', error);
@@ -1617,21 +1739,97 @@ export async function toggleProductVisibility(productId) {
   }
 }
 
-// ======= Funções de Configurações do Site =======
+/**
+ * Alterna o status de destaque de um produto
+ * @param {string} productId - ID do produto
+ * @returns {Promise<object>} - Resultado da operação
+ */
+export async function toggleProductFeatured(productId) {
+  try {
+    // Primeiro, obtemos o estado atual do produto
+    const { data: product, error: getError } = await supabase
+      .from('products')
+      .select('featured')
+      .eq('id', productId)
+      .single();
+    
+    if (getError) throw getError;
+    
+    // Inverte o estado de destaque
+    const newFeatured = !product.featured;
+    
+    // Atualiza o produto
+    const { data, error } = await supabase
+      .from('products')
+      .update({ 
+        featured: newFeatured,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', productId);
+    
+    if (error) throw error;
+    
+    // Limpa o cache para garantir que as mudanças sejam refletidas imediatamente
+    await clearCache('products');
+    
+    return { 
+      success: true, 
+      message: `Produto ${newFeatured ? 'adicionado aos destaques' : 'removido dos destaques'} com sucesso.`,
+      data
+    };
+  } catch (error) {
+    console.error('Erro ao alternar destaque do produto:', error);
+    return { success: false, error: error.message };
+  }
+}
 
 /**
- * Interface para as configurações do site
- * @typedef {Object} SiteSettings
- * @property {string} id - ID único das configurações
- * @property {string} heroTitle - Título principal da página inicial
- * @property {string} heroDescription - Descrição principal da página inicial
- * @property {string} heroImageUrl - URL da imagem de fundo do hero
- * @property {string} contactPhone - Telefone de contato
- * @property {string} contactWhatsapp - WhatsApp de contato
- * @property {string} paymentMethods - Formas de pagamento aceitas
- * @property {string} whatsappMessage - Mensagem padrão do WhatsApp
- * @property {string} projectName - Nome do projeto/site
+ * Obtém produtos em destaque
+ * @returns {Promise<Array>} - Lista de produtos em destaque
  */
+export async function getFeaturedProducts() {
+  try {
+    // Tenta obter do cache primeiro
+    const cacheKey = `featured_products_all`;
+    const cachedData = await getFromCache(cacheKey);
+    
+    if (cachedData) {
+      console.log('Usando produtos em destaque do cache');
+      return cachedData;
+    }
+    
+    // Se não estiver no cache, busca do banco de dados
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        categories (
+          id,
+          name,
+          slug
+        ),
+        product_images (
+          id,
+          image_url,
+          is_primary
+        )
+      `)
+      .eq('status', 'available')
+      .eq('visible', true)
+      .eq('featured', true)
+      .order('updated_at', { ascending: false });
+    
+    if (error) throw error;
+    
+    // Armazena no cache
+    await setInCache(cacheKey, data, 60 * 5); // 5 minutos
+    
+    return data;
+  } catch (error) {
+    console.error('Erro ao obter produtos em destaque:', error);
+    return [];
+  }
+}
 
 /**
  * Busca as configurações do site

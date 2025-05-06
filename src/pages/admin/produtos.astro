@@ -1,6 +1,6 @@
 ---
 import AdminLayout from '../../layouts/AdminLayout.astro';
-import { getAdminProducts, updateProductStatus, deleteProduct, testImageUpload, getCurrentUser, batchProductAction, toggleProductVisibility } from '../../services/supabase';
+import { getAdminProducts, updateProductStatus, deleteProduct, testImageUpload, getCurrentUser, batchProductAction, toggleProductVisibility, toggleProductFeatured } from '../../services/supabase';
 
 // Verificar autenticação primeiro
 const user = await getCurrentUser();
@@ -87,9 +87,39 @@ if (Astro.request.method === 'POST') {
                     (result && typeof result === 'object' && 'error' in result ? 
                       `Erro: ${typeof result.error === 'string' ? result.error : 'Erro desconhecido'}` : 'Operação concluída');
       console.log(`Mensagem definida para batch-markVisible: ${flashMessage}, tipo: ${messageType}`);
+    } else if (action === 'batch-markFeatured' && productIds.length > 0) {
+      console.log(`Processando batch-markFeatured para ${productIds.length} produtos:`, productIds);
+      const result = await batchProductAction(productIds, 'markFeatured');
+      console.log('Resultado da operação batch-markFeatured:', result);
+      messageType = result && typeof result === 'object' && 'success' in result && result.success ? 'success' : 'error';
+      flashMessage = result && typeof result === 'object' && 'message' in result ? 
+                    (typeof result.message === 'string' ? result.message : 'Produtos marcados como destaque') : 
+                    (result && typeof result === 'object' && 'error' in result ? 
+                      `Erro: ${typeof result.error === 'string' ? result.error : 'Erro desconhecido'}` : 'Produtos marcados como destaque');
+      console.log(`Mensagem definida para batch-markFeatured: ${flashMessage}, tipo: ${messageType}`);
+    } else if (action === 'batch-unmarkFeatured' && productIds.length > 0) {
+      console.log(`Processando batch-unmarkFeatured para ${productIds.length} produtos:`, productIds);
+      const result = await batchProductAction(productIds, 'unmarkFeatured');
+      console.log('Resultado da operação batch-unmarkFeatured:', result);
+      messageType = result && typeof result === 'object' && 'success' in result && result.success ? 'success' : 'error';
+      flashMessage = result && typeof result === 'object' && 'message' in result ? 
+                    (typeof result.message === 'string' ? result.message : 'Destaque removido dos produtos') : 
+                    (result && typeof result === 'object' && 'error' in result ? 
+                      `Erro: ${typeof result.error === 'string' ? result.error : 'Erro desconhecido'}` : 'Destaque removido dos produtos');
+      console.log(`Mensagem definida para batch-unmarkFeatured: ${flashMessage}, tipo: ${messageType}`);
     } else if (action === 'toggle-visibility' && productId) {
       console.log(`Processando toggle-visibility para produto ${productId}`);
       const result = await toggleProductVisibility(productId);
+      console.log('Resultado da operação:', result);
+      messageType = result && typeof result === 'object' && 'success' in result && result.success ? 'success' : 'error';
+      flashMessage = result && typeof result === 'object' && 'message' in result ? 
+                    (typeof result.message === 'string' ? result.message : 'Operação concluída') : 
+                    (result && typeof result === 'object' && 'error' in result ? 
+                      `Erro: ${typeof result.error === 'string' ? result.error : 'Erro desconhecido'}` : 'Operação concluída');
+      console.log(`Mensagem definida: ${flashMessage}, tipo: ${messageType}`);
+    } else if (action === 'toggle-featured' && productId) {
+      console.log(`Processando toggle-featured para produto ${productId}`);
+      const result = await toggleProductFeatured(productId);
       console.log('Resultado da operação:', result);
       messageType = result && typeof result === 'object' && 'success' in result && result.success ? 'success' : 'error';
       flashMessage = result && typeof result === 'object' && 'message' in result ? 
@@ -180,7 +210,10 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
       )}
     </div>
   )}
-  
+
+  <!-- Sistema de notificações toast -->
+  <div id="toast-container" class="fixed top-4 right-4 z-50 flex flex-col gap-2"></div>
+
   <!-- Informações de depuração -->
   <div class="p-4 mb-6 bg-gray-100 rounded-lg">
     <div class="flex flex-wrap gap-4">
@@ -218,7 +251,19 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
         <button type="button" id="batch-mark-visible" class="btn btn-sm btn-outline">
           <span class="hidden sm:inline">Marcar como</span> visível
         </button>
-        <button type="button" id="batch-delete" class="btn btn-sm btn-outline btn-error">
+        <button type="button" id="batch-mark-featured" class="btn btn-sm btn-accent">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1" fill="currentColor" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+          </svg>
+          Destacar
+        </button>
+        <button type="button" id="batch-unmark-featured" class="btn btn-sm btn-warning">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 inline-block mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+          </svg>
+          Remover Destaque
+        </button>
+        <button type="button" id="batch-delete" class="btn btn-sm btn-error">
           Excluir
         </button>
         <button type="button" id="batch-cancel" class="btn btn-sm btn-ghost">
@@ -403,6 +448,19 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
               
               <button 
                 type="button"
+                class="feature-toggle" 
+                title={product.featured ? 'Remover destaque' : 'Marcar como destaque'}
+                data-product-id={product.id}
+                data-featured={product.featured}
+                style={`color: ${product.featured ? '#FFD700' : '#9CA3AF'}; hover:color: ${product.featured ? '#FFC000' : '#FFD700'};`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill={product.featured ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z" />
+                </svg>
+              </button>
+              
+              <button 
+                type="button"
                 class="text-gray-400 hover:text-red-500 delete-product" 
                 title="Excluir produto"
                 data-product-id={product.id}
@@ -437,6 +495,8 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
   const batchMarkSold = document.getElementById('batch-mark-sold');
   const batchMarkHidden = document.getElementById('batch-mark-hidden');
   const batchMarkVisible = document.getElementById('batch-mark-visible');
+  const batchMarkFeatured = document.getElementById('batch-mark-featured');
+  const batchUnmarkFeatured = document.getElementById('batch-unmark-featured');
   const batchDelete = document.getElementById('batch-delete');
   const batchCancel = document.getElementById('batch-cancel');
   
@@ -581,7 +641,7 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
       
       if (confirm(`Deseja realmente marcar ${selectedIds.length} produto(s) como oculto(s)?`)) {
         const formData = new FormData();
-        formData.append('action', 'batch-mark-hidden');
+        formData.append('action', 'batch-markHidden');
         
         selectedIds.forEach(id => {
           formData.append('productIds[]', id || '');
@@ -626,6 +686,44 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
           console.error('Erro:', error);
           alert('Ocorreu um erro ao processar sua solicitação.');
         });
+      }
+    });
+  }
+
+  if (batchMarkFeatured) {
+    batchMarkFeatured.addEventListener('click', () => {
+      const selectedIds = getSelectedProductIds();
+      
+      if (selectedIds.length === 0) return;
+      
+      if (confirm(`Deseja realmente marcar ${selectedIds.length} produto(s) como destaque?`)) {
+        const formData = new FormData();
+        formData.append('action', 'batch-markFeatured');
+        
+        selectedIds.forEach(id => {
+          formData.append('productIds[]', id || '');
+        });
+        
+        reloadAfterAction(formData);
+      }
+    });
+  }
+
+  if (batchUnmarkFeatured) {
+    batchUnmarkFeatured.addEventListener('click', () => {
+      const selectedIds = getSelectedProductIds();
+      
+      if (selectedIds.length === 0) return;
+      
+      if (confirm(`Deseja realmente remover o destaque de ${selectedIds.length} produto(s)?`)) {
+        const formData = new FormData();
+        formData.append('action', 'batch-unmarkFeatured');
+        
+        selectedIds.forEach(id => {
+          formData.append('productIds[]', id || '');
+        });
+        
+        reloadAfterAction(formData);
       }
     });
   }
@@ -714,6 +812,147 @@ const getMainImage = (images: ProductImage[] | null | undefined): string | null 
       });
     }
   });
+
+  // Manipulador para botões de alternar destaque
+  document.querySelectorAll('.feature-toggle').forEach((button) => {
+    if (button instanceof HTMLElement) {
+      button.addEventListener('click', function(e) {
+        e.preventDefault();
+        if (this instanceof HTMLElement) {
+          const productId = this.dataset.productId;
+          const isFeatured = this.dataset.featured === 'true';
+          const newFeatured = !isFeatured;
+          
+          // Atualizar visualmente o botão imediatamente
+          this.dataset.featured = String(newFeatured);
+          const svgElement = this.querySelector('svg');
+          if (svgElement) {
+            if (newFeatured) {
+              svgElement.setAttribute('fill', 'currentColor');
+              this.style.color = '#FFD700';
+            } else {
+              svgElement.setAttribute('fill', 'none');
+              this.style.color = '#9CA3AF';
+            }
+          }
+          
+          // Mostrar toast de feedback
+          showToast(
+            newFeatured ? 'Produto adicionado aos destaques' : 'Produto removido dos destaques',
+            'success'
+          );
+          
+          // Enviar solicitação para o servidor
+          const formData = new FormData();
+          formData.append('action', 'toggle-featured');
+          formData.append('productId', productId || '');
+          
+          console.log(`Enviando solicitação para alternar destaque do produto ${productId} para ${newFeatured}`);
+          
+          fetch('', {
+            method: 'POST',
+            body: formData
+          })
+          .then(response => {
+            console.log('Resposta recebida:', response.status);
+            if (!response.ok) {
+              throw new Error(`Erro HTTP ${response.status}`);
+            }
+            return response.text().then(text => {
+              try {
+                return JSON.parse(text);
+              } catch (e) {
+                console.log('Resposta não é JSON válido:', text);
+                return { success: true };
+              }
+            });
+          })
+          .then((result) => {
+            console.log('Resposta processada:', result);
+            // Se a resposta não tiver um formato esperado ou não for um objeto, consideramos sucesso
+            if (!result || typeof result !== 'object') {
+              return;
+            }
+            
+            // Se houver erro explícito na resposta
+            if (result.success === false) {
+              // Reverter a alteração visual
+              this.dataset.featured = String(isFeatured);
+              if (svgElement) {
+                if (isFeatured) {
+                  svgElement.setAttribute('fill', 'currentColor');
+                  this.style.color = '#FFD700';
+                } else {
+                  svgElement.setAttribute('fill', 'none');
+                  this.style.color = '#9CA3AF';
+                }
+              }
+              showToast(result.error || 'Erro ao alternar destaque', 'error');
+            }
+          })
+          .catch(error => {
+            console.error('Erro na requisição:', error);
+            // Reverter a alteração visual em caso de erro
+            this.dataset.featured = String(isFeatured);
+            if (svgElement) {
+              if (isFeatured) {
+                svgElement.setAttribute('fill', 'currentColor');
+                this.style.color = '#FFD700';
+              } else {
+                svgElement.setAttribute('fill', 'none');
+                this.style.color = '#9CA3AF';
+              }
+            }
+            showToast('Ocorreu um erro ao processar sua solicitação', 'error');
+          });
+        }
+      });
+    }
+  });
+
+  // Função para criar uma notificação toast
+  function showToast(message, type = 'success', duration = 3000) {
+    const toastContainer = document.getElementById('toast-container');
+    if (!toastContainer) return;
+    
+    const toast = document.createElement('div');
+    toast.className = `py-2 px-4 rounded-lg shadow-lg transform transition-all duration-300 ease-in-out ${
+      type === 'success' 
+        ? 'bg-green-100 text-green-800 border-l-4 border-green-500' 
+        : type === 'error'
+          ? 'bg-red-100 text-red-800 border-l-4 border-red-500'
+          : 'bg-yellow-100 text-yellow-800 border-l-4 border-yellow-500'
+    }`;
+    
+    toast.innerHTML = `
+      <div class="flex items-center">
+        <span class="mr-2">
+          ${type === 'success' 
+            ? '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clip-rule="evenodd"></path></svg>'
+            : type === 'error'
+              ? '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clip-rule="evenodd"></path></svg>'
+              : '<svg class="w-5 h-5" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>'
+          }
+        </span>
+        <span>${message}</span>
+      </div>
+    `;
+    
+    toastContainer.appendChild(toast);
+    
+    // Adicionar classe para animar entrada
+    setTimeout(() => {
+      toast.classList.add('translate-x-0');
+    }, 10);
+    
+    // Remover após o tempo definido
+    setTimeout(() => {
+      toast.classList.add('opacity-0', '-translate-y-2');
+      setTimeout(() => {
+        toast.remove();
+      }, 300);
+    }, duration);
+  }
 
   // Verificar se há parâmetro de sucesso de upload em massa na URL
   document.addEventListener('DOMContentLoaded', () => {
