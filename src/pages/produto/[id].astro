@@ -156,7 +156,23 @@ function formatPrice(price: number): string {
 const mainImage = product.product_images.find(img => img.is_primary) || product.product_images[0];
 // Construir URL completa da imagem
 const baseUrl = Astro.site || `${Astro.url.protocol}//${Astro.url.host}`;
-const imageUrl = new URL(mainImage?.image_url || '/screenshot-540x720.jpg', baseUrl).toString();
+
+// Garantir que a URL da imagem seja absoluta
+let imageUrl;
+if (mainImage?.image_url) {
+  // Verificar se a URL já é absoluta
+  if (mainImage.image_url.startsWith('http')) {
+    imageUrl = mainImage.image_url;
+  } else {
+    // Construir URL absoluta
+    imageUrl = new URL(mainImage.image_url.replace(/^\//, ''), baseUrl).toString();
+  }
+} else {
+  // Imagem padrão
+  imageUrl = new URL('screenshot-540x720.jpg', baseUrl).toString();
+}
+
+console.log('URL da imagem para compartilhamento:', imageUrl);
 
 ---
 
