@@ -1,4 +1,4 @@
----
+a ---
 import Layout from '../../layouts/Layout.astro';
 import ProductGrid from '../../components/ProductGrid.astro';
 import WhatsAppButton from '../../components/WhatsAppButton.astro';
@@ -181,14 +181,17 @@ console.log('URL da imagem para compartilhamento:', imageUrl);
     <!-- Meta tags para compartilhamento -->
     <meta property="og:title" content={`${product.title} | ${projectName}`} />
     <meta property="og:description" content={product.description} />
-    <meta property="og:image" content={imageUrl} />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
+    <meta property="og:image" itemprop="image" content={imageUrl} />
+    <meta property="og:image:width" content="256" />
+    <meta property="og:image:height" content="256" />
+    <meta property="og:image:alt" content={product.title} />
     <meta property="og:url" content={`${baseUrl}/produto/${product.id}`} />
     <meta property="og:type" content="product" />
     <meta property="product:price:amount" content={product.price.toString()} />
     <meta property="product:price:currency" content="BRL" />
     <meta property="og:availability" content={product.status === 'available' ? 'instock' : 'oos'} />
+    {imageUrl.startsWith('https') && <meta property="og:image:secure_url" content={imageUrl} />}
+    <meta property="og:updated_time" content={Math.floor(Date.now() / 1000).toString()} />
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
