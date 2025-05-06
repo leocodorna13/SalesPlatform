@@ -1881,51 +1881,91 @@ export async function getSiteSettings() {
 }
 
 /**
- * Faz upload de uma imagem para o Supabase Storage
+ * Faz upload de uma imagem para o Supabase Storage com otimização
  * @param {File} file - Arquivo de imagem
  * @param {string} bucketName - Nome do bucket (default: 'site-images')
  * @param {string} folder - Pasta dentro do bucket (default: 'hero')
- * @returns {Promise<{success: boolean, url: string|null, error: any}>}
+ * @param {Object} options - Opções de otimização
+ * @returns {Promise<{success: boolean, url: string|null, thumbnailUrl: string|null, dimensions: {width: number, height: number}|null, error: any}>}
  */
-export async function uploadImage(file, bucketName = 'site-images', folder = 'hero') {
+export async function uploadImage(file, bucketName = 'site-images', folder = 'hero', options = {}) {
   try {
+    // Importar o otimizador de imagens
+    const { optimizeImage, uploadOptimizedImage } = await import('../utils/imageOptimizer.js');
+    
+    // Verificar se o bucket existe
     const bucketExists = await createBucketIfNotExists(bucketName);
     if (!bucketExists) {
       throw new Error('Não foi possível criar o bucket para armazenamento de imagens');
     }
 
-    // Converter o File para um formato que o Astro possa processar
-    const arrayBuffer = await file.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
+    // Configurar opções de otimização
+    const imageOptions = {
+      maxWidth: options.maxWidth || 1200,
+      quality: options.quality || 0.8,
+      format: options.format || 'webp',
+      generateThumbnail: options.generateThumbnail !== false, // true por padrão
+      thumbnailWidth: options.thumbnailWidth || 256
+    };
 
-    // Otimizar a imagem usando o Astro
-    const optimizedImage = await getImage({
-      src: buffer,
-      width: 1920,
-      height: 1080,
-      format: 'webp',
-      quality: 80
-    });
-
-    // Criar um novo File com a imagem otimizada
-    const response = await fetch(optimizedImage.src);
-    const optimizedBuffer = await response.arrayBuffer();
-    const optimizedFile = new File([optimizedBuffer], `${file.name.split('.')[0]}.webp`, {
-      type: 'image/webp'
-    });
-
-    // Upload para o Supabase
+    // Verificar se estamos no navegador (client-side) ou no servidor (SSR)
+    if (typeof window !== 'undefined') {
+      // Cliente: usar o otimizador de imagens no navegador
+      try {
+        // Otimizar e fazer upload da imagem
+        const result = await uploadOptimizedImage(supabase, file, bucketName, folder, imageOptions);
+        
+        return {
+          success: true,
+          url: result.url,
+          thumbnailUrl: result.thumbnailUrl,
+          dimensions: result.dimensions,
+          error: null
+        };
+      } catch (clientError) {
+        console.error('Erro ao otimizar imagem no cliente:', clientError);
+        // Fallback para o método tradicional em caso de erro
+      }
+    }
+    
+    // Servidor ou fallback: usar o método tradicional com otimização básica
+    // Gerar nome de arquivo único
     const fileName = `${folder}/${Date.now()}-${Math.random().toString(36).substring(2, 15)}.webp`;
     
+    // Converter para formato WebP se possível
+    let uploadFile = file;
+    
+    try {
+      // Tentar converter para WebP usando Buffer
+      const arrayBuffer = await file.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      
+      // Usar Sharp se disponível no servidor
+      if (typeof process !== 'undefined') {
+        const sharp = await import('sharp');
+        const optimizedBuffer = await sharp(buffer)
+          .resize(imageOptions.maxWidth)
+          .webp({ quality: imageOptions.quality * 100 })
+          .toBuffer();
+        
+        uploadFile = new File([optimizedBuffer], fileName, { type: 'image/webp' });
+      }
+    } catch (optimizeError) {
+      console.warn('Não foi possível otimizar a imagem no servidor:', optimizeError);
+      // Continuar com o arquivo original
+    }
+    
+    // Upload para o Supabase
     const { data, error } = await supabase.storage
       .from(bucketName)
-      .upload(fileName, optimizedFile, {
+      .upload(fileName, uploadFile, {
         cacheControl: '3600',
-        upsert: false
+        upsert: true
       });
 
     if (error) throw error;
 
+    // Obter URL pública
     const { data: publicURL } = supabase.storage
       .from(bucketName)
       .getPublicUrl(fileName);
@@ -1933,6 +1973,8 @@ export async function uploadImage(file, bucketName = 'site-images', folder = 'he
     return {
       success: true,
       url: publicURL.publicUrl,
+      thumbnailUrl: null, // Sem miniatura no método tradicional
+      dimensions: null, // Sem dimensões no método tradicional
       error: null
     };
   } catch (error) {
@@ -1940,6 +1982,8 @@ export async function uploadImage(file, bucketName = 'site-images', folder = 'he
     return {
       success: false,
       url: null,
+      thumbnailUrl: null,
+      dimensions: null,
       error
     };
   }
