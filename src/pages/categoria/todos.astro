@@ -22,6 +22,8 @@ const { data: productsData } = await supabase
       is_primary
     )
   `)
+  .eq('status', 'available')  // Apenas produtos disponíveis
+  .eq('visible', true)        // Apenas produtos visíveis
   .order('created_at', { ascending: false });
 
 const { data: categories } = await supabase

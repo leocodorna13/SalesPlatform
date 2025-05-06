@@ -22,7 +22,7 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
 });
 
 // Cache em memória para dados frequentes
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutos
+const CACHE_DURATION = 30 * 1000; // 30 segundos
 const cache = {
   siteSettings: { data: null, timestamp: 0 },
   categories: { data: null, timestamp: 0 },
@@ -1678,6 +1678,9 @@ export async function batchProductAction(productIds, action) {
       console.error(`Erro na operação ${action}:`, result.error);
       throw result.error;
     }
+    
+    // Limpar o cache para garantir que as alterações sejam refletidas imediatamente
+    await clearCache('products');
     
     return { 
       success: true, 
