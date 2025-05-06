@@ -172,12 +172,17 @@ const imageUrl = new URL(mainImage?.image_url || '/screenshot-540x720.jpg', base
     <meta property="og:type" content="product" />
     <meta property="product:price:amount" content={product.price.toString()} />
     <meta property="product:price:currency" content="BRL" />
+    <meta property="og:availability" content={product.status === 'available' ? 'instock' : 'oos'} />
     
-    <!-- Meta tags específicas para Twitter -->
+    <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={`${product.title} | ${projectName}`} />
     <meta name="twitter:description" content={product.description} />
     <meta name="twitter:image" content={imageUrl} />
+    
+    <!-- WhatsApp Preview -->
+    <meta property="og:site_name" content={projectName} />
+    <meta property="og:locale" content="pt_BR" />
   </head>
   
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -553,14 +558,16 @@ const imageUrl = new URL(mainImage?.image_url || '/screenshot-540x720.jpg', base
     });
   });
 
-  // Compartilhamento
   document.addEventListener('DOMContentLoaded', () => {
     const shareButton = document.getElementById('share-btn');
     const shareMenu = document.getElementById('share-menu');
     const copyLinkButton = document.getElementById('copy-link-btn');
     const copyFeedback = document.getElementById('copy-feedback');
-    const whatsappShare = document.getElementById('whatsapp-share');
+    const whatsappShare = document.getElementById('whatsapp-share') as HTMLAnchorElement;
+    const facebookShare = document.getElementById('facebook-share') as HTMLAnchorElement;
+    const twitterShare = document.getElementById('twitter-share') as HTMLAnchorElement;
     const currentUrl = window.location.href;
+    const productTitle = document.querySelector('h1')?.textContent || '';
 
     if (shareButton) {
       shareButton.addEventListener('click', (e) => {
@@ -581,23 +588,30 @@ const imageUrl = new URL(mainImage?.image_url || '/screenshot-540x720.jpg', base
     }
 
     if (whatsappShare) {
-      const productTitle = document.querySelector('h1')?.textContent || '';
       const message = `Confira este produto: ${productTitle} - ${currentUrl}`;
       whatsappShare.href = `https://wa.me/?text=${encodeURIComponent(message)}`;
     }
+    
+    if (facebookShare) {
+      facebookShare.href = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(currentUrl)}`;
+    }
+    
+    if (twitterShare) {
+      const message = `Confira este produto: ${productTitle}`;
+      twitterShare.href = `https://twitter.com/intent/tweet?text=${encodeURIComponent(message)}&url=${encodeURIComponent(currentUrl)}`;
+    }
 
     // Fechar o menu ao clicar fora
-    document.addEventListener('click', (e) => {
+    document.addEventListener('click', (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
       if (shareMenu && !shareMenu.classList.contains('hidden') && 
-          !shareButton?.contains(e.target) && 
-          !shareMenu.contains(e.target)) {
+          !shareButton?.contains(target) && 
+          !shareMenu.contains(target)) {
         shareMenu.classList.add('hidden');
       }
     });
   });
-</script>
 
-<script>
   const productId = '${Astro.params.id}';
   const excludeIds = [`${productId}`];
   let currentPage = 1;

@@ -19,7 +19,7 @@ const whatsappNumber = siteSettings.contactWhatsapp?.replace(/\D/g, '') || '';
 const featuredProductsList = await getFeaturedProducts();
 
 // Preparar produtos para exibição
-const prepareProductsForDisplay = (productList) => {
+const prepareProductsForDisplay = (productList: any[]) => {
   return (productList || []).map(product => {
     // Adicionar log para debug
     console.log('Processando produto:', product.id, product.title);
@@ -30,7 +30,7 @@ const prepareProductsForDisplay = (productList) => {
       console.log('Produto sem imagens:', product.id);
       product.image_url = '/images/placeholder.jpg';
     } else {
-      const primaryImage = product.product_images.find(img => img.is_primary);
+      const primaryImage = product.product_images.find((img: any) => img.is_primary);
       product.image_url = primaryImage ? primaryImage.image_url : product.product_images[0].image_url;
       console.log('Imagem definida:', product.image_url);
     }
@@ -44,9 +44,9 @@ const featuredProducts = prepareProductsForDisplay(featuredProductsList);
 console.log('Produtos em destaque processados:', featuredProducts.length);
 
 // Produtos recentes (excluindo os que já estão em destaque)
-const featuredIds = new Set(featuredProducts.map(p => p.id));
+const featuredIds = new Set(featuredProducts.map((p: any) => p.id));
 const recentProducts = prepareProductsForDisplay(
-  products.filter(p => !featuredIds.has(p.id)).slice(0, 8)
+  products.filter((p: any) => !featuredIds.has(p.id)).slice(0, 8)
 );
 console.log('Produtos recentes processados:', recentProducts.length);
 
