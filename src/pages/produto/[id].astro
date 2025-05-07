@@ -1,4 +1,4 @@
-a ---
+---
 import Layout from '../../layouts/Layout.astro';
 import ProductGrid from '../../components/ProductGrid.astro';
 import WhatsAppButton from '../../components/WhatsAppButton.astro';
@@ -172,36 +172,48 @@ if (mainImage?.image_url) {
   imageUrl = new URL('screenshot-540x720.jpg', baseUrl).toString();
 }
 
+// Garantir que a URL da imagem não tenha parâmetros que possam afetar o cache
+imageUrl = imageUrl.split('?')[0];
+
+// Construir URL canônica sem parâmetros de rastreamento
+const canonicalUrl = new URL(`/produto/${product.id}`, baseUrl).toString();
+
+// Preparar descrição (limitada a 80 caracteres para WhatsApp)
+const shortDescription = product.description && product.description.length > 80
+  ? product.description.substring(0, 77) + '...'
+  : product.description;
+
 console.log('URL da imagem para compartilhamento:', imageUrl);
+console.log('URL canônica:', canonicalUrl);
 
 ---
 
 <Layout title={`${product.title} | ${projectName}`}>
   <head>
-    <!-- Meta tags para compartilhamento -->
-    <meta property="og:title" content={`${product.title} | ${projectName}`} />
-    <meta property="og:description" content={product.description} />
-    <meta property="og:image" itemprop="image" content={imageUrl} />
-    <meta property="og:image:width" content="256" />
-    <meta property="og:image:height" content="256" />
-    <meta property="og:image:alt" content={product.title} />
-    <meta property="og:url" content={`${baseUrl}/produto/${product.id}`} />
-    <meta property="og:type" content="product" />
+    <!-- URL canônica -->
+    <link rel="canonical" href={canonicalUrl} />
+    
+    <!-- Meta tags básicas -->
+    <meta name="description" content={shortDescription} />
+    
+    <!-- Meta tags para Open Graph / WhatsApp -->
+    <meta property="og:title" content={`${product.title}`} />
+    <meta property="og:description" content={shortDescription} />
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:image" content={imageUrl} />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content={projectName} />
+    <meta property="og:locale" content="pt_BR" />
+    
+    <!-- Metatags específicas para produtos -->
     <meta property="product:price:amount" content={product.price.toString()} />
     <meta property="product:price:currency" content="BRL" />
-    <meta property="og:availability" content={product.status === 'available' ? 'instock' : 'oos'} />
-    {imageUrl.startsWith('https') && <meta property="og:image:secure_url" content={imageUrl} />}
-    <meta property="og:updated_time" content={Math.floor(Date.now() / 1000).toString()} />
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content={`${product.title} | ${projectName}`} />
-    <meta name="twitter:description" content={product.description} />
+    <meta name="twitter:title" content={`${product.title}`} />
+    <meta name="twitter:description" content={shortDescription} />
     <meta name="twitter:image" content={imageUrl} />
-    
-    <!-- WhatsApp Preview -->
-    <meta property="og:site_name" content={projectName} />
-    <meta property="og:locale" content="pt_BR" />
   </head>
   
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
