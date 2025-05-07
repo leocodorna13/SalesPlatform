@@ -1,0 +1,36 @@
+---
+// Página de teste para metatags Open Graph
+const imageUrl = "https://ebfjtzvwkgnhzstlqjnz.supabase.co/storage/v1/object/public/product-images/products/270/1746107311767-2.jpg";
+const canonicalUrl = new URL("/teste-og", Astro.site || `${Astro.url.protocol}//${Astro.url.host}`).toString();
+---
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Teste OG</title>
+  
+  <!-- APENAS METATAGS OG BÁSICAS -->
+  <meta property="og:image" content={imageUrl} />
+  <meta property="og:url" content={canonicalUrl} />
+  <meta property="og:type" content="website" />
+  <meta property="og:title" content="Teste OG" />
+</head>
+<body>
+  <div style="max-width: 800px; margin: 0 auto; padding: 20px;">
+    <h1>Página de Teste para Open Graph</h1>
+    <p>Esta página existe apenas para testar as metatags Open Graph para o WhatsApp.</p>
+    
+    <div style="background: #f0f0f0; padding: 20px; border-radius: 8px; margin-top: 20px;">
+      <h2>Informações de Debug:</h2>
+      <p><strong>URL da imagem:</strong> {imageUrl}</p>
+      <p><strong>URL canônica:</strong> {canonicalUrl}</p>
+    </div>
+    
+    <div style="margin-top: 20px;">
+      <img src={imageUrl} alt="Imagem de teste" style="max-width: 100%; border-radius: 8px;" />
+    </div>
+  </div>
+</body>
+</html>
