@@ -172,7 +172,7 @@ if (mainImage?.image_url) {
   imageUrl = new URL('screenshot-540x720.jpg', baseUrl).toString();
 }
 
-// Garantir que a URL da imagem não tenha parâmetros que possam afetar o cache
+// Remover parâmetros de URL e garantir que seja uma URL limpa
 imageUrl = imageUrl.split('?')[0];
 
 // Construir URL canônica sem parâmetros de rastreamento
@@ -182,6 +182,9 @@ const canonicalUrl = new URL(`/produto/${product.id}`, baseUrl).toString();
 const shortDescription = product.description && product.description.length > 80
   ? product.description.substring(0, 77) + '...'
   : product.description;
+
+// Título sem o nome do site
+const productTitle = product.title;
 
 console.log('URL da imagem para compartilhamento:', imageUrl);
 console.log('URL canônica:', canonicalUrl);
@@ -196,11 +199,13 @@ console.log('URL canônica:', canonicalUrl);
     <!-- Meta tags básicas -->
     <meta name="description" content={shortDescription} />
     
-    <!-- Meta tags para Open Graph / WhatsApp -->
-    <meta property="og:title" content={`${product.title}`} />
+    <!-- Meta tags para Open Graph / WhatsApp - seguindo exatamente o formato da documentação -->
+    <meta property="og:title" content={productTitle} />
     <meta property="og:description" content={shortDescription} />
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:image" content={imageUrl} />
+    
+    <!-- Meta tags adicionais que podem ajudar -->
     <meta property="og:type" content="website" />
     <meta property="og:site_name" content={projectName} />
     <meta property="og:locale" content="pt_BR" />
@@ -211,7 +216,7 @@ console.log('URL canônica:', canonicalUrl);
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content={`${product.title}`} />
+    <meta name="twitter:title" content={productTitle} />
     <meta name="twitter:description" content={shortDescription} />
     <meta name="twitter:image" content={imageUrl} />
   </head>
