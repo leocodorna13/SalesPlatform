@@ -37,7 +37,7 @@ if (!id) {
   return Astro.redirect('/');
 }
 
-// Buscar detalhes do produto
+// Buscar detalhes do produto - esta é a operação assíncrona principal que precisamos para as metatags
 const product = await getProductById(id) as Product | null;
 
 // Verificar se o produto existe e está visível
@@ -45,6 +45,47 @@ if (!product || !product.visible) {
   return Astro.redirect('/');
 }
 
+// PRIORIDADE: Preparar dados para metatags Open Graph logo após obter o produto
+// Construir URL base absoluta
+const baseUrl = Astro.site ? Astro.site.toString() : `${Astro.url.protocol}//${Astro.url.host}`;
+
+// 1. Preparar URL canônica (usada em og:url)
+const canonicalUrl = new URL(`/produto/${product.id}`, baseUrl).toString();
+
+// 2. Preparar título (usado em og:title)
+const productTitle = product.title;
+
+// 3. Preparar descrição curta (usada em og:description)
+const shortDescription = product.description && product.description.length > 80
+  ? product.description.substring(0, 77) + '...'
+  : product.description;
+
+// 4. Preparar URL da imagem (usada em og:image) - SIMPLIFICADA E PRIORIZADA
+let imageUrl;
+const mainImage = product.product_images.find(img => img.is_primary) || product.product_images[0];
+
+if (mainImage?.image_url) {
+  // Garantir URL absoluta e limpa
+  if (mainImage.image_url.startsWith('http')) {
+    // Já é absoluta, apenas limpar
+    imageUrl = mainImage.image_url.split('?')[0];
+  } else {
+    // Construir URL absoluta
+    imageUrl = new URL(mainImage.image_url.replace(/^\//, ''), baseUrl).toString();
+  }
+  
+  // Forçar HTTPS
+  imageUrl = imageUrl.replace(/^http:\/\//i, 'https://');
+} else {
+  // Imagem padrão absoluta
+  imageUrl = `${baseUrl.replace(/\/$/, '')}/screenshot-540x720.jpg`;
+}
+
+// Registrar as URLs para diagnóstico
+console.log('[METATAGS] URL da imagem:', imageUrl);
+console.log('[METATAGS] URL canônica:', canonicalUrl);
+
+// Agora podemos continuar com outras operações que não afetam as metatags
 // Verificar visualizações antes de incrementar
 const viewsBefore = await checkProductViews(id);
 console.log(`[DEBUG] Visualizações antes de incrementar: ${viewsBefore}`);
@@ -199,22 +240,21 @@ console.log('URL canônica:', canonicalUrl);
     <!-- Meta tags básicas -->
     <meta name="description" content={shortDescription} />
     
-    <!-- Meta tags para Open Graph / WhatsApp - seguindo exatamente o formato da documentação -->
+    <!-- Open Graph Tags (ordem específica recomendada pelo Facebook) -->
+    <meta property="og:url" content={canonicalUrl} />
+    <meta property="og:type" content="website" />
     <meta property="og:title" content={productTitle} />
     <meta property="og:description" content={shortDescription} />
-    <meta property="og:url" content={canonicalUrl} />
     <meta property="og:image" content={imageUrl} />
-    <meta property="og:image:url" content={imageUrl} />
+    <meta property="og:site_name" content={projectName} />
+    <meta property="og:locale" content="pt_BR" />
+    
+    <!-- Tags adicionais de imagem (após as tags principais) -->
     <meta property="og:image:secure_url" content={imageUrl} />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content={productTitle} />
-    
-    <!-- Meta tags adicionais que podem ajudar -->
-    <meta property="og:type" content="website" />
-    <meta property="og:site_name" content={projectName} />
-    <meta property="og:locale" content="pt_BR" />
     
     <!-- Metatags específicas para produtos -->
     <meta property="product:price:amount" content={product.price.toString()} />
@@ -222,6 +262,7 @@ console.log('URL canônica:', canonicalUrl);
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:site" content="@site_account" />
     <meta name="twitter:title" content={productTitle} />
     <meta name="twitter:description" content={shortDescription} />
     <meta name="twitter:image" content={imageUrl} />
