@@ -193,42 +193,9 @@ function formatPrice(price: number): string {
   });
 }
 
-// Imagem principal
-const mainImage = product.product_images.find(img => img.is_primary) || product.product_images[0];
-// Construir URL completa da imagem
-const baseUrl = Astro.site || `${Astro.url.protocol}//${Astro.url.host}`;
-
-// Garantir que a URL da imagem seja absoluta
-let imageUrl;
-if (mainImage?.image_url) {
-  // Verificar se a URL já é absoluta
-  if (mainImage.image_url.startsWith('http')) {
-    imageUrl = mainImage.image_url;
-  } else {
-    // Construir URL absoluta
-    imageUrl = new URL(mainImage.image_url.replace(/^\//, ''), baseUrl).toString();
-  }
-} else {
-  // Imagem padrão
-  imageUrl = new URL('screenshot-540x720.jpg', baseUrl).toString();
-}
-
-// Remover parâmetros de URL e garantir que seja uma URL limpa
-imageUrl = imageUrl.split('?')[0];
-
-// Construir URL canônica sem parâmetros de rastreamento
-const canonicalUrl = new URL(`/produto/${product.id}`, baseUrl).toString();
-
-// Preparar descrição (limitada a 80 caracteres para WhatsApp)
-const shortDescription = product.description && product.description.length > 80
-  ? product.description.substring(0, 77) + '...'
-  : product.description;
-
-// Título sem o nome do site
-const productTitle = product.title;
-
-console.log('URL da imagem para compartilhamento:', imageUrl);
-console.log('URL canônica:', canonicalUrl);
+// Logs finais para diagnóstico
+console.log('[DEBUG] URL da imagem final:', imageUrl);
+console.log('[DEBUG] URL canônica final:', canonicalUrl);
 
 ---
 
@@ -246,15 +213,13 @@ console.log('URL canônica:', canonicalUrl);
     <meta property="og:title" content={productTitle} />
     <meta property="og:description" content={shortDescription} />
     <meta property="og:image" content={imageUrl} />
-    <meta property="og:site_name" content={projectName} />
-    <meta property="og:locale" content="pt_BR" />
-    
-    <!-- Tags adicionais de imagem (após as tags principais) -->
     <meta property="og:image:secure_url" content={imageUrl} />
     <meta property="og:image:type" content="image/jpeg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta property="og:image:alt" content={productTitle} />
+    <meta property="og:site_name" content={projectName} />
+    <meta property="og:locale" content="pt_BR" />
     
     <!-- Metatags específicas para produtos -->
     <meta property="product:price:amount" content={product.price.toString()} />
@@ -262,7 +227,6 @@ console.log('URL canônica:', canonicalUrl);
     
     <!-- Twitter Card -->
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:site" content="@site_account" />
     <meta name="twitter:title" content={productTitle} />
     <meta name="twitter:description" content={shortDescription} />
     <meta name="twitter:image" content={imageUrl} />
