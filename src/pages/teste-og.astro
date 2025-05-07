@@ -1,8 +1,12 @@
 ---
 // Página de teste para metatags Open Graph
-// Usar uma imagem do próprio Facebook, que certamente funciona com o WhatsApp
-const imageUrl = "https://www.facebook.com/images/fb_icon_325x325.png";
+// Usar uma imagem de um CDN público confiável
+const imageUrl = "https://images.unsplash.com/photo-1501139083538-0139583c060f?w=1200&h=630";
 const canonicalUrl = new URL("/teste-og", Astro.site || `${Astro.url.protocol}//${Astro.url.host}`).toString();
+
+// Dimensões da imagem para as metatags
+const imageWidth = 1200;
+const imageHeight = 630;
 ---
 
 <!DOCTYPE html>
@@ -14,6 +18,9 @@ const canonicalUrl = new URL("/teste-og", Astro.site || `${Astro.url.protocol}//
   
   <!-- METATAGS OG COMPLETAS PARA WHATSAPP -->
   <meta property="og:image" content={imageUrl} />
+  <meta property="og:image:width" content={imageWidth.toString()} />
+  <meta property="og:image:height" content={imageHeight.toString()} />
+  <meta property="og:image:type" content="image/jpeg" />
   <meta property="og:url" content={canonicalUrl} />
   <meta property="og:type" content="website" />
   <meta property="og:title" content="Teste OG" />
