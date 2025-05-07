@@ -60,26 +60,12 @@ const shortDescription = product.description && product.description.length > 80
   ? product.description.substring(0, 77) + '...'
   : product.description;
 
-// 4. Preparar URL da imagem (usada em og:image) - SIMPLIFICADA E PRIORIZADA
-let imageUrl;
-const mainImage = product.product_images.find(img => img.is_primary) || product.product_images[0];
+// 4. Preparar URL da imagem (usada em og:image) - USANDO IMAGEM EXTERNA PARA TESTE
+// Usar uma imagem externa conhecida para testar se o problema é com o Supabase
+let imageUrl = "https://images.unsplash.com/photo-1575936123452-b67c3203c357?q=80";
 
-if (mainImage?.image_url) {
-  // Garantir URL absoluta e limpa
-  if (mainImage.image_url.startsWith('http')) {
-    // Já é absoluta, apenas limpar
-    imageUrl = mainImage.image_url.split('?')[0];
-  } else {
-    // Construir URL absoluta
-    imageUrl = new URL(mainImage.image_url.replace(/^\//, ''), baseUrl).toString();
-  }
-  
-  // Forçar HTTPS
-  imageUrl = imageUrl.replace(/^http:\/\//i, 'https://');
-} else {
-  // Imagem padrão absoluta
-  imageUrl = `${baseUrl.replace(/\/$/, '')}/screenshot-540x720.jpg`;
-}
+// Manter a referência ao mainImage para o resto do código
+const mainImage = product.product_images.find(img => img.is_primary) || product.product_images[0];
 
 // Registrar as URLs para diagnóstico
 console.log('[METATAGS] URL da imagem:', imageUrl);
@@ -201,36 +187,23 @@ console.log('[DEBUG] URL canônica final:', canonicalUrl);
 
 <Layout title={`${product.title} | ${projectName}`}>
   <head>
-    <!-- URL canônica -->
-    <link rel="canonical" href={canonicalUrl} />
+    <!-- APENAS A TAG OG:IMAGE PARA TESTE -->
+    <meta property="og:image" content={imageUrl} />
     
-    <!-- Meta tags básicas -->
-    <meta name="description" content={shortDescription} />
-    
-    <!-- Open Graph Tags (ordem específica recomendada pelo Facebook) -->
+    <!-- Outras tags mínimas -->
     <meta property="og:url" content={canonicalUrl} />
     <meta property="og:type" content="website" />
-    <meta property="og:title" content={productTitle} />
-    <meta property="og:description" content={shortDescription} />
-    <meta property="og:image" content={imageUrl} />
-    <meta property="og:image:secure_url" content={imageUrl} />
-    <meta property="og:image:type" content="image/jpeg" />
-    <meta property="og:image:width" content="1200" />
-    <meta property="og:image:height" content="630" />
-    <meta property="og:image:alt" content={productTitle} />
-    <meta property="og:site_name" content={projectName} />
-    <meta property="og:locale" content="pt_BR" />
+    <meta property="og:title" content="Produto" />
     
-    <!-- Metatags específicas para produtos -->
-    <meta property="product:price:amount" content={product.price.toString()} />
-    <meta property="product:price:currency" content="BRL" />
-    
-    <!-- Twitter Card -->
-    <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content={productTitle} />
-    <meta name="twitter:description" content={shortDescription} />
-    <meta name="twitter:image" content={imageUrl} />
+    <!-- URL canônica no final -->
+    <link rel="canonical" href={canonicalUrl} />
   </head>
+  
+  <!-- Debug da URL da imagem - REMOVER APÓS TESTE -->
+  <div class="fixed top-0 left-0 right-0 bg-black text-white p-2 z-50 text-xs overflow-auto max-h-32">
+    <p>URL da imagem: {imageUrl}</p>
+    <p>URL canônica: {canonicalUrl}</p>
+  </div>
   
   <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
     <div class="mb-6">
