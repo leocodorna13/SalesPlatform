@@ -4,6 +4,9 @@ import ProductGrid from '../../components/ProductGrid.astro';
 import WhatsAppButton from '../../components/WhatsAppButton.astro';
 import { getProductById, registerInterest, getRelatedProducts, getSiteSettings, getProductInterestCount, getRecommendedProducts, supabase, getProducts, incrementProductViews, checkProductViews } from '../../services/supabase';
 
+// Definir a URL da imagem do Facebook para garantir que funcione
+const FACEBOOK_LOGO = "https://static.xx.fbcdn.net/rsrc.php/v3/y8/r/dF5SId3UHWd.svg";
+
 // Definir interface para o produto
 interface ProductImage {
   id: string;
@@ -60,9 +63,9 @@ const shortDescription = product.description && product.description.length > 80
   ? product.description.substring(0, 77) + '...'
   : product.description;
 
-// 4. Preparar URL da imagem (usada em og:image) - USANDO IMAGEM EXTERNA PARA TESTE
-// Usar uma imagem externa conhecida para testar se o problema é com o Supabase
-let imageUrl = "https://images.unsplash.com/photo-1575936123452-b67c3203c357?q=80";
+// 4. Preparar URL da imagem (usada em og:image) - USANDO IMAGEM ABSOLUTAMENTE BÁSICA
+// Usar a imagem do Facebook para garantir que funcione
+let imageUrl = FACEBOOK_LOGO;
 
 // Manter a referência ao mainImage para o resto do código
 const mainImage = product.product_images.find(img => img.is_primary) || product.product_images[0];
@@ -186,18 +189,11 @@ console.log('[DEBUG] URL canônica final:', canonicalUrl);
 ---
 
 <Layout title={`${product.title} | ${projectName}`}>
-  <head>
-    <!-- APENAS A TAG OG:IMAGE PARA TESTE -->
-    <meta property="og:image" content={imageUrl} />
-    
-    <!-- Outras tags mínimas -->
-    <meta property="og:url" content={canonicalUrl} />
-    <meta property="og:type" content="website" />
-    <meta property="og:title" content="Produto" />
-    
-    <!-- URL canônica no final -->
-    <link rel="canonical" href={canonicalUrl} />
-  </head>
+  <meta slot="head" property="og:image" content={imageUrl} />
+  <meta slot="head" property="og:url" content={canonicalUrl} />
+  <meta slot="head" property="og:type" content="website" />
+  <meta slot="head" property="og:title" content="Produto" />
+  <link slot="head" rel="canonical" href={canonicalUrl} />
   
   <!-- Debug da URL da imagem - REMOVER APÓS TESTE -->
   <div class="fixed top-0 left-0 right-0 bg-black text-white p-2 z-50 text-xs overflow-auto max-h-32">
