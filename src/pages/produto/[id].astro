@@ -213,7 +213,7 @@ console.log('[DEBUG] URL canônica final:', canonicalUrl);
   
   <!-- Incluir estilos e scripts necessários -->
   <style is:global>
-    @import '../../../styles/global.css';
+    @import '../../styles/global.css';
   </style>
   
   <!-- Font Awesome -->
@@ -224,11 +224,7 @@ console.log('[DEBUG] URL canônica final:', canonicalUrl);
     title={`${product.title} | Desapego dos Martins`} 
     description={shortDescription}
   >
-    <!-- Debug da URL da imagem - REMOVER APÓS TESTE -->
-    <div class="fixed top-0 left-0 right-0 bg-black text-white p-2 z-50 text-xs overflow-auto max-h-32">
-      <p>URL da imagem: {imageUrl}</p>
-      <p>URL canônica: {canonicalUrl}</p>
-    </div>
+    
     
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div class="mb-6">
